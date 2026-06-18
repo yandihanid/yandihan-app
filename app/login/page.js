@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { LogIn } from 'lucide-react'
+import Link from 'next/link'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -32,11 +33,17 @@ export default function Login() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--primary-color)', padding: '1rem' }}>
+    <div className="flex flex-col items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
+      <div style={{ marginBottom: '2rem' }}>
+        <Link href="/" style={{ color: 'var(--primary-color)', fontWeight: 'bold', fontSize: '1.5rem', textDecoration: 'none' }}>
+          Yandihan
+        </Link>
+      </div>
+
       <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ color: 'var(--primary-color)', fontSize: '2rem', marginBottom: '0.5rem', fontWeight: '700' }}>Yandihan</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Masuk ke Dashboard UMKM</p>
+          <h1 style={{ color: 'var(--text-main)', fontSize: '1.75rem', marginBottom: '0.5rem', fontWeight: '700' }}>Masuk Dashboard</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Pantau laporan keuangan UMKM Anda</p>
         </div>
         
         <form onSubmit={handleLogin} className="flex flex-col">
@@ -76,6 +83,13 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+          Belum punya akun?{' '}
+          <Link href="/signup" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>
+            Daftar sekarang
+          </Link>
+        </div>
       </div>
     </div>
   )
