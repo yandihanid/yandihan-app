@@ -75,7 +75,6 @@ export default async function SettingsPage() {
                               value={`yandihan.my.id/c/${c.token}`} 
                               className="input-field" 
                               style={{ padding: '0.4rem', fontSize: '0.8rem', width: '250px' }}
-                              onClick={(e) => e.target.select()}
                             />
                           </div>
                         ) : '-'}
