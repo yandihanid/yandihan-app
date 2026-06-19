@@ -83,6 +83,10 @@ export default function LandingPage() {
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: '1rem' }}>
             Yandihan
           </div>
+          <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', gap: '2rem' }}>
+            <Link href="/guide" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Panduan Penggunaan</Link>
+            <Link href="/login" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Login Bos</Link>
+          </div>
           <p>&copy; {new Date().getFullYear()} Yandihan - SaaS UMKM Indonesia.</p>
         </div>
       </footer>
