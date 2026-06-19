@@ -35,6 +35,12 @@ export default async function SettingsPage() {
         <SettingsForm store={store} userId={user.id} />
       </div>
 
+      <div className="card" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.5rem' }}>Pusat Bantuan</h3>
+        <p style={{ color: '#0c4a6e', fontSize: '0.875rem', marginBottom: '1rem' }}>Bingung cara menggunakan Yandihan? Jangan khawatir, baca panduan lengkapnya di sini.</p>
+        <a href="/guide" className="btn btn-primary" style={{ backgroundColor: '#0284c7', padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Buka Panduan (Guidebook)</a>
+      </div>
+
       {store && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
@@ -72,7 +78,7 @@ export default async function SettingsPage() {
                             <input 
                               type="text" 
                               readOnly 
-                              value={`yandihan.my.id/c/${c.token}`} 
+                              value={`yandihan-app.vercel.app/c/${c.token}`} 
                               className="input-field" 
                               style={{ padding: '0.4rem', fontSize: '0.8rem', width: '250px' }}
                             />

@@ -10,7 +10,8 @@ export default function LandingPage() {
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
             Yandihan
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            <Link href="/guide" style={{ color: 'var(--text-muted)', fontWeight: '500', marginRight: '1rem' }}>Panduan</Link>
             <Link href="/login" className="btn btn-secondary" style={{ padding: '0.5rem 1rem', border: 'none', backgroundColor: 'transparent' }}>Masuk</Link>
             <Link href="/signup" className="btn btn-primary" style={{ padding: '0.5rem 1.5rem' }}>Daftar Gratis</Link>
           </div>

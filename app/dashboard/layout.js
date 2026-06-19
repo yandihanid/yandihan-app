@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, BarChart3 } from 'lucide-react'
 
 export default async function DashboardLayout({ children }) {
   const supabase = await createClient()
@@ -36,6 +36,10 @@ export default async function DashboardLayout({ children }) {
           <Link href="/dashboard" className="btn btn-secondary" style={{ justifyContent: 'flex-start', border: 'none', backgroundColor: 'transparent', boxShadow: 'none' }}>
             <LayoutDashboard size={18} style={{ marginRight: '10px' }} />
             Ringkasan
+          </Link>
+          <Link href="/dashboard/laporan" className="btn btn-secondary" style={{ justifyContent: 'flex-start', border: 'none', backgroundColor: 'transparent', boxShadow: 'none' }}>
+            <BarChart3 size={18} style={{ marginRight: '10px' }} />
+            Laporan
           </Link>
           <Link href="/dashboard/settings" className="btn btn-secondary" style={{ justifyContent: 'flex-start', border: 'none', backgroundColor: 'transparent', boxShadow: 'none' }}>
             <Settings size={18} style={{ marginRight: '10px' }} />
