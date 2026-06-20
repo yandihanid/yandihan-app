@@ -87,15 +87,50 @@ export async function POST(req) {
     }
 
     // Parse transaction
-    // Expect format: 50000 Nasi Goreng
-    const match = text.trim().match(/^(\d+)\s+(.+)$/s)
-    if (!match) {
-      await sendMessage(chatId, '❌ Format salah.\nGunakan format: <nominal> <produk>\nContoh: 50000 Nasi Goreng\nPastikan nominal hanya angka tanpa titik.')
-      return NextResponse.json({ ok: true })
-    }
+    let amount = 0
+    let productName = ''
 
-    const amount = parseInt(match[1], 10)
-    const productName = match[2].trim()
+    const lines = text.trim().split('\n').filter(l => l.trim() !== '')
+
+    if (lines.length === 1) {
+      // Format: 50000 2 Nasi Goreng OR 50000 Nasi Goreng
+      const match = lines[0].trim().match(/^(\d+)\s+(.+)$/)
+      if (!match) {
+        await sendMessage(chatId, '❌ Format salah.\nGunakan: <nominal> <kuantitas> <produk>\nContoh: 50000 2 Nasi Goreng')
+        return NextResponse.json({ ok: true })
+      }
+      amount = parseInt(match[1], 10)
+      
+      const prodParts = match[2].trim().match(/^(\d+)\s+(.+)$/)
+      if (prodParts) {
+        productName = `${prodParts[1]}x ${prodParts[2]}`
+      } else {
+        productName = `1x ${match[2].trim()}`
+      }
+    } else {
+      // Format multi-line:
+      // 65000
+      // 2 Nasi Goreng
+      // 1 Es Teh
+      const firstLine = lines[0].trim()
+      if (!/^\d+$/.test(firstLine)) {
+        await sendMessage(chatId, '❌ Format salah.\nBaris pertama harus total nominal (angka saja).\nContoh:\n65000\n2 Nasi Goreng\n1 Es Teh')
+        return NextResponse.json({ ok: true })
+      }
+      amount = parseInt(firstLine, 10)
+
+      const items = []
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim()
+        const prodParts = line.match(/^(\d+)\s+(.+)$/)
+        if (prodParts) {
+          items.push(`${prodParts[1]}x ${prodParts[2]}`)
+        } else {
+          items.push(`1x ${line}`)
+        }
+      }
+      productName = items.join(', ')
+    }
 
     let paymentMethod = 'CASH'
     let receiptUrl = null

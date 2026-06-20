@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
-export default function RealtimeTransactions({ initialTransactions, storeId, filter }) {
+export default function RealtimeTransactions({ initialTransactions, storeId, filter, timeFilter }) {
   const [transactions, setTransactions] = useState(initialTransactions || [])
   const supabase = createClient()
 
@@ -38,6 +38,18 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
             return
           }
 
+          if (timeFilter !== 'ALL_TIME') {
+            const txDate = new Date(txWithCashier.created_at)
+            const now = new Date()
+            if (timeFilter === 'TODAY') {
+              const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+              if (txDate < todayStart) return
+            } else if (timeFilter === 'THIS_MONTH') {
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+              if (txDate < monthStart) return
+            }
+          }
+
           setTransactions(prev => [txWithCashier, ...prev])
         }
       )
@@ -46,7 +58,7 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [storeId, filter, supabase])
+  }, [storeId, filter, timeFilter, supabase])
 
   const totalIncome = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0)
 
@@ -66,26 +78,50 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>Riwayat Transaksi</h3>
           
-          {/* Toggle Filter */}
-          <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '8px', padding: '0.25rem' }}>
-            <Link 
-              href="/dashboard?filter=ALL" 
-              style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: filter === 'ALL' ? 'white' : 'transparent', color: filter === 'ALL' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: filter === 'ALL' ? 'var(--shadow-sm)' : 'none' }}
-            >
-              Semua
-            </Link>
-            <Link 
-              href="/dashboard?filter=CASH" 
-              style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: filter === 'CASH' ? 'white' : 'transparent', color: filter === 'CASH' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: filter === 'CASH' ? 'var(--shadow-sm)' : 'none' }}
-            >
-              Tunai
-            </Link>
-            <Link 
-              href="/dashboard?filter=QRIS/TF" 
-              style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: filter === 'QRIS/TF' ? 'white' : 'transparent', color: filter === 'QRIS/TF' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: filter === 'QRIS/TF' ? 'var(--shadow-sm)' : 'none' }}
-            >
-              QRIS/TF
-            </Link>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* Toggle Waktu */}
+            <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '8px', padding: '0.25rem' }}>
+              <Link 
+                href={`/dashboard?filter=${filter}&time=TODAY`}
+                style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: timeFilter === 'TODAY' ? 'white' : 'transparent', color: timeFilter === 'TODAY' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: timeFilter === 'TODAY' ? 'var(--shadow-sm)' : 'none' }}
+              >
+                Hari Ini
+              </Link>
+              <Link 
+                href={`/dashboard?filter=${filter}&time=THIS_MONTH`}
+                style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: timeFilter === 'THIS_MONTH' ? 'white' : 'transparent', color: timeFilter === 'THIS_MONTH' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: timeFilter === 'THIS_MONTH' ? 'var(--shadow-sm)' : 'none' }}
+              >
+                Bulan Ini
+              </Link>
+              <Link 
+                href={`/dashboard?filter=${filter}&time=ALL_TIME`}
+                style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: timeFilter === 'ALL_TIME' ? 'white' : 'transparent', color: timeFilter === 'ALL_TIME' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: timeFilter === 'ALL_TIME' ? 'var(--shadow-sm)' : 'none' }}
+              >
+                Semua Waktu
+              </Link>
+            </div>
+
+            {/* Toggle Filter Metode */}
+            <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '8px', padding: '0.25rem' }}>
+              <Link 
+                href={`/dashboard?filter=ALL&time=${timeFilter}`}
+                style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: filter === 'ALL' ? 'white' : 'transparent', color: filter === 'ALL' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: filter === 'ALL' ? 'var(--shadow-sm)' : 'none' }}
+              >
+                Semua
+              </Link>
+              <Link 
+                href={`/dashboard?filter=CASH&time=${timeFilter}`}
+                style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: filter === 'CASH' ? 'white' : 'transparent', color: filter === 'CASH' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: filter === 'CASH' ? 'var(--shadow-sm)' : 'none' }}
+              >
+                Tunai
+              </Link>
+              <Link 
+                href={`/dashboard?filter=QRIS/TF&time=${timeFilter}`}
+                style={{ padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.875rem', fontWeight: '500', backgroundColor: filter === 'QRIS/TF' ? 'white' : 'transparent', color: filter === 'QRIS/TF' ? 'var(--text-main)' : 'var(--text-muted)', boxShadow: filter === 'QRIS/TF' ? 'var(--shadow-sm)' : 'none' }}
+              >
+                QRIS/TF
+              </Link>
+            </div>
           </div>
         </div>
         <div className="table-container">
