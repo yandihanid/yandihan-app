@@ -1,23 +1,55 @@
-import { createServiceClient } from '@/utils/supabase/service'
-import { notFound } from 'next/navigation'
+'use client'
+
+import { useState, useEffect } from 'react'
 import CashierForm from './CashierForm'
+import { useParams } from 'next/navigation'
 
-export const dynamic = 'force-dynamic'
+export default function CashierWeb() {
+  const params = useParams()
+  const token = params.token
 
-export default async function CashierWeb({ params }) {
-  const token = (await params).token
+  const [cashier, setCashier] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  const supabase = createServiceClient()
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(`/api/cashier?token=${token}`)
+        if (!res.ok) {
+          setError(true)
+          setLoading(false)
+          return
+        }
+        const data = await res.json()
+        setCashier(data)
+      } catch (e) {
+        setError(true)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [token])
 
-  // Find cashier and store
-  const { data: cashier } = await supabase
-    .from('cashiers')
-    .select('*, stores(name)')
-    .eq('token', token)
-    .single()
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '1.125rem' }}>Memuat data kasir...</p>
+        </div>
+      </div>
+    )
+  }
 
-  if (!cashier) {
-    return notFound()
+  if (error || !cashier) {
+    return (
+      <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>Link Tidak Valid</h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Link kasir ini tidak ditemukan atau sudah tidak berlaku.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
