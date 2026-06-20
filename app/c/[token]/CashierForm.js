@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
 
 // Fungsi kompresi gambar menggunakan Canvas HTML5
 function compressImage(file) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = (event) => {
@@ -37,32 +37,112 @@ function compressImage(file) {
         ctx.drawImage(img, 0, 0, width, height)
 
         canvas.toBlob((blob) => {
-          if (!blob) {
-            resolve(file) // fallback
-            return
-          }
-          const newFile = new File([blob], file.name || 'photo.jpg', {
+          if (!blob) { resolve(file); return }
+          resolve(new File([blob], file.name || 'photo.jpg', {
             type: 'image/jpeg',
             lastModified: Date.now(),
-          })
-          resolve(newFile)
+          }))
         }, 'image/jpeg', 0.7)
       }
-      img.onerror = () => resolve(file) // fallback
+      img.onerror = () => resolve(file)
     }
-    reader.onerror = () => resolve(file) // fallback
+    reader.onerror = () => resolve(file)
   })
+}
+
+const LEGACY_STORAGE_KEY = 'yandihan_cashier_form'
+
+function getStorageKey(token) {
+  return `yandihan_cashier_form_${token}`
+}
+
+function loadSavedForm(token) {
+  if (typeof window === 'undefined') return null
+  try {
+    const key = getStorageKey(token)
+    let saved = sessionStorage.getItem(key)
+    if (!saved) {
+      saved = sessionStorage.getItem(LEGACY_STORAGE_KEY)
+      if (saved) {
+        sessionStorage.setItem(key, saved)
+        sessionStorage.removeItem(LEGACY_STORAGE_KEY)
+      }
+    }
+    return saved ? JSON.parse(saved) : null
+  } catch {
+    return null
+  }
+}
+
+function hasSavedFormData(data) {
+  if (!data) return false
+  return !!(
+    data.amount ||
+    data.paymentMethod === 'QRIS/TF' ||
+    data.fileName ||
+    data.receiptDataUrl ||
+    data.items?.some(item => item.name?.trim())
+  )
+}
+
+function dataUrlToFile(dataUrl, name) {
+  const [header, base64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
+  const binary = atob(base64)
+  const array = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i)
+  return new File([array], name || 'photo.jpg', { type: mime, lastModified: Date.now() })
 }
 
 export default function CashierForm({ cashierId, storeId, token }) {
   const router = useRouter()
-  const [amount, setAmount] = useState('')
-  const [items, setItems] = useState([{ name: '', qty: 1 }])
-  const [paymentMethod, setPaymentMethod] = useState('CASH')
-  const [fileName, setFileName] = useState('')
   const fileRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
+  const savedOnInit = useRef(loadSavedForm(token))
+  const [restored, setRestored] = useState(() => hasSavedFormData(savedOnInit.current))
+  const [hydrated, setHydrated] = useState(false)
+
+  const [amount, setAmount] = useState(() => savedOnInit.current?.amount ?? '')
+  const [items, setItems] = useState(() => savedOnInit.current?.items ?? [{ name: '', qty: 1 }])
+  const [paymentMethod, setPaymentMethod] = useState(() => savedOnInit.current?.paymentMethod ?? 'CASH')
+  const [fileName, setFileName] = useState(() => savedOnInit.current?.fileName ?? '')
+  const [receiptDataUrl, setReceiptDataUrl] = useState(() => savedOnInit.current?.receiptDataUrl ?? null)
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
+
+  const saveForm = useCallback(() => {
+    const payload = { amount, items, paymentMethod, fileName, receiptDataUrl }
+    const key = getStorageKey(token)
+    try {
+      sessionStorage.setItem(key, JSON.stringify(payload))
+    } catch {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ amount, items, paymentMethod, fileName }))
+      } catch { /* ignore */ }
+    }
+  }, [amount, items, paymentMethod, fileName, receiptDataUrl, token])
+
+  useEffect(() => {
+    if (!hydrated) return
+    saveForm()
+  }, [hydrated, saveForm])
+
+  useEffect(() => {
+    if (!hydrated) return
+
+    const persist = () => saveForm()
+    window.addEventListener('pagehide', persist)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persist()
+    })
+
+    return () => {
+      window.removeEventListener('pagehide', persist)
+    }
+  }, [hydrated, saveForm])
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items]
@@ -80,11 +160,39 @@ export default function CashierForm({ cashierId, storeId, token }) {
     setItems(newItems)
   }
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setFileName(selectedFile.name)
+    if (!selectedFile) return
+
+    setFileName(selectedFile.name)
+    setRestored(false)
+
+    const persistReceipt = (dataUrl) => {
+      setReceiptDataUrl(dataUrl)
+      try {
+        sessionStorage.setItem(getStorageKey(token), JSON.stringify({
+          amount, items, paymentMethod, fileName: selectedFile.name, receiptDataUrl: dataUrl
+        }))
+      } catch {
+        try {
+          sessionStorage.setItem(getStorageKey(token), JSON.stringify({
+            amount, items, paymentMethod, fileName: selectedFile.name
+          }))
+        } catch { /* ignore */ }
+      }
     }
+
+    // Simpan mentah dulu — browser sering reload sebelum kompresi selesai
+    const quickReader = new FileReader()
+    quickReader.onload = () => persistReceipt(quickReader.result)
+    quickReader.readAsDataURL(selectedFile)
+
+    try {
+      const compressed = await compressImage(selectedFile)
+      const reader = new FileReader()
+      reader.onload = () => persistReceipt(reader.result)
+      reader.readAsDataURL(compressed)
+    } catch { /* raw backup sudah tersimpan di atas */ }
   }
 
   const handleSubmit = async (e) => {
@@ -92,7 +200,6 @@ export default function CashierForm({ cashierId, storeId, token }) {
     setLoading(true)
     setMessage(null)
 
-    // Gabungkan item menjadi satu string (contoh: "2x Nasi Goreng, 1x Es Teh")
     const combinedProductName = items
       .filter(item => item.name.trim() !== '')
       .map(item => `${item.qty}x ${item.name.trim()}`)
@@ -100,6 +207,16 @@ export default function CashierForm({ cashierId, storeId, token }) {
 
     if (!combinedProductName) {
       setMessage({ type: 'error', text: 'Minimal satu produk harus diisi.' })
+      setLoading(false)
+      return
+    }
+
+    let rawFile = fileRef.current?.files?.[0]
+    if (!rawFile && receiptDataUrl) {
+      rawFile = dataUrlToFile(receiptDataUrl, fileName)
+    }
+    if (paymentMethod === 'QRIS/TF' && !rawFile) {
+      setMessage({ type: 'error', text: 'Silakan pilih ulang foto bukti pembayaran.' })
       setLoading(false)
       return
     }
@@ -112,13 +229,11 @@ export default function CashierForm({ cashierId, storeId, token }) {
     formData.append('productName', combinedProductName)
     formData.append('paymentMethod', paymentMethod)
     
-    const rawFile = fileRef.current?.files?.[0]
     if (rawFile && paymentMethod === 'QRIS/TF') {
       try {
         const compressedFile = await compressImage(rawFile)
         formData.append('receipt', compressedFile)
       } catch (err) {
-        console.error("Compression error:", err)
         formData.append('receipt', rawFile)
       }
     }
@@ -129,6 +244,8 @@ export default function CashierForm({ cashierId, storeId, token }) {
     if (result.error) {
       setMessage({ type: 'error', text: result.error })
     } else {
+      sessionStorage.removeItem(getStorageKey(token))
+      sessionStorage.removeItem(LEGACY_STORAGE_KEY)
       router.push(`/r/${result.transactionId}`)
     }
   }
@@ -143,6 +260,18 @@ export default function CashierForm({ cashierId, storeId, token }) {
           color: message.type === 'error' ? '#842029' : '#0f5132'
         }}>
           {message.text}
+        </div>
+      )}
+
+      {restored && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: '8px',
+          backgroundColor: '#fef3c7',
+          color: '#92400e',
+          fontSize: '0.875rem'
+        }}>
+          ⚠️ Halaman dimuat ulang oleh browser. Isian formulir telah dipulihkan{receiptDataUrl ? ', termasuk foto bukti' : ''}. {receiptDataUrl ? '' : 'Silakan pilih ulang foto bukti pembayaran jika diperlukan.'}
         </div>
       )}
 
@@ -217,37 +346,33 @@ export default function CashierForm({ cashierId, storeId, token }) {
         <select 
           className="input-field" 
           value={paymentMethod} 
-          onChange={e => {
-            setPaymentMethod(e.target.value)
-          }}
+          onChange={e => setPaymentMethod(e.target.value)}
         >
           <option value="CASH">CASH (Tunai)</option>
           <option value="QRIS/TF">QRIS / Transfer Bank</option>
         </select>
       </div>
 
-      {paymentMethod === 'QRIS/TF' && (
-        <div className="input-group animate-fade-in">
-          <label>Upload Bukti Pembayaran</label>
-          <input 
-            type="file" 
-            ref={fileRef}
-            className="input-field" 
-            accept="image/*"
-            onChange={handleFileChange}
-            required
-            style={{ padding: '0.5rem' }}
-          />
-          {fileName && (
-            <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: 0 }}>
-              ✓ Foto terpilih: {fileName}
-            </p>
-          )}
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-            Foto akan dikompres otomatis saat dikirim agar cepat dan hemat kuota.
+      {/* File input SELALU di-render, di-hide pakai CSS saat CASH */}
+      <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
+        <label>Upload Bukti Pembayaran</label>
+        <input 
+          type="file" 
+          ref={fileRef}
+          className="input-field" 
+          accept="image/*"
+          onChange={handleFileChange}
+          style={{ padding: '0.5rem' }}
+        />
+        {fileName && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: 0 }}>
+            ✓ Foto terpilih: {fileName}
           </p>
-        </div>
-      )}
+        )}
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+          Foto akan dikompres otomatis saat dikirim agar cepat dan hemat kuota.
+        </p>
+      </div>
 
       <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
         {loading ? 'Mengirim & Mengompres Data...' : 'Kirim Laporan'}
