@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
 
-// Fungsi kompresi gambar menggunakan Canvas HTML5
 function compressImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -51,26 +50,70 @@ function compressImage(file) {
 }
 
 const LEGACY_STORAGE_KEY = 'yandihan_cashier_form'
+const STORAGE_PREFIX = 'yandihan_cashier_form_'
 
 function getStorageKey(token) {
-  return `yandihan_cashier_form_${token}`
+  return `${STORAGE_PREFIX}${token}`
+}
+
+function readFromStores(key) {
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      const saved = store.getItem(key)
+      if (saved) return JSON.parse(saved)
+    } catch { /* ignore */ }
+  }
+  return null
 }
 
 function loadSavedForm(token) {
   if (typeof window === 'undefined') return null
-  try {
-    const key = getStorageKey(token)
-    let saved = sessionStorage.getItem(key)
-    if (!saved) {
-      saved = sessionStorage.getItem(LEGACY_STORAGE_KEY)
-      if (saved) {
-        sessionStorage.setItem(key, saved)
-        sessionStorage.removeItem(LEGACY_STORAGE_KEY)
-      }
+
+  const key = getStorageKey(token)
+  let data = readFromStores(key)
+
+  if (!data) {
+    const legacy = readFromStores(LEGACY_STORAGE_KEY)
+    if (legacy) {
+      writeToStores(key, legacy)
+      clearFormStores(LEGACY_STORAGE_KEY)
+      data = legacy
     }
-    return saved ? JSON.parse(saved) : null
-  } catch {
-    return null
+  }
+
+  return data
+}
+
+function writeToStores(key, payload) {
+  const textOnly = {
+    amount: payload.amount,
+    items: payload.items,
+    paymentMethod: payload.paymentMethod,
+    fileName: payload.fileName,
+    savedAt: Date.now(),
+  }
+
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      store.setItem(key, JSON.stringify(payload))
+      return 'full'
+    } catch {
+      try {
+        store.setItem(key, JSON.stringify(textOnly))
+        return 'text'
+      } catch { /* ignore */ }
+    }
+  }
+  return null
+}
+
+function clearFormStores(tokenOrKey) {
+  const key = tokenOrKey.startsWith(STORAGE_PREFIX) ? tokenOrKey : getStorageKey(tokenOrKey)
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      store.removeItem(key)
+      store.removeItem(LEGACY_STORAGE_KEY)
+    } catch { /* ignore */ }
   }
 }
 
@@ -94,105 +137,124 @@ function dataUrlToFile(dataUrl, name) {
   return new File([array], name || 'photo.jpg', { type: mime, lastModified: Date.now() })
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function CashierForm({ cashierId, storeId, token }) {
   const router = useRouter()
   const fileRef = useRef(null)
+  const readyRef = useRef(false)
+  const formRef = useRef({
+    amount: '',
+    items: [{ name: '', qty: 1 }],
+    paymentMethod: 'CASH',
+    fileName: '',
+    receiptDataUrl: null,
+  })
+
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
-  const savedOnInit = useRef(loadSavedForm(token))
-  const [restored, setRestored] = useState(() => hasSavedFormData(savedOnInit.current))
-  const [hydrated, setHydrated] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [restored, setRestored] = useState(false)
 
-  const [amount, setAmount] = useState(() => savedOnInit.current?.amount ?? '')
-  const [items, setItems] = useState(() => savedOnInit.current?.items ?? [{ name: '', qty: 1 }])
-  const [paymentMethod, setPaymentMethod] = useState(() => savedOnInit.current?.paymentMethod ?? 'CASH')
-  const [fileName, setFileName] = useState(() => savedOnInit.current?.fileName ?? '')
-  const [receiptDataUrl, setReceiptDataUrl] = useState(() => savedOnInit.current?.receiptDataUrl ?? null)
+  const [amount, setAmount] = useState('')
+  const [items, setItems] = useState([{ name: '', qty: 1 }])
+  const [paymentMethod, setPaymentMethod] = useState('CASH')
+  const [fileName, setFileName] = useState('')
+  const [receiptDataUrl, setReceiptDataUrl] = useState(null)
 
-  useEffect(() => {
-    setHydrated(true)
-  }, [])
+  formRef.current = { amount, items, paymentMethod, fileName, receiptDataUrl }
 
-  const saveForm = useCallback(() => {
-    const payload = { amount, items, paymentMethod, fileName, receiptDataUrl }
-    const key = getStorageKey(token)
-    try {
-      sessionStorage.setItem(key, JSON.stringify(payload))
-    } catch {
-      try {
-        sessionStorage.setItem(key, JSON.stringify({ amount, items, paymentMethod, fileName }))
-      } catch { /* ignore */ }
+  const persistForm = useCallback((override = {}) => {
+    if (!readyRef.current) return
+
+    const data = { ...formRef.current, ...override, savedAt: Date.now() }
+    writeToStores(getStorageKey(token), data)
+  }, [token])
+
+  // Pulihkan dari storage HANYA di client — lazy useState tidak aman dengan SSR Next.js
+  useLayoutEffect(() => {
+    const saved = loadSavedForm(token)
+    if (saved) {
+      if (saved.amount != null) setAmount(String(saved.amount))
+      if (saved.items?.length) setItems(saved.items)
+      if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod)
+      if (saved.fileName) setFileName(saved.fileName)
+      if (saved.receiptDataUrl) setReceiptDataUrl(saved.receiptDataUrl)
+      if (hasSavedFormData(saved)) setRestored(true)
     }
-  }, [amount, items, paymentMethod, fileName, receiptDataUrl, token])
+
+    readyRef.current = true
+    setReady(true)
+  }, [token])
 
   useEffect(() => {
-    if (!hydrated) return
-    saveForm()
-  }, [hydrated, saveForm])
+    if (!ready) return
+    persistForm()
+  }, [ready, amount, items, paymentMethod, fileName, receiptDataUrl, persistForm])
 
   useEffect(() => {
-    if (!hydrated) return
+    if (!ready) return
 
-    const persist = () => saveForm()
-    window.addEventListener('pagehide', persist)
+    const flush = () => persistForm()
+    window.addEventListener('pagehide', flush)
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') persist()
+      if (document.visibilityState === 'hidden') flush()
     })
 
     return () => {
-      window.removeEventListener('pagehide', persist)
+      window.removeEventListener('pagehide', flush)
     }
-  }, [hydrated, saveForm])
+  }, [ready, persistForm])
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items]
     newItems[index][field] = value
     setItems(newItems)
+    readyRef.current && persistForm({ items: newItems })
   }
 
   const addItem = () => {
-    setItems([...items, { name: '', qty: 1 }])
+    const newItems = [...items, { name: '', qty: 1 }]
+    setItems(newItems)
+    readyRef.current && persistForm({ items: newItems })
   }
 
   const removeItem = (index) => {
     const newItems = items.filter((_, i) => i !== index)
     if (newItems.length === 0) newItems.push({ name: '', qty: 1 })
     setItems(newItems)
+    readyRef.current && persistForm({ items: newItems })
   }
 
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) return
 
-    setFileName(selectedFile.name)
+    const nextFileName = selectedFile.name
+    setFileName(nextFileName)
     setRestored(false)
 
-    const persistReceipt = (dataUrl) => {
-      setReceiptDataUrl(dataUrl)
-      try {
-        sessionStorage.setItem(getStorageKey(token), JSON.stringify({
-          amount, items, paymentMethod, fileName: selectedFile.name, receiptDataUrl: dataUrl
-        }))
-      } catch {
-        try {
-          sessionStorage.setItem(getStorageKey(token), JSON.stringify({
-            amount, items, paymentMethod, fileName: selectedFile.name
-          }))
-        } catch { /* ignore */ }
-      }
-    }
-
-    // Simpan mentah dulu — browser sering reload sebelum kompresi selesai
-    const quickReader = new FileReader()
-    quickReader.onload = () => persistReceipt(quickReader.result)
-    quickReader.readAsDataURL(selectedFile)
+    readyRef.current && persistForm({ fileName: nextFileName, receiptDataUrl: null })
 
     try {
       const compressed = await compressImage(selectedFile)
-      const reader = new FileReader()
-      reader.onload = () => persistReceipt(reader.result)
-      reader.readAsDataURL(compressed)
-    } catch { /* raw backup sudah tersimpan di atas */ }
+      const dataUrl = await readFileAsDataUrl(compressed)
+      setReceiptDataUrl(dataUrl)
+      readyRef.current && persistForm({ fileName: nextFileName, receiptDataUrl: dataUrl })
+    } catch {
+      try {
+        const dataUrl = await readFileAsDataUrl(selectedFile)
+        setReceiptDataUrl(dataUrl)
+        readyRef.current && persistForm({ fileName: nextFileName, receiptDataUrl: dataUrl })
+      } catch { /* ignore */ }
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -228,24 +290,23 @@ export default function CashierForm({ cashierId, storeId, token }) {
     formData.append('amount', amount)
     formData.append('productName', combinedProductName)
     formData.append('paymentMethod', paymentMethod)
-    
+
     if (rawFile && paymentMethod === 'QRIS/TF') {
       try {
         const compressedFile = await compressImage(rawFile)
         formData.append('receipt', compressedFile)
-      } catch (err) {
+      } catch {
         formData.append('receipt', rawFile)
       }
     }
 
     const result = await submitTransaction(formData)
-    
+
     setLoading(false)
     if (result.error) {
       setMessage({ type: 'error', text: result.error })
     } else {
-      sessionStorage.removeItem(getStorageKey(token))
-      sessionStorage.removeItem(LEGACY_STORAGE_KEY)
+      clearFormStores(token)
       router.push(`/r/${result.transactionId}`)
     }
   }
@@ -253,9 +314,9 @@ export default function CashierForm({ cashierId, storeId, token }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {message && (
-        <div style={{ 
-          padding: '1rem', 
-          borderRadius: '8px', 
+        <div style={{
+          padding: '1rem',
+          borderRadius: '8px',
           backgroundColor: message.type === 'error' ? '#f8d7da' : '#d1fae5',
           color: message.type === 'error' ? '#842029' : '#0f5132'
         }}>
@@ -271,18 +332,21 @@ export default function CashierForm({ cashierId, storeId, token }) {
           color: '#92400e',
           fontSize: '0.875rem'
         }}>
-          ⚠️ Halaman dimuat ulang oleh browser. Isian formulir telah dipulihkan{receiptDataUrl ? ', termasuk foto bukti' : ''}. {receiptDataUrl ? '' : 'Silakan pilih ulang foto bukti pembayaran jika diperlukan.'}
+          ⚠️ Halaman dimuat ulang oleh browser. Isian formulir telah dipulihkan{receiptDataUrl ? ', termasuk foto bukti' : ''}.{receiptDataUrl ? '' : ' Silakan pilih ulang foto bukti pembayaran jika diperlukan.'}
         </div>
       )}
 
       <div className="input-group">
         <label>Total Nominal (Rp)</label>
-        <input 
-          type="number" 
-          className="input-field" 
-          value={amount} 
-          onChange={e => setAmount(e.target.value)} 
-          required 
+        <input
+          type="number"
+          className="input-field"
+          value={amount}
+          onChange={e => {
+            setAmount(e.target.value)
+            readyRef.current && persistForm({ amount: e.target.value })
+          }}
+          required
           min="1"
           placeholder="Misal: 50000"
         />
@@ -293,22 +357,22 @@ export default function CashierForm({ cashierId, storeId, token }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {items.map((item, index) => (
             <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input 
-                type="number" 
-                className="input-field" 
-                value={item.qty} 
-                onChange={e => handleItemChange(index, 'qty', parseInt(e.target.value) || 1)} 
+              <input
+                type="number"
+                className="input-field"
+                value={item.qty}
+                onChange={e => handleItemChange(index, 'qty', parseInt(e.target.value) || 1)}
                 min="1"
                 style={{ width: '70px', padding: '0.5rem' }}
                 title="Kuantitas"
                 required
               />
               <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
-              <input 
-                type="text" 
-                className="input-field" 
-                value={item.name} 
-                onChange={e => handleItemChange(index, 'name', e.target.value)} 
+              <input
+                type="text"
+                className="input-field"
+                value={item.name}
+                onChange={e => handleItemChange(index, 'name', e.target.value)}
                 placeholder="Nama Produk"
                 style={{ flex: 1, padding: '0.5rem' }}
                 required
@@ -321,18 +385,18 @@ export default function CashierForm({ cashierId, storeId, token }) {
             </div>
           ))}
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={addItem}
-          style={{ 
-            marginTop: '0.5rem', 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: '0.25rem', 
-            color: 'var(--primary-color)', 
-            background: 'none', 
-            border: 'none', 
-            fontWeight: '600', 
+          style={{
+            marginTop: '0.5rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            color: 'var(--primary-color)',
+            background: 'none',
+            border: 'none',
+            fontWeight: '600',
             cursor: 'pointer',
             fontSize: '0.875rem'
           }}
@@ -343,23 +407,25 @@ export default function CashierForm({ cashierId, storeId, token }) {
 
       <div className="input-group">
         <label>Metode Pembayaran</label>
-        <select 
-          className="input-field" 
-          value={paymentMethod} 
-          onChange={e => setPaymentMethod(e.target.value)}
+        <select
+          className="input-field"
+          value={paymentMethod}
+          onChange={e => {
+            setPaymentMethod(e.target.value)
+            readyRef.current && persistForm({ paymentMethod: e.target.value })
+          }}
         >
           <option value="CASH">CASH (Tunai)</option>
           <option value="QRIS/TF">QRIS / Transfer Bank</option>
         </select>
       </div>
 
-      {/* File input SELALU di-render, di-hide pakai CSS saat CASH */}
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
         <label>Upload Bukti Pembayaran</label>
-        <input 
-          type="file" 
+        <input
+          type="file"
           ref={fileRef}
-          className="input-field" 
+          className="input-field"
           accept="image/*"
           onChange={handleFileChange}
           style={{ padding: '0.5rem' }}

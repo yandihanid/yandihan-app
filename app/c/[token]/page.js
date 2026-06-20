@@ -1,37 +1,94 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect } from 'react'
 import CashierForm from './CashierForm'
 import { useParams } from 'next/navigation'
 
+const CASHIER_META_PREFIX = 'yandihan_cashier_meta_'
+
+function getCashierCacheKey(token) {
+  return `${CASHIER_META_PREFIX}${token}`
+}
+
+function loadCachedCashier(token) {
+  if (typeof window === 'undefined') return null
+  try {
+    const cached = localStorage.getItem(getCashierCacheKey(token))
+    return cached ? JSON.parse(cached) : null
+  } catch {
+    return null
+  }
+}
+
+function cacheCashier(token, data) {
+  try {
+    localStorage.setItem(getCashierCacheKey(token), JSON.stringify(data))
+  } catch { /* ignore */ }
+}
+
 export default function CashierWeb() {
   const params = useParams()
-  const token = params.token
+  const token = Array.isArray(params.token) ? params.token[0] : params.token
 
   const [cashier, setCashier] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  useLayoutEffect(() => {
+    if (!token) return
+    const cached = loadCachedCashier(token)
+    if (cached?.id) {
+      setCashier(cached)
+      setLoading(false)
+    }
+  }, [token])
+
   useEffect(() => {
+    if (!token) return
+
+    const cached = loadCachedCashier(token)
+    let cancelled = false
+
     async function load() {
       try {
         const res = await fetch(`/api/cashier?token=${token}`)
+        if (cancelled) return
+
         if (!res.ok) {
-          setError(true)
+          if (!cached?.id) setError(true)
           setLoading(false)
           return
         }
+
         const data = await res.json()
         setCashier(data)
-      } catch (e) {
-        setError(true)
+        cacheCashier(token, data)
+        setError(false)
+      } catch {
+        if (!cancelled && !cached?.id) setError(true)
       }
-      setLoading(false)
+
+      if (!cancelled) setLoading(false)
     }
+
     load()
+
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
-  if (loading) {
+  if (!token) {
+    return (
+      <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>Link Tidak Valid</h1>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading && !cashier) {
     return (
       <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
         <div style={{ textAlign: 'center', marginTop: '4rem' }}>
