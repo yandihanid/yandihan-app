@@ -1,17 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
-import { Plus, Trash2 } from 'lucide-react'
 
 // Fungsi kompresi gambar menggunakan Canvas HTML5
-const compressImage = (file) => {
+function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = (event) => {
-      const img = new Image()
+      const img = document.createElement('img')
       img.src = event.target.result
       img.onload = () => {
         const canvas = document.createElement('canvas')
@@ -38,16 +37,20 @@ const compressImage = (file) => {
         ctx.drawImage(img, 0, 0, width, height)
 
         canvas.toBlob((blob) => {
-          const newFile = new File([blob], file.name, {
+          if (!blob) {
+            resolve(file) // fallback
+            return
+          }
+          const newFile = new File([blob], file.name || 'photo.jpg', {
             type: 'image/jpeg',
             lastModified: Date.now(),
           })
           resolve(newFile)
-        }, 'image/jpeg', 0.7) // Kualitas 70%
+        }, 'image/jpeg', 0.7)
       }
-      img.onerror = (error) => reject(error)
+      img.onerror = () => resolve(file) // fallback
     }
-    reader.onerror = (error) => reject(error)
+    reader.onerror = () => resolve(file) // fallback
   })
 }
 
@@ -56,7 +59,8 @@ export default function CashierForm({ cashierId, storeId, token }) {
   const [amount, setAmount] = useState('')
   const [items, setItems] = useState([{ name: '', qty: 1 }])
   const [paymentMethod, setPaymentMethod] = useState('CASH')
-  const [file, setFile] = useState(null)
+  const [fileName, setFileName] = useState('')
+  const fileRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
 
@@ -74,6 +78,13 @@ export default function CashierForm({ cashierId, storeId, token }) {
     const newItems = items.filter((_, i) => i !== index)
     if (newItems.length === 0) newItems.push({ name: '', qty: 1 })
     setItems(newItems)
+  }
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFileName(selectedFile.name)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -101,13 +112,14 @@ export default function CashierForm({ cashierId, storeId, token }) {
     formData.append('productName', combinedProductName)
     formData.append('paymentMethod', paymentMethod)
     
-    if (file && paymentMethod === 'QRIS/TF') {
+    const rawFile = fileRef.current?.files?.[0]
+    if (rawFile && paymentMethod === 'QRIS/TF') {
       try {
-        const compressedFile = await compressImage(file)
+        const compressedFile = await compressImage(rawFile)
         formData.append('receipt', compressedFile)
       } catch (err) {
         console.error("Compression error:", err)
-        formData.append('receipt', file) // Fallback ke file asli jika gagal kompresi
+        formData.append('receipt', rawFile)
       }
     }
 
@@ -173,8 +185,8 @@ export default function CashierForm({ cashierId, storeId, token }) {
                 required
               />
               {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(index)} style={{ padding: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                  <Trash2 size={20} />
+                <button type="button" onClick={() => removeItem(index)} style={{ padding: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.25rem' }}>
+                  ✕
                 </button>
               )}
             </div>
@@ -196,7 +208,7 @@ export default function CashierForm({ cashierId, storeId, token }) {
             fontSize: '0.875rem'
           }}
         >
-          <Plus size={16} /> Tambah Produk Lain
+          + Tambah Produk Lain
         </button>
       </div>
 
@@ -207,7 +219,6 @@ export default function CashierForm({ cashierId, storeId, token }) {
           value={paymentMethod} 
           onChange={e => {
             setPaymentMethod(e.target.value)
-            if (e.target.value === 'CASH') setFile(null)
           }}
         >
           <option value="CASH">CASH (Tunai)</option>
@@ -217,17 +228,23 @@ export default function CashierForm({ cashierId, storeId, token }) {
 
       {paymentMethod === 'QRIS/TF' && (
         <div className="input-group animate-fade-in">
-          <label>Upload Bukti Pembayaran (Otomatis Kompres)</label>
+          <label>Upload Bukti Pembayaran</label>
           <input 
             type="file" 
+            ref={fileRef}
             className="input-field" 
             accept="image/*"
-            onChange={e => setFile(e.target.files[0])} 
+            onChange={handleFileChange}
             required
             style={{ padding: '0.5rem' }}
           />
+          {fileName && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: 0 }}>
+              ✓ Foto terpilih: {fileName}
+            </p>
+          )}
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-            Upload foto ukuran berapapun, akan dikompres otomatis agar hemat kuota dan cepat!
+            Foto akan dikompres otomatis saat dikirim agar cepat dan hemat kuota.
           </p>
         </div>
       )}
