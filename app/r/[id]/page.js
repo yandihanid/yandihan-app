@@ -9,15 +9,20 @@ export default async function ReceiptPage({ params }) {
 
   const supabase = createServiceClient()
 
-  // Ambil transaksi beserta info toko dan kasir
-  const { data: tx } = await supabase
+  const { data: tx, error: txError } = await supabase
     .from('transactions')
     .select('*, stores(name), cashiers(name, telegram_name)')
     .eq('id', id)
     .single()
 
-  if (!tx) {
-    return notFound()
+  if (txError || !tx) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <h1>Struk Tidak Ditemukan</h1>
+        <p>ID Transaksi: {id}</p>
+        <p>Detail Error: {txError?.message || 'Data transaksi kosong.'}</p>
+      </div>
+    )
   }
 
   const cashierName = tx.cashiers?.name || tx.cashiers?.telegram_name || 'Kasir'
