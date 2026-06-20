@@ -171,3 +171,43 @@ tr:last-child td {
 tr:hover td {
   background-color: #f8fafc;
 }
+
+/* Glassmorphism & Gradients */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #0056b3 0%, #002d62 100%);
+  color: white;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-top: 3rem;
+}
+
+.hero-section {
+  padding: 6rem 1rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+  100% { transform: translateY(0px); }
+}
+
+.floating {
+  animation: float 6s ease-in-out infinite;
+}

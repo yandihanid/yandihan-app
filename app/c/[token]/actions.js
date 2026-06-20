@@ -53,7 +53,7 @@ export async function submitTransaction(formData) {
       receiptUrl = publicUrlData.publicUrl
     }
 
-    const { error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await supabase
       .from('transactions')
       .insert({
         store_id: storeId,
@@ -63,13 +63,15 @@ export async function submitTransaction(formData) {
         payment_method: paymentMethod,
         receipt_url: receiptUrl
       })
+      .select()
+      .single()
 
     if (insertError) {
       console.error("Insert Error:", insertError)
       throw new Error("Gagal mencatat transaksi.")
     }
 
-    return { success: true }
+    return { success: true, transactionId: insertData.id }
   } catch (error) {
     console.error("Action error:", error)
     return { error: error.message }

@@ -136,7 +136,7 @@ export async function POST(req) {
     }
 
     // Insert transaction
-    const { error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await supabase
       .from('transactions')
       .insert({
         store_id: cashier.store_id,
@@ -146,12 +146,14 @@ export async function POST(req) {
         payment_method: paymentMethod,
         receipt_url: receiptUrl
       })
+      .select()
+      .single()
 
     if (insertError) {
       console.error(insertError)
       await sendMessage(chatId, 'Terjadi kesalahan sistem saat mencatat transaksi.')
     } else {
-      await sendMessage(chatId, `✅ Transaksi berhasil dicatat!\n\nProduk: ${productName}\nNominal: Rp ${amount.toLocaleString('id-ID')}\nMetode: ${paymentMethod}`)
+      await sendMessage(chatId, `✅ Transaksi berhasil dicatat!\n\nLihat/Cetak Struk:\nhttps://yandihan-app.vercel.app/r/${insertData.id}`)
     }
 
     return NextResponse.json({ ok: true })

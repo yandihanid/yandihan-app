@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
 
 export default function CashierForm({ cashierId, storeId, token }) {
+  const router = useRouter()
   const [amount, setAmount] = useState('')
   const [productName, setProductName] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
@@ -33,11 +35,7 @@ export default function CashierForm({ cashierId, storeId, token }) {
     if (result.error) {
       setMessage({ type: 'error', text: result.error })
     } else {
-      setMessage({ type: 'success', text: 'Transaksi berhasil dicatat!' })
-      setAmount('')
-      setProductName('')
-      setFile(null)
-      e.target.reset()
+      router.push(`/r/${result.transactionId}`)
     }
   }
 
