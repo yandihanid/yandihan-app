@@ -27,7 +27,7 @@ export default async function Dashboard({ searchParams }) {
   // Fetch transactions
   let query = supabase
     .from('transactions')
-    .select('*, cashiers(name, telegram_name)')
+    .select('*, cashiers(name)')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 

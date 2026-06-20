@@ -11,7 +11,7 @@ export default async function ReceiptPage({ params }) {
 
   const { data: tx, error: txError } = await supabase
     .from('transactions')
-    .select('*, stores(name), cashiers(name, telegram_name)')
+    .select('*, stores(name), cashiers(name)')
     .eq('id', id)
     .single()
 
@@ -25,7 +25,7 @@ export default async function ReceiptPage({ params }) {
     )
   }
 
-  const cashierName = tx.cashiers?.name || tx.cashiers?.telegram_name || 'Kasir'
+  const cashierName = tx.cashiers?.name || 'Kasir'
 
   return (
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem 1rem' }}>

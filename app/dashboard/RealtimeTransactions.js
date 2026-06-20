@@ -24,7 +24,7 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
           // Ambil nama kasir
           const { data: cashier } = await supabase
             .from('cashiers')
-            .select('name, telegram_name')
+            .select('name')
             .eq('id', newTx.cashier_id)
             .single()
 
@@ -109,7 +109,7 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
                 transactions.map(tx => (
                   <tr key={tx.id} className="animate-fade-in">
                     <td>{new Date(tx.created_at).toLocaleString('id-ID')}</td>
-                    <td>{tx.cashiers?.name || tx.cashiers?.telegram_name || 'Tidak diketahui'}</td>
+                    <td>{tx.cashiers?.name || 'Tidak diketahui'}</td>
                     <td>{tx.product_name}</td>
                     <td>
                       <span style={{ 

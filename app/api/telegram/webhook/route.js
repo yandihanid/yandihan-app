@@ -62,7 +62,7 @@ export async function POST(req) {
         .upsert({ 
           store_id: store.id, 
           telegram_chat_id: chatId,
-          telegram_name: fromName 
+          name: fromName 
         }, { onConflict: 'telegram_chat_id' })
 
       if (error) {
