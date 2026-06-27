@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import RealtimeTransactions from './RealtimeTransactions'
+import UpgradeBanner from './UpgradeBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export default async function Dashboard({ searchParams }) {
   // Fetch store
   const { data: store } = await supabase
     .from('stores')
-    .select('id, name')
+    .select('id, name, subscription_tier')
     .eq('user_id', user.id)
     .single()
 
@@ -49,7 +50,14 @@ export default async function Dashboard({ searchParams }) {
 
   return (
     <div className="animate-fade-in flex flex-col gap-4">
-      <h2 style={{ fontSize: '1.5rem', fontWeight: '600' }}>Ringkasan Toko: {store.name}</h2>
+      <UpgradeBanner storeId={store.id} subscriptionTier={store.subscription_tier} />
+      
+      <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginTop: store.subscription_tier === 'FREE' ? '1rem' : '0' }}>
+        Ringkasan Toko: {store.name} 
+        <span style={{ fontSize: '0.875rem', fontWeight: 'bold', marginLeft: '0.5rem', backgroundColor: store.subscription_tier === 'PRO' ? 'var(--secondary-color)' : 'var(--border-color)', color: store.subscription_tier === 'PRO' ? 'var(--primary-color)' : 'var(--text-muted)', padding: '0.2rem 0.6rem', borderRadius: '99px', verticalAlign: 'middle' }}>
+          {store.subscription_tier}
+        </span>
+      </h2>
       <RealtimeTransactions initialTransactions={transactions || []} storeId={store.id} filter={filter} timeFilter={timeFilter} />
     </div>
   )

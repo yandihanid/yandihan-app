@@ -14,15 +14,30 @@ export async function submitTransaction(formData) {
 
     const supabase = createServiceClient()
 
-    // Verify token matches cashier
+    // Verify token matches cashier and fetch store subscription
     const { data: cashier } = await supabase
       .from('cashiers')
-      .select('id')
+      .select('id, stores(id, subscription_tier)')
       .eq('token', token)
       .eq('id', cashierId)
       .single()
 
     if (!cashier) throw new Error("Unauthorized")
+
+    // Check Free Tier Limits (Max 40 transactions/day)
+    if (cashier.stores.subscription_tier === 'FREE') {
+      const today = new Date().toISOString().split('T')[0]
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', storeId)
+        .gte('created_at', `${today}T00:00:00Z`)
+        .lt('created_at', `${today}T23:59:59Z`)
+      
+      if (count >= 40) {
+        throw new Error("Batas transaksi harian paket GRATIS (40 transaksi) telah tercapai. Silakan upgrade ke PRO.")
+      }
+    }
 
     let receiptUrl = null
 

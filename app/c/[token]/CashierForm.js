@@ -96,14 +96,23 @@ function writeToStores(key, payload) {
   for (const store of [localStorage, sessionStorage]) {
     try {
       store.setItem(key, JSON.stringify(payload))
+      // #region agent log
+      fetch('http://127.0.0.1:7449/ingest/967cd299-60b4-494c-a62c-d11cf5e270f9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5a0991'},body:JSON.stringify({sessionId:'5a0991',hypothesisId:'H5',location:'CashierForm.js:writeToStores',message:'storage write ok',data:{store:store===localStorage?'localStorage':'sessionStorage',mode:'full',amount:payload.amount,paymentMethod:payload.paymentMethod,hasFileName:!!payload.fileName,hasReceipt:!!payload.receiptDataUrl,receiptLen:payload.receiptDataUrl?.length||0},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return 'full'
-    } catch {
+    } catch (err) {
       try {
         store.setItem(key, JSON.stringify(textOnly))
+        // #region agent log
+        fetch('http://127.0.0.1:7449/ingest/967cd299-60b4-494c-a62c-d11cf5e270f9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5a0991'},body:JSON.stringify({sessionId:'5a0991',hypothesisId:'H5',location:'CashierForm.js:writeToStores',message:'storage write text-only fallback',data:{store:store===localStorage?'localStorage':'sessionStorage',err:String(err),amount:textOnly.amount,paymentMethod:textOnly.paymentMethod},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         return 'text'
       } catch { /* ignore */ }
     }
   }
+  // #region agent log
+  fetch('http://127.0.0.1:7449/ingest/967cd299-60b4-494c-a62c-d11cf5e270f9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5a0991'},body:JSON.stringify({sessionId:'5a0991',hypothesisId:'H5',location:'CashierForm.js:writeToStores',message:'storage write failed both stores',data:{amount:payload.amount,paymentMethod:payload.paymentMethod},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   return null
 }
 
@@ -146,10 +155,12 @@ function readFileAsDataUrl(file) {
   })
 }
 
-export default function CashierForm({ cashierId, storeId, token }) {
+export default function CashierForm({ cashierId, storeId, token, products = [] }) {
   const router = useRouter()
   const fileRef = useRef(null)
   const readyRef = useRef(false)
+  const instanceId = useRef(`cf-${Math.random().toString(36).slice(2, 8)}`)
+  const mountCount = useRef(0)
   const formRef = useRef({
     amount: '',
     items: [{ name: '', qty: 1 }],
@@ -178,9 +189,11 @@ export default function CashierForm({ cashierId, storeId, token }) {
     writeToStores(getStorageKey(token), data)
   }, [token])
 
-  // Pulihkan dari storage HANYA di client — lazy useState tidak aman dengan SSR Next.js
+  // Pulihkan dari storage
   useLayoutEffect(() => {
+    mountCount.current += 1
     const saved = loadSavedForm(token)
+    
     if (saved) {
       if (saved.amount != null) setAmount(String(saved.amount))
       if (saved.items?.length) setItems(saved.items)
@@ -196,28 +209,58 @@ export default function CashierForm({ cashierId, storeId, token }) {
 
   useEffect(() => {
     if (!ready) return
-    persistForm()
-  }, [ready, amount, items, paymentMethod, fileName, receiptDataUrl, persistForm])
+    writeToStores(getStorageKey(token), { ...formRef.current, savedAt: Date.now() })
+  }, [ready, amount, items, paymentMethod, fileName, receiptDataUrl, token])
 
   useEffect(() => {
     if (!ready) return
 
-    const flush = () => persistForm()
+    const flush = () => {
+      persistForm()
+    }
+    const onPageShow = (e) => {}
+    
     window.addEventListener('pagehide', flush)
+    window.addEventListener('pageshow', onPageShow)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') flush()
     })
 
     return () => {
       window.removeEventListener('pagehide', flush)
+      window.removeEventListener('pageshow', onPageShow)
     }
   }, [ready, persistForm])
+
+  // Calculate total automatically
+  const calculateTotal = (currentItems) => {
+    if (!products || products.length === 0) return amount;
+    let total = 0;
+    let autoCalcPossible = false;
+    
+    currentItems.forEach(item => {
+      const prod = products.find(p => p.name === item.name);
+      if (prod) {
+        total += (parseFloat(prod.price) || 0) * (parseInt(item.qty) || 0);
+        autoCalcPossible = true;
+      }
+    });
+
+    return autoCalcPossible && total > 0 ? String(total) : amount;
+  }
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items]
     newItems[index][field] = value
     setItems(newItems)
-    readyRef.current && persistForm({ items: newItems })
+    
+    const newAmount = calculateTotal(newItems);
+    if (newAmount !== amount) {
+      setAmount(newAmount)
+      readyRef.current && persistForm({ items: newItems, amount: newAmount })
+    } else {
+      readyRef.current && persistForm({ items: newItems })
+    }
   }
 
   const addItem = () => {
@@ -230,7 +273,14 @@ export default function CashierForm({ cashierId, storeId, token }) {
     const newItems = items.filter((_, i) => i !== index)
     if (newItems.length === 0) newItems.push({ name: '', qty: 1 })
     setItems(newItems)
-    readyRef.current && persistForm({ items: newItems })
+    
+    const newAmount = calculateTotal(newItems);
+    if (newAmount !== amount) {
+      setAmount(newAmount)
+      readyRef.current && persistForm({ items: newItems, amount: newAmount })
+    } else {
+      readyRef.current && persistForm({ items: newItems })
+    }
   }
 
   const handleFileChange = async (e) => {
@@ -337,22 +387,6 @@ export default function CashierForm({ cashierId, storeId, token }) {
       )}
 
       <div className="input-group">
-        <label>Total Nominal (Rp)</label>
-        <input
-          type="number"
-          className="input-field"
-          value={amount}
-          onChange={e => {
-            setAmount(e.target.value)
-            readyRef.current && persistForm({ amount: e.target.value })
-          }}
-          required
-          min="1"
-          placeholder="Misal: 50000"
-        />
-      </div>
-
-      <div className="input-group">
         <label>Daftar Produk</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {items.map((item, index) => (
@@ -368,15 +402,32 @@ export default function CashierForm({ cashierId, storeId, token }) {
                 required
               />
               <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
-              <input
-                type="text"
-                className="input-field"
-                value={item.name}
-                onChange={e => handleItemChange(index, 'name', e.target.value)}
-                placeholder="Nama Produk"
-                style={{ flex: 1, padding: '0.5rem' }}
-                required
-              />
+              
+              {products && products.length > 0 ? (
+                <select 
+                  className="input-field"
+                  value={item.name}
+                  onChange={e => handleItemChange(index, 'name', e.target.value)}
+                  style={{ flex: 1, padding: '0.5rem' }}
+                  required
+                >
+                  <option value="" disabled>Pilih Produk</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.name}>{p.name} (Rp {parseInt(p.price).toLocaleString('id-ID')})</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  className="input-field"
+                  value={item.name}
+                  onChange={e => handleItemChange(index, 'name', e.target.value)}
+                  placeholder="Nama Produk"
+                  style={{ flex: 1, padding: '0.5rem' }}
+                  required
+                />
+              )}
+
               {items.length > 1 && (
                 <button type="button" onClick={() => removeItem(index)} style={{ padding: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.25rem' }}>
                   ✕
@@ -403,6 +454,22 @@ export default function CashierForm({ cashierId, storeId, token }) {
         >
           + Tambah Produk Lain
         </button>
+      </div>
+
+      <div className="input-group">
+        <label>Total Nominal (Rp)</label>
+        <input
+          type="number"
+          className="input-field"
+          value={amount}
+          onChange={e => {
+            setAmount(e.target.value)
+            readyRef.current && persistForm({ amount: e.target.value })
+          }}
+          required
+          min="1"
+          placeholder="Misal: 50000"
+        />
       </div>
 
       <div className="input-group">

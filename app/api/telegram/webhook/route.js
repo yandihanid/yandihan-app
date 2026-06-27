@@ -47,13 +47,27 @@ export async function POST(req) {
       // Find store
       const { data: store } = await supabase
         .from('stores')
-        .select('id, name')
+        .select('id, name, subscription_tier')
         .eq('unique_code', code)
         .single()
 
       if (!store) {
         await sendMessage(chatId, 'Toko tidak ditemukan. Periksa kembali kode unik.')
         return NextResponse.json({ ok: true })
+      }
+
+      // Check Free Tier Cashier Limit
+      if (store.subscription_tier === 'FREE') {
+        const { count } = await supabase
+          .from('cashiers')
+          .select('*', { count: 'exact', head: true })
+          .eq('store_id', store.id)
+          .neq('telegram_chat_id', chatId) // don't count if they are just re-registering
+
+        if (count >= 1) {
+          await sendMessage(chatId, '❌ Batas maksimal kasir (1 Kasir/Weblink) untuk paket GRATIS telah tercapai. Minta owner toko untuk upgrade ke PRO.')
+          return NextResponse.json({ ok: true })
+        }
       }
 
       // Upsert cashier
@@ -74,16 +88,32 @@ export async function POST(req) {
       return NextResponse.json({ ok: true })
     }
 
-    // Check if cashier is registered
+    // Check if cashier is registered and fetch store info
     const { data: cashier } = await supabase
       .from('cashiers')
-      .select('id, store_id')
+      .select('id, store_id, stores(id, subscription_tier)')
       .eq('telegram_chat_id', chatId)
       .single()
 
     if (!cashier) {
       await sendMessage(chatId, 'Anda belum terhubung ke toko mana pun. Kirim /start KODE_TOKO')
       return NextResponse.json({ ok: true })
+    }
+
+    // Check Free Tier Limits (Max 40 transactions/day)
+    if (cashier.stores.subscription_tier === 'FREE') {
+      const today = new Date().toISOString().split('T')[0]
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', cashier.store_id)
+        .gte('created_at', `${today}T00:00:00Z`)
+        .lt('created_at', `${today}T23:59:59Z`)
+      
+      if (count >= 40) {
+        await sendMessage(chatId, '❌ Batas transaksi harian paket GRATIS (40 transaksi) telah tercapai. Minta owner toko untuk upgrade ke PRO.')
+        return NextResponse.json({ ok: true })
+      }
     }
 
     // Parse transaction
