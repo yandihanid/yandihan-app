@@ -34,7 +34,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orderId = `PRO-${store.id}-${Date.now()}`
+    const orderId = `PRO-${store.id.substring(0, 8)}-${Date.now()}`;
     const grossAmount = 189000 // 189 ribu
 
     // Request to Midtrans API
