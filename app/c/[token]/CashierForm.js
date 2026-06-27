@@ -457,19 +457,30 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       </div>
 
       <div className="input-group">
-        <label>Total Nominal (Rp)</label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          Total Nominal (Rp)
+          {products && products.length > 0 && (
+            <span style={{ fontSize: '0.75rem', backgroundColor: '#dcfce7', color: '#16a34a', padding: '0.1rem 0.5rem', borderRadius: '99px', fontWeight: '600' }}>otomatis</span>
+          )}
+        </label>
         <input
           type="number"
           className="input-field"
           value={amount}
           onChange={e => {
+            if (products && products.length > 0) return // readonly when products exist
             setAmount(e.target.value)
             readyRef.current && persistForm({ amount: e.target.value })
           }}
+          readOnly={products && products.length > 0}
           required
           min="1"
-          placeholder="Misal: 50000"
+          placeholder={products && products.length > 0 ? 'Pilih produk & kuantitas untuk menghitung...' : 'Misal: 50000'}
+          style={products && products.length > 0 ? { backgroundColor: '#f8fafc', cursor: 'default', color: 'var(--text-muted)' } : {}}
         />
+        {products && products.length > 0 && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>💡 Total dihitung otomatis dari pilihan produk di atas.</p>
+        )}
       </div>
 
       <div className="input-group">

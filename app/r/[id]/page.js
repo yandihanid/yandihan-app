@@ -11,7 +11,7 @@ export default async function ReceiptPage({ params }) {
 
   const { data: tx, error: txError } = await supabase
     .from('transactions')
-    .select('*, stores(name), cashiers(name)')
+    .select('*, stores(name), cashiers(name, token)')
     .eq('id', id)
     .single()
 
@@ -87,7 +87,7 @@ export default async function ReceiptPage({ params }) {
         }
       `}} />
       
-      <PrintButton />
+      <PrintButton cashierToken={tx.cashiers?.token} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import SettingsForm from './SettingsForm'
 import AddCashierForm from './AddCashierForm'
+import CashierRow from './CashierRow'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,29 +64,12 @@ export default async function SettingsPage() {
                     <th>Nama Kasir</th>
                     <th>Akses (Telegram/Web)</th>
                     <th>Link Web Kasir</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cashiers.map(c => (
-                    <tr key={c.id}>
-                      <td style={{ fontWeight: '500' }}>{c.name || 'Tanpa Nama'}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                        {c.telegram_chat_id ? `Telegram (ID: ${c.telegram_chat_id})` : 'Hanya Web'}
-                      </td>
-                      <td>
-                        {c.token ? (
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <input 
-                              type="text" 
-                              readOnly 
-                              value={`yandihan-app.vercel.app/c/${c.token}`} 
-                              className="input-field" 
-                              style={{ padding: '0.4rem', fontSize: '0.8rem', width: '250px' }}
-                            />
-                          </div>
-                        ) : '-'}
-                      </td>
-                    </tr>
+                    <CashierRow key={c.id} cashier={c} />
                   ))}
                 </tbody>
               </table>

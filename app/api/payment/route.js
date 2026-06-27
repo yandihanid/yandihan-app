@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { NextResponse } from 'next/server'
 
 export async function POST(req) {
   try {
@@ -8,17 +9,29 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Store ID required' }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const serviceSupabase = createServiceClient()
 
     // Get Store details
-    const { data: store, error: storeError } = await supabase
+    const { data: store, error: storeError } = await serviceSupabase
       .from('stores')
-      .select('id, unique_code, users:user_id(id, email)')
+      .select('id, unique_code, user_id')
       .eq('id', storeId)
       .single()
 
     if (storeError || !store) {
       return NextResponse.json({ error: 'Store not found' }, { status: 404 })
+    }
+
+    // Verify ownership
+    if (store.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const orderId = `PRO-${store.id}-${Date.now()}`
@@ -43,7 +56,7 @@ export async function POST(req) {
           secure: true
         },
         customer_details: {
-          email: store.users?.email || 'customer@yandihan.my.id'
+          email: user.email || 'customer@yandihan.my.id'
         },
         item_details: [
           {
