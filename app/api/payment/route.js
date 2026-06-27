@@ -21,7 +21,7 @@ export async function POST(req) {
     // Get Store details
     const { data: store, error: storeError } = await serviceSupabase
       .from('stores')
-      .select('id, unique_code, user_id')
+      .select('id, user_id')
       .eq('id', storeId)
       .single()
 
@@ -34,10 +34,13 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orderId = `PRO-${store.id.substring(0, 8)}-${Date.now()}`;
-    const grossAmount = 189000 // 189 ribu
+    // Use timestamp as unique suffix. storeId is a UUID (36 chars), keep it intact.
+    // Format: PRO__<storeId>__<timestamp>
+    const timestamp = Date.now()
+    const orderId = `PRO__${storeId}__${timestamp}`
+    const grossAmount = 189000
 
-    // Request to Midtrans API
+    // Request to Midtrans Snap API
     const authString = Buffer.from(`${process.env.MIDTRANS_SERVER_KEY}:`).toString('base64')
     
     const midtransRes = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
@@ -52,9 +55,7 @@ export async function POST(req) {
           order_id: orderId,
           gross_amount: grossAmount
         },
-        credit_card: {
-          secure: true
-        },
+        credit_card: { secure: true },
         customer_details: {
           email: user.email || 'customer@yandihan.my.id'
         },
@@ -73,16 +74,13 @@ export async function POST(req) {
 
     if (!midtransRes.ok) {
       console.error('Midtrans Error:', midtransData)
-      return NextResponse.json({ error: 'Payment gateway error' }, { status: 500 })
+      return NextResponse.json({ error: 'Payment gateway error: ' + JSON.stringify(midtransData) }, { status: 500 })
     }
 
-    // Save order intent to database (optional, but good for tracking)
-    // We could create an orders table, but for now we'll just return the token
-    
-    return NextResponse.json({ token: midtransData.token })
+    return NextResponse.json({ token: midtransData.token, orderId })
 
   } catch (error) {
     console.error('Payment Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 })
   }
 }
