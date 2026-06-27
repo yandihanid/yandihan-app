@@ -36,13 +36,15 @@ export async function POST(req) {
 
     // Use timestamp as unique suffix. storeId is a UUID (36 chars), keep it intact.
     // Format: PRO__<storeId>__<timestamp>
-    const timestamp = Date.now()
-    const orderId = `PRO__${storeId}__${timestamp}`
-    const grossAmount = 189000
+    // 1. Buat orderId yang pendek & unik (Sangat aman dari limit 50 karakter)
+    const timestamp = Date.now();
+    const orderId = `PRO-${timestamp}`;
+    const grossAmount = 189000;
 
     // Request to Midtrans Snap API
-    const authString = Buffer.from(`${process.env.MIDTRANS_SERVER_KEY}:`).toString('base64')
+    const authString = Buffer.from(`${process.env.MIDTRANS_SERVER_KEY}:`).toString('base64');
     
+    // 2. Kirim ke Midtrans beserta data TITIPAN (metadata)
     const midtransRes = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
       method: 'POST',
       headers: {
@@ -55,20 +57,12 @@ export async function POST(req) {
           order_id: orderId,
           gross_amount: grossAmount
         },
-        credit_card: { secure: true },
-        customer_details: {
-          email: user.email || 'customer@yandihan.my.id'
-        },
-        item_details: [
-          {
-            id: 'PRO-1M',
-            price: grossAmount,
-            quantity: 1,
-            name: 'Yandihan PRO (1 Bulan)'
-          }
-        ]
+        // 👇 TITIPKAN STORE ID ASLI DI SINI (Otomatis dikirim balik oleh Midtrans)
+        metadata: {
+          store_id: storeId
+        }
       })
-    })
+    });
 
     const midtransData = await midtransRes.json()
 
