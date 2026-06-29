@@ -512,6 +512,33 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
             ✓ Foto terpilih: {fileName}
           </p>
         )}
+        {receiptDataUrl && ( // NEW: Display preview if data URL exists
+          <div style={{ marginTop: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+            <p style={{ margin: '0.5rem 0.75rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Preview Foto Bukti:</p>
+            <img src={receiptDataUrl} alt="Bukti Pembayaran" style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
+            <button
+              type="button"
+              onClick={() => {
+                setReceiptDataUrl(null);
+                setFileName('');
+                if (fileRef.current) fileRef.current.value = ''; // Clear file input
+                persistForm({ receiptDataUrl: null, fileName: '' });
+              }}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                backgroundColor: '#fef2f2',
+                color: '#ef4444',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '600',
+                borderTop: '1px solid var(--border-color)'
+              }}
+            >
+              Hapus Foto Ini
+            </button>
+          </div>
+        )}
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
           Foto akan dikompres otomatis saat dikirim agar cepat dan hemat kuota.
         </p>
@@ -519,6 +546,27 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
 
       <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
         {loading ? 'Mengirim & Mengompres Data...' : 'Kirim Laporan'}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          if (confirm('Apakah Anda yakin ingin mereset seluruh formulir? Semua isian akan hilang.')) {
+            clearFormStores(token);
+            setAmount('');
+            setItems([{ name: '', qty: 1 }]);
+            setPaymentMethod('CASH');
+            setFileName('');
+            setReceiptDataUrl(null);
+            if (fileRef.current) fileRef.current.value = '';
+            setMessage(null);
+            setRestored(false);
+          }
+        }}
+        className="btn btn-secondary"
+        style={{ marginTop: '0.5rem', padding: '0.75rem', fontSize: '1rem' }}
+      >
+        Reset Formulir
       </button>
     </form>
   )
