@@ -9,9 +9,11 @@ import Link from 'next/link'
 export default function SignUp() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('') // State baru
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
+  const [signUpSuccess, setSignUpSuccess] = useState(false) // State baru untuk sukses pendaftaran
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false) // State baru untuk verifikasi email
   const router = useRouter()
   const supabase = createClient()
 
@@ -19,23 +21,43 @@ export default function SignUp() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    setSuccess(false)
+    setSignUpSuccess(false) // Reset
+    setRequiresEmailVerification(false) // Reset
+
+    // Client-side validation
+    if (password.length < 6) {
+      setError('Password minimal 6 karakter.')
+      setLoading(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Konfirmasi password tidak cocok.')
+      setLoading(false)
+      return
+    }
     
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
     })
     
-    if (error) {
-      setError(error.message)
+    if (signUpError) {
+      setError(signUpError.message)
       setLoading(false)
     } else {
-      setSuccess(true)
+      setSignUpSuccess(true) // Pendaftaran berhasil dikirim
       setLoading(false)
-      setTimeout(() => {
-        router.push('/dashboard')
-        router.refresh()
-      }, 2000)
+      if (data.session) {
+        // Pengguna langsung login (misal: konfirmasi email dinonaktifkan)
+        setTimeout(() => {
+          router.push('/dashboard')
+          router.refresh()
+        }, 2000)
+      } else {
+        // Konfirmasi email diperlukan
+        setRequiresEmailVerification(true)
+      }
     }
   }
 
@@ -53,11 +75,14 @@ export default function SignUp() {
           <p style={{ color: 'var(--text-muted)' }}>Mulai kelola keuangan UMKM Anda</p>
         </div>
         
-        {success ? (
+        {signUpSuccess ? (
           <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '8px', marginBottom: '1rem' }}>
             <p><strong>Pendaftaran Berhasil!</strong></p>
-            <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>Mengarahkan Anda ke Dashboard...</p>
-            <p style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>(Cek kotak masuk/spam email Anda jika Supabase meminta konfirmasi email).</p>
+            {requiresEmailVerification ? (
+              <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>Silakan cek kotak masuk/spam email Anda untuk verifikasi akun, lalu masuk ke dashboard.</p>
+            ) : (
+              <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>Mengarahkan Anda ke Dashboard...</p>
+            )}
           </div>
         ) : (
           <form onSubmit={handleSignUp} className="flex flex-col">
@@ -73,7 +98,7 @@ export default function SignUp() {
                 placeholder="bos@toko.com"
               />
             </div>
-            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+            <div className="input-group">
               <label htmlFor="password">Password</label>
               <input 
                 id="password"
@@ -83,6 +108,20 @@ export default function SignUp() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="Minimal 6 karakter"
+                minLength="6"
+              />
+            </div>
+            {/* Input konfirmasi password baru */}
+            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+              <label htmlFor="confirmPassword">Konfirmasi Password</label>
+              <input 
+                id="confirmPassword"
+                type="password" 
+                className="input-field" 
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                placeholder="Ketik ulang password Anda"
                 minLength="6"
               />
             </div>
