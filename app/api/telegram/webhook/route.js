@@ -109,9 +109,9 @@ export async function POST(req) {
         .eq('store_id', cashier.store_id)
         .gte('created_at', `${today}T00:00:00Z`)
         .lt('created_at', `${today}T23:59:59Z`)
-      
-      if (count >= 40) {
-        await sendMessage(chatId, '❌ Batas transaksi harian paket GRATIS (40 transaksi) telah tercapai. Minta owner toko untuk upgrade ke PRO.')
+
+      if (count >= 30) {
+        await sendMessage(chatId, '❌ Batas transaksi harian paket GRATIS (30 transaksi) telah tercapai. Minta owner toko untuk upgrade ke PRO.')
         return NextResponse.json({ ok: true })
       }
     }
@@ -122,29 +122,36 @@ export async function POST(req) {
 
     const lines = text.trim().split('\n').filter(l => l.trim() !== '')
 
+    if (lines.length === 0) {
+      await sendMessage(chatId, '❌ Pesan kosong. Kirimkan nominal dan nama produk.')
+      return NextResponse.json({ ok: true })
+    }
+
     if (lines.length === 1) {
-      // Format: 50000 2 Nasi Goreng OR 50000 Nasi Goreng
+      // Format: <nominal> <kuantitas> <produk> ATAU <nominal> <produk>
       const match = lines[0].trim().match(/^(\d+)\s+(.+)$/)
       if (!match) {
-        await sendMessage(chatId, '❌ Format salah.\nGunakan: <nominal> <kuantitas> <produk>\nContoh: 50000 2 Nasi Goreng')
+        await sendMessage(chatId, '❌ Format salah.\nGunakan:\n`<nominal> <jumlah> <nama_produk>`\nContoh:\n`50000 2 Nasi Goreng`\n\nUntuk multi-item:\n`<total_nominal>`\n`<jumlah> <nama_produk_1>`\n`<jumlah> <nama_produk_2>`\nContoh:\n`65000`\n`2 Nasi Goreng`\n`1 Es Teh`')
         return NextResponse.json({ ok: true })
       }
       amount = parseInt(match[1], 10)
       
-      const prodParts = match[2].trim().match(/^(\d+)\s+(.+)$/)
+      // Ensure productName always starts with a quantity prefix
+      const prodDescription = match[2].trim()
+      const prodParts = prodDescription.match(/^(\d+)\s+(.+)$/)
       if (prodParts) {
         productName = `${prodParts[1]}x ${prodParts[2]}`
       } else {
-        productName = `1x ${match[2].trim()}`
+        productName = `1x ${prodDescription}`
       }
     } else {
       // Format multi-line:
-      // 65000
-      // 2 Nasi Goreng
-      // 1 Es Teh
+      // <total_nominal>
+      // <kuantitas> <produk 1>
+      // <kuantitas> <produk 2>
       const firstLine = lines[0].trim()
       if (!/^\d+$/.test(firstLine)) {
-        await sendMessage(chatId, '❌ Format salah.\nBaris pertama harus total nominal (angka saja).\nContoh:\n65000\n2 Nasi Goreng\n1 Es Teh')
+        await sendMessage(chatId, '❌ Format salah untuk multi-item.\nBaris pertama harus total nominal (angka saja).\nContoh:\n`65000`\n`2 Nasi Goreng`\n`1 Es Teh`')
         return NextResponse.json({ ok: true })
       }
       amount = parseInt(firstLine, 10)
@@ -156,7 +163,7 @@ export async function POST(req) {
         if (prodParts) {
           items.push(`${prodParts[1]}x ${prodParts[2]}`)
         } else {
-          items.push(`1x ${line}`)
+          items.push(`1x ${line}`) // Default to 1x if quantity is missing
         }
       }
       productName = items.join(', ')

@@ -139,11 +139,11 @@ export default function Home() {
                 <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2.5rem 0', display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', color: 'var(--text-main)', fontWeight: '500' }}>
                     <CheckCircle2 size={20} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Maks 40 transaksi per hari
+                    Maks 30 transaksi per hari
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', color: 'var(--text-main)', fontWeight: '500' }}>
                     <CheckCircle2 size={20} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    1 Web Kasir & 1 Akun Telegram
+                    1 Web Kasir & 1 Akun Telegram Bot
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', color: 'var(--text-main)', fontWeight: '500' }}>
                     <CheckCircle2 size={20} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />

@@ -79,12 +79,31 @@ export default function Guidebook() {
               Jika Anda lebih nyaman menggunakan Telegram, Yandihan juga menyediakannya.
             </p>
             <div style={{ backgroundColor: '#f0fdf4', padding: '1.5rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-              <ol style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', color: '#166534' }}>
+              <ol style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: '#166534' }}>
                 <li>Bos harus memberikan <strong>Kode Unik</strong> tokonya dari menu Pengaturan (misal: <code>KASIR-ABC123</code>).</li>
                 <li>Kasir membuka Telegram, cari bot Telegram Anda.</li>
                 <li>Kasir mengirim pesan: <code>/start KASIR-ABC123</code> untuk menyambungkan akun.</li>
-                <li>Untuk lapor transaksi tunai, cukup ketik: <code>50000 Nasi Goreng</code> lalu kirim.</li>
-                <li>Untuk lapor QRIS/TF, <strong>kirimkan foto buktinya</strong>, dan di bagian *caption* (keterangan foto) ketik: <code>50000 Nasi Goreng</code> lalu kirim.</li>
+                <li>
+                  Untuk lapor transaksi (Tunai/QRIS/Transfer), gunakan format berikut:
+                  <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <li>
+                      <strong>Single item:</strong><br />
+                      <code>&lt;nominal&gt; &lt;jumlah&gt; &lt;nama_produk&gt;</code><br />
+                      Contoh: <code>50000 2 Nasi Goreng</code>
+                    </li>
+                    <li>
+                      <strong>Multi-item:</strong><br />
+                      <code>&lt;total_nominal&gt;</code> (baris pertama)<br />
+                      <code>&lt;jumlah&gt; &lt;nama_produk_1&gt;</code> (baris berikutnya)<br />
+                      <code>&lt;jumlah&gt; &lt;nama_produk_2&gt;</code><br />
+                      Contoh:<br />
+                      <code>65000</code><br />
+                      <code>2 Nasi Goreng</code><br />
+                      <code>1 Es Teh</code>
+                    </li>
+                  </ul>
+                  Jika pelanggan bayar via QRIS/Transfer, <strong>kirimkan foto bukti bayar</strong> dan gunakan format di atas sebagai *caption* (keterangan foto).
+                </li>
               </ol>
             </div>
           </section>

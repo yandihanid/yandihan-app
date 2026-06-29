@@ -11,7 +11,7 @@ export default async function ReceiptPage({ params }) {
 
   const { data: tx, error: txError } = await supabase
     .from('transactions')
-    .select('*, stores(name), cashiers(name, token)')
+    .select('*, stores(name), cashiers(name, token), cash_received, change_amount')
     .eq('id', id)
     .single()
 
@@ -66,10 +66,23 @@ export default async function ReceiptPage({ params }) {
 
         <div style={{ borderTop: '2px dashed #ccc', margin: '1rem 0' }}></div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.125rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
           <span>{tx.product_name || 'Pembelian'}</span>
           <span>Rp {Number(tx.amount).toLocaleString('id-ID')}</span>
         </div>
+
+        {tx.payment_method === 'CASH' && tx.cash_received && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderTop: '1px dashed #eee', paddingTop: '0.5rem' }}>
+              <span>Uang Diterima:</span>
+              <span>Rp {Number(tx.cash_received).toLocaleString('id-ID')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.125rem' }}>
+              <span>Kembalian:</span>
+              <span>Rp {Number(tx.change_amount).toLocaleString('id-ID')}</span>
+            </div>
+          </>
+        )}
 
         <div style={{ borderTop: '2px dashed #ccc', margin: '1rem 0' }}></div>
 

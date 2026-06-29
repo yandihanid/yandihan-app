@@ -11,6 +11,8 @@ export async function submitTransaction(formData) {
     const productName = formData.get('productName')
     const paymentMethod = formData.get('paymentMethod')
     const receiptFile = formData.get('receipt')
+    const cashReceived = formData.get('cashReceived')
+    const changeAmount = formData.get('changeAmount')
 
     const supabase = createServiceClient()
 
@@ -33,9 +35,9 @@ export async function submitTransaction(formData) {
         .eq('store_id', storeId)
         .gte('created_at', `${today}T00:00:00Z`)
         .lt('created_at', `${today}T23:59:59Z`)
-      
-      if (count >= 40) {
-        throw new Error("Batas transaksi harian paket GRATIS (40 transaksi) telah tercapai. Silakan upgrade ke PRO.")
+
+      if (count >= 30) {
+        throw new Error("Batas transaksi harian paket GRATIS (30 transaksi) telah tercapai. Silakan upgrade ke PRO.")
       }
     }
 
@@ -76,7 +78,9 @@ export async function submitTransaction(formData) {
         amount: parseInt(amount, 10),
         product_name: productName,
         payment_method: paymentMethod,
-        receipt_url: receiptUrl
+        receipt_url: receiptUrl,
+        cash_received: paymentMethod === 'CASH' ? parseInt(cashReceived, 10) : null,
+        change_amount: paymentMethod === 'CASH' ? parseInt(changeAmount, 10) : null,
       })
       .select()
       .single()

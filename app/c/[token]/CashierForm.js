@@ -79,7 +79,8 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [fileName, setFileName] = useState('')
   const [receiptDataUrl, setReceiptDataUrl] = useState(null)
-  const [cashReceived, setCashReceived] = useState('') // New state for cash received
+  const [cashReceived, setCashReceived] = useState('')
+  const [changeAmount, setChangeAmount] = useState(0) // New state for change amount
 
   // Fungsi untuk mereset seluruh formulir ke kondisi awal
   const resetForm = () => {
@@ -90,6 +91,8 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setReceiptDataUrl(null);
     if (fileRef.current) fileRef.current.value = ''; // Hapus file dari input
     setMessage(null);
+    setCashReceived(''); // Reset cash received
+    setChangeAmount(0);  // Reset change amount
   }
 
   // Efek untuk mereset formulir saat komponen dimuat (misal: halaman dibuka/kembali dari struk)
@@ -103,7 +106,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     if (!products || products.length === 0) return amount;
     let total = 0;
     let autoCalcPossible = false;
-    
+
     currentItems.forEach(item => {
       const prod = products.find(p => p.name === item.name);
       if (prod) {
@@ -114,6 +117,17 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
 
     return autoCalcPossible && total > 0 ? String(total) : amount;
   }
+
+  // Effect to calculate change whenever amount or cashReceived changes
+  useEffect(() => {
+    const totalAmount = parseFloat(amount);
+    const received = parseFloat(cashReceived);
+    if (!isNaN(totalAmount) && !isNaN(received) && received >= totalAmount) {
+      setChangeAmount(received - totalAmount);
+    } else {
+      setChangeAmount(0);
+    }
+  }, [amount, cashReceived]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items]
@@ -211,6 +225,11 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     formData.append('amount', amount)
     formData.append('productName', combinedProductName)
     formData.append('paymentMethod', paymentMethod)
+
+    if (paymentMethod === 'CASH') {
+      formData.append('cashReceived', cashReceived);
+      formData.append('changeAmount', changeAmount);
+    }
 
     if (rawFile && paymentMethod === 'QRIS/TF') {
       try {
@@ -371,9 +390,9 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
             min={amount ? parseFloat(amount) : 0} // Minimum must be total amount
             placeholder="Jumlah uang yang diberikan pelanggan"
           />
-          {amount && cashReceived && (
+          {amount && cashReceived && !isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(amount) && (
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-              Kembalian: Rp {Math.max(0, parseFloat(cashReceived) - parseFloat(amount)).toLocaleString('id-ID')}
+              Kembalian: Rp {changeAmount.toLocaleString('id-ID')}
             </p>
           )}
         </div>
