@@ -171,6 +171,18 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setLoading(true)
     setMessage(null)
 
+    const totalAmount = parseFloat(amount) // Convert amount to number
+
+    // Validation for cash payment
+    if (paymentMethod === 'CASH') {
+      const received = parseFloat(cashReceived)
+      if (isNaN(received) || received < totalAmount) {
+        setMessage({ type: 'error', text: 'Uang yang diterima tidak cukup atau tidak valid.' })
+        setLoading(false)
+        return
+      }
+    }
+
     const combinedProductName = items
       .filter(item => item.name.trim() !== '')
       .map(item => `${item.qty}x ${item.name.trim()}`)
