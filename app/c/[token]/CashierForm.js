@@ -249,6 +249,40 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     return autoCalcPossible && total > 0 ? String(total) : amount;
   }
 
+  // Fungsi untuk mereset seluruh formulir ke kondisi awal
+  const resetForm = () => {
+    setAmount('');
+    setItems([{ name: '', qty: 1 }]);
+    setPaymentMethod('CASH');
+    setFileName('');
+    setReceiptDataUrl(null);
+    if (fileRef.current) fileRef.current.value = ''; // Hapus file dari input
+    setMessage(null);
+  }
+
+  // Efek untuk mereset formulir saat komponen dimuat (misal: halaman dibuka/kembali dari struk)
+  useEffect(() => {
+    resetForm();
+  }, [token]); // Reset setiap kali token kasir berubah (atau saat komponen di-mount ulang)
+
+
+  // Calculate total automatically
+  const calculateTotal = (currentItems) => {
+    if (!products || products.length === 0) return amount;
+    let total = 0;
+    let autoCalcPossible = false;
+    
+    currentItems.forEach(item => {
+      const prod = products.find(p => p.name === item.name);
+      if (prod) {
+        total += (parseFloat(prod.price) || 0) * (parseInt(item.qty) || 0);
+        autoCalcPossible = true;
+      }
+    });
+
+    return autoCalcPossible && total > 0 ? String(total) : amount;
+  }
+
   const handleItemChange = (index, field, value) => {
     const newItems = [...items]
     newItems[index][field] = value
@@ -257,16 +291,12 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     const newAmount = calculateTotal(newItems);
     if (newAmount !== amount) {
       setAmount(newAmount)
-      readyRef.current && persistForm({ items: newItems, amount: newAmount })
-    } else {
-      readyRef.current && persistForm({ items: newItems })
     }
   }
 
   const addItem = () => {
     const newItems = [...items, { name: '', qty: 1 }]
     setItems(newItems)
-    readyRef.current && persistForm({ items: newItems })
   }
 
   const removeItem = (index) => {
@@ -277,32 +307,29 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     const newAmount = calculateTotal(newItems);
     if (newAmount !== amount) {
       setAmount(newAmount)
-      readyRef.current && persistForm({ items: newItems, amount: newAmount })
-    } else {
-      readyRef.current && persistForm({ items: newItems })
     }
   }
 
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files?.[0]
-    if (!selectedFile) return
+    if (!selectedFile) {
+      setFileName('');
+      setReceiptDataUrl(null);
+      return;
+    }
 
     const nextFileName = selectedFile.name
     setFileName(nextFileName)
-    setRestored(false)
-
-    readyRef.current && persistForm({ fileName: nextFileName, receiptDataUrl: null })
+    setReceiptDataUrl(null) // Clear previous Data URL while compressing
 
     try {
       const compressed = await compressImage(selectedFile)
       const dataUrl = await readFileAsDataUrl(compressed)
       setReceiptDataUrl(dataUrl)
-      readyRef.current && persistForm({ fileName: nextFileName, receiptDataUrl: dataUrl })
     } catch {
       try {
         const dataUrl = await readFileAsDataUrl(selectedFile)
         setReceiptDataUrl(dataUrl)
-        readyRef.current && persistForm({ fileName: nextFileName, receiptDataUrl: dataUrl })
       } catch { /* ignore */ }
     }
   }
@@ -373,33 +400,24 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
         </div>
       )}
 
-      {restored && (
-        <div style={{
-          padding: '0.75rem 1rem',
-          borderRadius: '8px',
-          backgroundColor: '#fef3c7',
-          color: '#92400e',
-          fontSize: '0.875rem'
-        }}>
-          ⚠️ Halaman dimuat ulang oleh browser. Isian formulir telah dipulihkan{receiptDataUrl ? ', termasuk foto bukti' : ''}.{receiptDataUrl ? '' : ' Silakan pilih ulang foto bukti pembayaran jika diperlukan.'}
-        </div>
-      )}
-
       <div className="input-group">
         <label>Daftar Produk</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {items.map((item, index) => (
             <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input
-                type="number"
+              {/* Dropdown Kuantitas */}
+              <select
                 className="input-field"
                 value={item.qty}
                 onChange={e => handleItemChange(index, 'qty', parseInt(e.target.value) || 1)}
-                min="1"
                 style={{ width: '70px', padding: '0.5rem' }}
                 title="Kuantitas"
                 required
-              />
+              >
+                {[...Array(10).keys()].map(i => ( // Opsi 1 hingga 10
+                  <option key={i + 1} value={i + 1}>{i + 1}</option>
+                ))}
+              </select>
               <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
               
               {products && products.length > 0 ? (
@@ -469,7 +487,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           onChange={e => {
             if (products && products.length > 0) return // readonly when products exist
             setAmount(e.target.value)
-            readyRef.current && persistForm({ amount: e.target.value })
           }}
           readOnly={products && products.length > 0}
           required
@@ -489,7 +506,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           value={paymentMethod}
           onChange={e => {
             setPaymentMethod(e.target.value)
-            readyRef.current && persistForm({ paymentMethod: e.target.value })
           }}
         >
           <option value="CASH">CASH (Tunai)</option>
@@ -512,7 +528,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
             ✓ Foto terpilih: {fileName}
           </p>
         )}
-        {receiptDataUrl && ( // NEW: Display preview if data URL exists
+        {receiptDataUrl && (
           <div style={{ marginTop: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
             <p style={{ margin: '0.5rem 0.75rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Preview Foto Bukti:</p>
             <img src={receiptDataUrl} alt="Bukti Pembayaran" style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
@@ -522,7 +538,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 setReceiptDataUrl(null);
                 setFileName('');
                 if (fileRef.current) fileRef.current.value = ''; // Clear file input
-                persistForm({ receiptDataUrl: null, fileName: '' });
               }}
               style={{
                 width: '100%',
@@ -546,27 +561,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
 
       <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
         {loading ? 'Mengirim & Mengompres Data...' : 'Kirim Laporan'}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => {
-          if (confirm('Apakah Anda yakin ingin mereset seluruh formulir? Semua isian akan hilang.')) {
-            clearFormStores(token);
-            setAmount('');
-            setItems([{ name: '', qty: 1 }]);
-            setPaymentMethod('CASH');
-            setFileName('');
-            setReceiptDataUrl(null);
-            if (fileRef.current) fileRef.current.value = '';
-            setMessage(null);
-            setRestored(false);
-          }
-        }}
-        className="btn btn-secondary"
-        style={{ marginTop: '0.5rem', padding: '0.75rem', fontSize: '1rem' }}
-      >
-        Reset Formulir
       </button>
     </form>
   )
