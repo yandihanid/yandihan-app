@@ -79,6 +79,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [fileName, setFileName] = useState('')
   const [receiptDataUrl, setReceiptDataUrl] = useState(null)
+  const [cashReceived, setCashReceived] = useState('') // New state for cash received
 
   // Fungsi untuk mereset seluruh formulir ke kondisi awal
   const resetForm = () => {
@@ -343,6 +344,28 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           <option value="QRIS/TF">QRIS / Transfer Bank</option>
         </select>
       </div>
+
+      {/* Input Uang Diterima dan Kembalian untuk CASH */}
+      {paymentMethod === 'CASH' && (
+        <div className="input-group">
+          <label htmlFor="cashReceived">Uang Diterima (Rp)</label>
+          <input
+            id="cashReceived"
+            type="number"
+            className="input-field"
+            value={cashReceived}
+            onChange={(e) => setCashReceived(e.target.value)}
+            required
+            min={amount ? parseFloat(amount) : 0} // Minimum must be total amount
+            placeholder="Jumlah uang yang diberikan pelanggan"
+          />
+          {amount && cashReceived && (
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+              Kembalian: Rp {Math.max(0, parseFloat(cashReceived) - parseFloat(amount)).toLocaleString('id-ID')}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
         <label>Upload Bukti Pembayaran</label>
