@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
 
@@ -49,94 +49,6 @@ function compressImage(file) {
   })
 }
 
-const LEGACY_STORAGE_KEY = 'yandihan_cashier_form'
-const STORAGE_PREFIX = 'yandihan_cashier_form_'
-
-function getStorageKey(token) {
-  return `${STORAGE_PREFIX}${token}`
-}
-
-function readFromStores(key) {
-  for (const store of [localStorage, sessionStorage]) {
-    try {
-      const saved = store.getItem(key)
-      if (saved) return JSON.parse(saved)
-    } catch { /* ignore */ }
-  }
-  return null
-}
-
-function loadSavedForm(token) {
-  if (typeof window === 'undefined') return null
-
-  const key = getStorageKey(token)
-  let data = readFromStores(key)
-
-  if (!data) {
-    const legacy = readFromStores(LEGACY_STORAGE_KEY)
-    if (legacy) {
-      writeToStores(key, legacy)
-      clearFormStores(LEGACY_STORAGE_KEY)
-      data = legacy
-    }
-  }
-
-  return data
-}
-
-function writeToStores(key, payload) {
-  const textOnly = {
-    amount: payload.amount,
-    items: payload.items,
-    paymentMethod: payload.paymentMethod,
-    fileName: payload.fileName,
-    savedAt: Date.now(),
-  }
-
-  for (const store of [localStorage, sessionStorage]) {
-    try {
-      store.setItem(key, JSON.stringify(payload))
-      // #region agent log
-      fetch('http://127.0.0.1:7449/ingest/967cd299-60b4-494c-a62c-d11cf5e270f9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5a0991'},body:JSON.stringify({sessionId:'5a0991',hypothesisId:'H5',location:'CashierForm.js:writeToStores',message:'storage write ok',data:{store:store===localStorage?'localStorage':'sessionStorage',mode:'full',amount:payload.amount,paymentMethod:payload.paymentMethod,hasFileName:!!payload.fileName,hasReceipt:!!payload.receiptDataUrl,receiptLen:payload.receiptDataUrl?.length||0},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      return 'full'
-    } catch (err) {
-      try {
-        store.setItem(key, JSON.stringify(textOnly))
-        // #region agent log
-        fetch('http://127.0.0.1:7449/ingest/967cd299-60b4-494c-a62c-d11cf5e270f9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5a0991'},body:JSON.stringify({sessionId:'5a0991',hypothesisId:'H5',location:'CashierForm.js:writeToStores',message:'storage write text-only fallback',data:{store:store===localStorage?'localStorage':'sessionStorage',err:String(err),amount:textOnly.amount,paymentMethod:textOnly.paymentMethod},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        return 'text'
-      } catch { /* ignore */ }
-    }
-  }
-  // #region agent log
-  fetch('http://127.0.0.1:7449/ingest/967cd299-60b4-494c-a62c-d11cf5e270f9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5a0991'},body:JSON.stringify({sessionId:'5a0991',hypothesisId:'H5',location:'CashierForm.js:writeToStores',message:'storage write failed both stores',data:{amount:payload.amount,paymentMethod:payload.paymentMethod},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  return null
-}
-
-function clearFormStores(tokenOrKey) {
-  const key = tokenOrKey.startsWith(STORAGE_PREFIX) ? tokenOrKey : getStorageKey(tokenOrKey)
-  for (const store of [localStorage, sessionStorage]) {
-    try {
-      store.removeItem(key)
-      store.removeItem(LEGACY_STORAGE_KEY)
-    } catch { /* ignore */ }
-  }
-}
-
-function hasSavedFormData(data) {
-  if (!data) return false
-  return !!(
-    data.amount ||
-    data.paymentMethod === 'QRIS/TF' ||
-    data.fileName ||
-    data.receiptDataUrl ||
-    data.items?.some(item => item.name?.trim())
-  )
-}
-
 function dataUrlToFile(dataUrl, name) {
   const [header, base64] = dataUrl.split(',')
   const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
@@ -158,96 +70,15 @@ function readFileAsDataUrl(file) {
 export default function CashierForm({ cashierId, storeId, token, products = [] }) {
   const router = useRouter()
   const fileRef = useRef(null)
-  const readyRef = useRef(false)
-  const instanceId = useRef(`cf-${Math.random().toString(36).slice(2, 8)}`)
-  const mountCount = useRef(0)
-  const formRef = useRef({
-    amount: '',
-    items: [{ name: '', qty: 1 }],
-    paymentMethod: 'CASH',
-    fileName: '',
-    receiptDataUrl: null,
-  })
 
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
-  const [ready, setReady] = useState(false)
-  const [restored, setRestored] = useState(false)
 
   const [amount, setAmount] = useState('')
   const [items, setItems] = useState([{ name: '', qty: 1 }])
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [fileName, setFileName] = useState('')
   const [receiptDataUrl, setReceiptDataUrl] = useState(null)
-
-  formRef.current = { amount, items, paymentMethod, fileName, receiptDataUrl }
-
-  const persistForm = useCallback((override = {}) => {
-    if (!readyRef.current) return
-
-    const data = { ...formRef.current, ...override, savedAt: Date.now() }
-    writeToStores(getStorageKey(token), data)
-  }, [token])
-
-  // Pulihkan dari storage
-  useLayoutEffect(() => {
-    mountCount.current += 1
-    const saved = loadSavedForm(token)
-    
-    if (saved) {
-      if (saved.amount != null) setAmount(String(saved.amount))
-      if (saved.items?.length) setItems(saved.items)
-      if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod)
-      if (saved.fileName) setFileName(saved.fileName)
-      if (saved.receiptDataUrl) setReceiptDataUrl(saved.receiptDataUrl)
-      if (hasSavedFormData(saved)) setRestored(true)
-    }
-
-    readyRef.current = true
-    setReady(true)
-  }, [token])
-
-  useEffect(() => {
-    if (!ready) return
-    writeToStores(getStorageKey(token), { ...formRef.current, savedAt: Date.now() })
-  }, [ready, amount, items, paymentMethod, fileName, receiptDataUrl, token])
-
-  useEffect(() => {
-    if (!ready) return
-
-    const flush = () => {
-      persistForm()
-    }
-    const onPageShow = (e) => {}
-    
-    window.addEventListener('pagehide', flush)
-    window.addEventListener('pageshow', onPageShow)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') flush()
-    })
-
-    return () => {
-      window.removeEventListener('pagehide', flush)
-      window.removeEventListener('pageshow', onPageShow)
-    }
-  }, [ready, persistForm])
-
-  // Calculate total automatically
-  const calculateTotal = (currentItems) => {
-    if (!products || products.length === 0) return amount;
-    let total = 0;
-    let autoCalcPossible = false;
-    
-    currentItems.forEach(item => {
-      const prod = products.find(p => p.name === item.name);
-      if (prod) {
-        total += (parseFloat(prod.price) || 0) * (parseInt(item.qty) || 0);
-        autoCalcPossible = true;
-      }
-    });
-
-    return autoCalcPossible && total > 0 ? String(total) : amount;
-  }
 
   // Fungsi untuk mereset seluruh formulir ke kondisi awal
   const resetForm = () => {
