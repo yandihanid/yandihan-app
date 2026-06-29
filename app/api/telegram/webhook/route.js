@@ -83,7 +83,7 @@ export async function POST(req) {
         console.error(error)
         await sendMessage(chatId, 'Terjadi kesalahan sistem saat mendaftar.')
       } else {
-        await sendMessage(chatId, `✅ Berhasil terhubung ke toko: *${store.name}*\n\nMulai laporkan transaksi dengan mengetik:\n<nominal> <produk>\nContoh: 50000 Nasi Goreng\n\nUntuk QRIS/Transfer, kirimkan foto bukti dengan caption/keterangan yang sama.`)
+        await sendMessage(chatId, `✅ Berhasil terhubung ke toko: *${store.name}*\n\nMulai laporkan transaksi dengan format:\n\n*Single item:*\n\`<nominal> <jumlah> <nama_produk>\`\nContoh: \`50000 2 Nasi Goreng\`\n\n*Multi-item:*\n\`<total_nominal>\`\n\`<jumlah> <nama_produk_1>\`\n\`<jumlah> <nama_produk_2>\`\nContoh:\n\`65000\`\n\`2 Nasi Goreng\`\n\`1 Es Teh\`\n\nUntuk QRIS/Transfer, kirimkan foto bukti dengan caption/keterangan yang sama.`)
       }
       return NextResponse.json({ ok: true })
     }
