@@ -356,7 +356,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     if (result.error) {
       setMessage({ type: 'error', text: result.error })
     } else {
-      clearFormStores(token)
       router.push(`/r/${result.transactionId}`)
     }
   }
