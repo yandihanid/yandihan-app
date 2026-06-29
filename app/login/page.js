@@ -36,7 +36,7 @@ export default function Login() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      router.replace('/dashboard') // Use replace to prevent going back to login
       router.refresh()
     }
   }
