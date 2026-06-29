@@ -29,7 +29,7 @@ export default async function Dashboard({ searchParams }) {
   // Fetch transactions
   let query = supabase
     .from('transactions')
-    .select('*, cashiers(name)')
+    .select('*, cashiers(name), cash_received, change_amount') // Explicitly select cash_received and change_amount
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 

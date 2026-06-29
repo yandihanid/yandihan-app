@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { UserPlus } from 'lucide-react'
@@ -16,6 +16,15 @@ export default function SignUp() {
   const [requiresEmailVerification, setRequiresEmailVerification] = useState(false) // State baru untuk verifikasi email
   const router = useRouter()
   const supabase = createClient()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace('/dashboard')
+      }
+    })
+  }, [router, supabase])
 
   const handleSignUp = async (e) => {
     e.preventDefault()
@@ -51,7 +60,7 @@ export default function SignUp() {
       if (data.session) {
         // Pengguna langsung login (misal: konfirmasi email dinonaktifkan)
         setTimeout(() => {
-          router.push('/dashboard')
+          router.replace('/dashboard') // Use replace to prevent going back to signup
           router.refresh()
         }, 2000)
       } else {

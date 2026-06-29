@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { LogIn } from 'lucide-react'
@@ -14,6 +14,15 @@ export default function Login() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Redirect if already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace('/dashboard')
+      }
+    })
+  }, [router, supabase])
+
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -22,7 +31,7 @@ export default function Login() {
       email,
       password,
     })
-    
+
     if (error) {
       setError(error.message)
       setLoading(false)

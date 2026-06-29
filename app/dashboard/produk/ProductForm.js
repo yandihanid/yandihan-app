@@ -19,12 +19,17 @@ export default function ProductForm({ storeId }) {
     formData.append('name', name)
     formData.append('price', price)
 
-    await addProduct(formData)
+    const result = await addProduct(formData)
 
-    setName('')
-    setPrice('')
     setLoading(false)
-    router.refresh()
+    if (!result.error) {
+      setName('')
+      setPrice('')
+      router.refresh()
+      router.replace('/dashboard/produk') // Redirect to product list after successful add
+    } else {
+      alert(result.error); // Show error if product add failed
+    }
   }
 
   return (
