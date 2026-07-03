@@ -8,15 +8,17 @@ export async function addProduct(formData) {
   const storeId = formData.get('storeId')
   const name = formData.get('name')
   const price = formData.get('price')
+  const stock = formData.get('stock')
 
-  if (!storeId || !name || !price) return { error: 'Data tidak lengkap' }
+  if (!storeId || !name || !price || stock === null || stock === undefined) return { error: 'Data tidak lengkap' }
 
   const { error } = await supabase
     .from('products')
     .insert({
       store_id: storeId,
       name: name,
-      price: price
+      price: parseInt(price, 10),
+      stock: parseInt(stock, 10)
     })
 
   if (error) {

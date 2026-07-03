@@ -9,6 +9,7 @@ export default function ProductForm({ storeId }) {
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
+  const [stock, setStock] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -18,6 +19,7 @@ export default function ProductForm({ storeId }) {
     formData.append('storeId', storeId)
     formData.append('name', name)
     formData.append('price', price)
+    formData.append('stock', stock)
 
     const result = await addProduct(formData)
 
@@ -25,6 +27,7 @@ export default function ProductForm({ storeId }) {
     if (!result.error) {
       setName('')
       setPrice('')
+      setStock('')
       router.refresh()
       router.replace('/dashboard/produk') // Redirect to product list after successful add
     } else {
@@ -34,7 +37,7 @@ export default function ProductForm({ storeId }) {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-      <div style={{ flex: '1', minWidth: '200px' }}>
+      <div style={{ flex: '2', minWidth: '200px' }}>
         <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Nama Produk</label>
         <input
           type="text"
@@ -45,7 +48,7 @@ export default function ProductForm({ storeId }) {
           required
         />
       </div>
-      <div style={{ flex: '1', minWidth: '150px' }}>
+      <div style={{ flex: '1', minWidth: '120px' }}>
         <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Harga (Rp)</label>
         <input
           type="number"
@@ -53,6 +56,18 @@ export default function ProductForm({ storeId }) {
           value={price}
           onChange={e => setPrice(e.target.value)}
           placeholder="Misal: 25000"
+          required
+          min="0"
+        />
+      </div>
+      <div style={{ flex: '1', minWidth: '100px' }}>
+        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Stok Awal</label>
+        <input
+          type="number"
+          className="input-field"
+          value={stock}
+          onChange={e => setStock(e.target.value)}
+          placeholder="Misal: 50"
           required
           min="0"
         />

@@ -41,6 +41,43 @@ export async function submitTransaction(formData) {
       }
     }
 
+    // Parse items to check and update stock
+    // Format productName: "2x Nasi Goreng, 1x Es Teh"
+    const itemsToProcess = productName.split(', ').map(itemStr => {
+      const match = itemStr.match(/^(\d+)x\s+(.+)$/)
+      if (match) {
+        return { qty: parseInt(match[1], 10), name: match[2].trim() }
+      }
+      return null
+    }).filter(Boolean)
+
+    // Verify and deduct stock for each product
+    for (const item of itemsToProcess) {
+      const { data: product, error: prodError } = await supabase
+        .from('products')
+        .select('id, name, stock')
+        .eq('store_id', storeId)
+        .eq('name', item.name)
+        .single()
+
+      if (!prodError && product) {
+        if (product.stock < item.qty) {
+          throw new Error(`Stok untuk "${product.name}" tidak mencukupi (Sisa: ${product.stock}).`)
+        }
+
+        // Deduct stock
+        const { error: updateStockError } = await supabase
+          .from('products')
+          .update({ stock: product.stock - item.qty })
+          .eq('id', product.id)
+
+        if (updateStockError) {
+          console.error("Update Stock Error:", updateStockError)
+          throw new Error(`Gagal memperbarui stok untuk "${product.name}".`)
+        }
+      }
+    }
+
     let receiptUrl = null
 
     if (receiptFile && paymentMethod === 'QRIS/TF') {
