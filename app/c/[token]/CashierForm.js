@@ -80,12 +80,14 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [fileName, setFileName] = useState('')
   const [receiptDataUrl, setReceiptDataUrl] = useState(null)
   const [cashReceived, setCashReceived] = useState('')
-  const [changeAmount, setChangeAmount] = useState(0) // New state for change amount
+  const [changeAmount, setChangeAmount] = useState(0)
 
   // Offline Mode States
   const [isOnline, setIsOnline] = useState(true)
   const [offlineQueue, setOfflineQueue] = useState([])
   const [syncing, setSyncing] = useState(false)
+
+  const draftKey = `yandihan_draft_form_${token}`
 
   // Monitor online/offline status
   useEffect(() => {
@@ -116,24 +118,61 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     }
   }, [isOnline])
 
-  // Fungsi untuk mereset seluruh formulir ke kondisi awal
+  // Fungsi untuk mereset seluruh formulir ke kondisi awal dan menghapus draf
   const resetForm = () => {
     setAmount('');
     setItems([{ name: '', qty: 1 }]);
     setPaymentMethod('CASH');
     setFileName('');
     setReceiptDataUrl(null);
-    if (fileRef.current) fileRef.current.value = ''; // Hapus file dari input
+    if (fileRef.current) fileRef.current.value = '';
     setMessage(null);
-    setCashReceived(''); // Reset cash received
-    setChangeAmount(0);  // Reset change amount
+    setCashReceived('');
+    setChangeAmount(0);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(draftKey)
+    }
   }
 
-  // Efek untuk mereset formulir saat komponen dimuat (misal: halaman dibuka/kembali dari struk)
+  // Efek untuk memulihkan draf form saat pertama kali dimuat (mencegah kehilangan data akibat refresh kamera)
   useEffect(() => {
-    resetForm();
-  }, [token]); // Reset setiap kali token kasir berubah (atau saat komponen di-mount ulang)
+    if (typeof window !== 'undefined') {
+      const savedDraft = localStorage.getItem(draftKey)
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft)
+          if (draft.amount) setAmount(draft.amount)
+          if (draft.items) setItems(draft.items)
+          if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod)
+          if (draft.fileName) setFileName(draft.fileName)
+          if (draft.receiptDataUrl) setReceiptDataUrl(draft.receiptDataUrl)
+          if (draft.cashReceived) setCashReceived(draft.cashReceived)
+          if (draft.changeAmount) setChangeAmount(draft.changeAmount)
+        } catch (e) {
+          console.error("Gagal memulihkan draf form", e)
+        }
+      }
+    }
+  }, [token])
 
+  // Efek untuk menyimpan draf form secara otomatis setiap kali ada perubahan input
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Jangan simpan draf jika form dalam keadaan kosong/default
+      if (amount || items.some(i => i.name) || receiptDataUrl || cashReceived) {
+        const draft = {
+          amount,
+          items,
+          paymentMethod,
+          fileName,
+          receiptDataUrl,
+          cashReceived,
+          changeAmount
+        }
+        localStorage.setItem(draftKey, JSON.stringify(draft))
+      }
+    }
+  }, [amount, items, paymentMethod, fileName, receiptDataUrl, cashReceived, changeAmount])
 
   // Calculate total automatically
   const calculateTotal = (currentItems) => {
@@ -200,7 +239,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
 
     const nextFileName = selectedFile.name
     setFileName(nextFileName)
-    setReceiptDataUrl(null) // Clear previous Data URL while compressing
+    setReceiptDataUrl(null)
 
     try {
       const compressed = await compressImage(selectedFile)
@@ -275,7 +314,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setLoading(true)
     setMessage(null)
 
-    const totalAmount = parseFloat(amount) // Convert amount to number
+    const totalAmount = parseFloat(amount)
 
     // Validation for cash payment
     if (paymentMethod === 'CASH') {
@@ -367,6 +406,10 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       if (result.error) {
         setMessage({ type: 'error', text: result.error })
       } else {
+        // Hapus draf karena transaksi sukses dikirim
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(draftKey)
+        }
         router.push(`/r/${result.transactionId}`)
       }
     } catch (err) {
@@ -466,7 +509,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 title="Kuantitas"
                 required
               >
-                {[...Array(10).keys()].map(i => ( // Opsi 1 hingga 10
+                {[...Array(10).keys()].map(i => (
                   <option key={i + 1} value={i + 1}>{i + 1}</option>
                 ))}
               </select>
@@ -537,7 +580,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           className="input-field"
           value={amount}
           onChange={e => {
-            if (products && products.length > 0) return // readonly when products exist
+            if (products && products.length > 0) return
             setAmount(e.target.value)
           }}
           readOnly={products && products.length > 0}
@@ -576,7 +619,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
             value={cashReceived}
             onChange={(e) => setCashReceived(e.target.value)}
             required
-            min={amount ? parseFloat(amount) : 0} // Minimum must be total amount
+            min={amount ? parseFloat(amount) : 0}
             placeholder="Jumlah uang yang diberikan pelanggan"
           />
           {amount && cashReceived && !isNaN(parseFloat(cashReceived)) && parseFloat(cashReceived) >= parseFloat(amount) && (
@@ -611,7 +654,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               onClick={() => {
                 setReceiptDataUrl(null);
                 setFileName('');
-                if (fileRef.current) fileRef.current.value = ''; // Clear file input
+                if (fileRef.current) fileRef.current.value = '';
               }}
               style={{
                 width: '100%',
