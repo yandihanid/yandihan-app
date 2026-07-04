@@ -4,6 +4,64 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
 
+// Helper sederhana untuk IndexedDB agar aman menyimpan gambar berukuran besar secara offline
+const DB_NAME = 'YandihanDraftDB'
+const STORE_NAME = 'draft_images'
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject('Window is undefined')
+      return
+    }
+    const request = indexedDB.open(DB_NAME, 1)
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME)
+      }
+    }
+    request.onsuccess = (e) => resolve(e.target.result)
+    request.onerror = (e) => reject(e.target.error)
+  })
+}
+
+async function saveImageToIndexedDB(key, dataUrl) {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.objectStore(STORE_NAME).put(dataUrl, key)
+    return new Promise((resolve) => {
+      tx.oncomplete = () => resolve(true)
+    })
+  } catch (e) {
+    console.error('Gagal menyimpan gambar ke IndexedDB:', e)
+    return false
+  }
+}
+
+async function loadImageFromIndexedDB(key) {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const req = tx.objectStore(STORE_NAME).get(key)
+    return new Promise((resolve) => {
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => resolve(null)
+    })
+  } catch (e) {
+    return null
+  }
+}
+
+async function deleteImageFromIndexedDB(key) {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.objectStore(STORE_NAME).delete(key)
+  } catch (e) { /* ignore */ }
+}
+
 function compressImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -88,6 +146,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [syncing, setSyncing] = useState(false)
 
   const draftKey = `yandihan_draft_form_${token}`
+  const draftImageKey = `yandihan_draft_img_${token}`
 
   // Monitor online/offline status
   useEffect(() => {
@@ -131,10 +190,11 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setChangeAmount(0);
     if (typeof window !== 'undefined') {
       localStorage.removeItem(draftKey)
+      deleteImageFromIndexedDB(draftImageKey)
     }
   }
 
-  // Efek untuk memulihkan draf form saat pertama kali dimuat (mencegah kehilangan data akibat refresh kamera)
+  // Efek untuk memulihkan draf form saat pertama kali dimuat
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedDraft = localStorage.getItem(draftKey)
@@ -145,34 +205,49 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           if (draft.items) setItems(draft.items)
           if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod)
           if (draft.fileName) setFileName(draft.fileName)
-          if (draft.receiptDataUrl) setReceiptDataUrl(draft.receiptDataUrl)
           if (draft.cashReceived) setCashReceived(draft.cashReceived)
           if (draft.changeAmount) setChangeAmount(draft.changeAmount)
         } catch (e) {
           console.error("Gagal memulihkan draf form", e)
         }
       }
+
+      // Pulihkan gambar dari IndexedDB secara asinkron agar tidak membebani RAM
+      loadImageFromIndexedDB(draftImageKey).then((savedImg) => {
+        if (savedImg) {
+          setReceiptDataUrl(savedImg)
+        }
+      })
     }
   }, [token])
 
-  // Efek untuk menyimpan draf form secara otomatis setiap kali ada perubahan input
+  // Efek untuk menyimpan draf form secara otomatis setiap kali ada perubahan input (Teks ke LocalStorage, Gambar ke IndexedDB)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Jangan simpan draf jika form dalam keadaan kosong/default
-      if (amount || items.some(i => i.name) || receiptDataUrl || cashReceived) {
+      if (amount || items.some(i => i.name) || cashReceived) {
         const draft = {
           amount,
           items,
           paymentMethod,
           fileName,
-          receiptDataUrl,
           cashReceived,
           changeAmount
         }
         localStorage.setItem(draftKey, JSON.stringify(draft))
       }
     }
-  }, [amount, items, paymentMethod, fileName, receiptDataUrl, cashReceived, changeAmount])
+  }, [amount, items, paymentMethod, fileName, cashReceived, changeAmount])
+
+  // Simpan gambar ke IndexedDB secara terpisah setiap kali receiptDataUrl berubah
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (receiptDataUrl) {
+        saveImageToIndexedDB(draftImageKey, receiptDataUrl)
+      } else {
+        deleteImageFromIndexedDB(draftImageKey)
+      }
+    }
+  }, [receiptDataUrl])
 
   // Calculate total automatically
   const calculateTotal = (currentItems) => {
@@ -409,6 +484,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
         // Hapus draf karena transaksi sukses dikirim
         if (typeof window !== 'undefined') {
           localStorage.removeItem(draftKey)
+          deleteImageFromIndexedDB(draftImageKey)
         }
         router.push(`/r/${result.transactionId}`)
       }
