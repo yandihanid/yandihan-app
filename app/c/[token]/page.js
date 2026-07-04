@@ -33,6 +33,24 @@ export default function CashierWeb() {
   const [cashier, setCashier] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
+
+  // Monitor online status for header indicator
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine)
+      const handleOnline = () => setIsOnline(true)
+      const handleOffline = () => setIsOnline(false)
+
+      window.addEventListener('online', handleOnline)
+      window.addEventListener('offline', handleOffline)
+
+      return () => {
+        window.removeEventListener('online', handleOnline)
+        window.removeEventListener('offline', handleOffline)
+      }
+    }
+  }, [])
 
   useLayoutEffect(() => {
     if (!token) return
@@ -138,7 +156,33 @@ export default function CashierWeb() {
 
   return (
     <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
-      <header style={{ textAlign: 'center', margin: '2rem 0' }}>
+      <header style={{ textAlign: 'center', margin: '2rem 0', position: 'relative' }}>
+        {/* Connection Status Indicator */}
+        <div style={{
+          position: 'absolute',
+          top: '-1rem',
+          right: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          padding: '0.25rem 0.5rem',
+          borderRadius: '99px',
+          backgroundColor: isOnline ? '#dcfce7' : '#fee2e2',
+          color: isOnline ? '#15803d' : '#b91c1c',
+          border: `1px solid ${isOnline ? '#bbf7d0' : '#fecaca'}`
+        }}>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: isOnline ? '#22c55e' : '#ef4444',
+            display: 'inline-block'
+          }}></span>
+          {isOnline ? 'Online' : 'Offline Mode'}
+        </div>
+
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
           {cashier.stores?.name}
         </h1>

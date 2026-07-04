@@ -82,6 +82,40 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [cashReceived, setCashReceived] = useState('')
   const [changeAmount, setChangeAmount] = useState(0) // New state for change amount
 
+  // Offline Mode States
+  const [isOnline, setIsOnline] = useState(true)
+  const [offlineQueue, setOfflineQueue] = useState([])
+  const [syncing, setSyncing] = useState(false)
+
+  // Monitor online/offline status
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine)
+      const handleOnline = () => setIsOnline(true)
+      const handleOffline = () => setIsOnline(false)
+
+      window.addEventListener('online', handleOnline)
+      window.addEventListener('offline', handleOffline)
+
+      // Load initial offline queue
+      const queueKey = `yandihan_offline_queue_${token}`
+      const savedQueue = JSON.parse(localStorage.getItem(queueKey) || '[]')
+      setOfflineQueue(savedQueue)
+
+      return () => {
+        window.removeEventListener('online', handleOnline)
+        window.removeEventListener('offline', handleOffline)
+      }
+    }
+  }, [token])
+
+  // Auto-sync when coming back online
+  useEffect(() => {
+    if (isOnline && offlineQueue.length > 0 && !syncing) {
+      handleSyncQueue()
+    }
+  }, [isOnline])
+
   // Fungsi untuk mereset seluruh formulir ke kondisi awal
   const resetForm = () => {
     setAmount('');
@@ -180,6 +214,62 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     }
   }
 
+  // Sync offline queue to server
+  const handleSyncQueue = async () => {
+    if (syncing) return
+    const queueKey = `yandihan_offline_queue_${token}`
+    const currentQueue = JSON.parse(localStorage.getItem(queueKey) || '[]')
+    if (currentQueue.length === 0) return
+
+    setSyncing(true)
+    setMessage({ type: 'info', text: '⏳ Menyinkronkan transaksi offline ke server...' })
+
+    let successCount = 0
+    const remainingQueue = []
+
+    for (const tx of currentQueue) {
+      try {
+        const formData = new FormData()
+        formData.append('cashierId', tx.cashierId)
+        formData.append('storeId', tx.storeId)
+        formData.append('token', tx.token)
+        formData.append('amount', tx.amount)
+        formData.append('productName', tx.productName)
+        formData.append('paymentMethod', tx.paymentMethod)
+
+        if (tx.paymentMethod === 'CASH') {
+          formData.append('cashReceived', tx.cashReceived)
+          formData.append('changeAmount', tx.changeAmount)
+        }
+
+        if (tx.receiptDataUrl && tx.paymentMethod === 'QRIS/TF') {
+          const file = dataUrlToFile(tx.receiptDataUrl, tx.fileName)
+          const compressedFile = await compressImage(file)
+          formData.append('receipt', compressedFile)
+        }
+
+        const result = await submitTransaction(formData)
+        if (result && !result.error) {
+          successCount++
+        } else {
+          remainingQueue.push(tx)
+        }
+      } catch (err) {
+        remainingQueue.push(tx)
+      }
+    }
+
+    localStorage.setItem(queueKey, JSON.stringify(remainingQueue))
+    setOfflineQueue(remainingQueue)
+    setSyncing(false)
+
+    if (successCount > 0) {
+      setMessage({ type: 'success', text: `✅ Berhasil menyinkronkan ${successCount} transaksi offline!` })
+    } else {
+      setMessage({ type: 'error', text: '❌ Gagal menyinkronkan transaksi offline. Silakan coba lagi nanti.' })
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -218,6 +308,36 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       return
     }
 
+    // Handle Offline Mode
+    if (!isOnline) {
+      const queueKey = `yandihan_offline_queue_${token}`
+      const currentQueue = JSON.parse(localStorage.getItem(queueKey) || '[]')
+
+      const offlineTx = {
+        id: 'offline_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        cashierId,
+        storeId,
+        token,
+        amount,
+        productName: combinedProductName,
+        paymentMethod,
+        cashReceived: paymentMethod === 'CASH' ? cashReceived : '',
+        changeAmount: paymentMethod === 'CASH' ? changeAmount : 0,
+        receiptDataUrl: paymentMethod === 'QRIS/TF' ? receiptDataUrl : null,
+        fileName: paymentMethod === 'QRIS/TF' ? fileName : '',
+        createdAt: new Date().toISOString()
+      }
+
+      const updatedQueue = [...currentQueue, offlineTx]
+      localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+      setOfflineQueue(updatedQueue)
+
+      setMessage({ type: 'success', text: '💾 Offline! Transaksi disimpan secara lokal di antrean. Akan otomatis dikirim saat internet terhubung.' })
+      resetForm()
+      setLoading(false)
+      return
+    }
+
     const formData = new FormData()
     formData.append('cashierId', cashierId)
     formData.append('storeId', storeId)
@@ -240,24 +360,93 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       }
     }
 
-    const result = await submitTransaction(formData)
+    try {
+      const result = await submitTransaction(formData)
 
-    setLoading(false)
-    if (result.error) {
-      setMessage({ type: 'error', text: result.error })
-    } else {
-      router.push(`/r/${result.transactionId}`)
+      setLoading(false)
+      if (result.error) {
+        setMessage({ type: 'error', text: result.error })
+      } else {
+        router.push(`/r/${result.transactionId}`)
+      }
+    } catch (err) {
+      // Fallback to offline queue if network request fails unexpectedly
+      const queueKey = `yandihan_offline_queue_${token}`
+      const currentQueue = JSON.parse(localStorage.getItem(queueKey) || '[]')
+
+      const offlineTx = {
+        id: 'offline_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        cashierId,
+        storeId,
+        token,
+        amount,
+        productName: combinedProductName,
+        paymentMethod,
+        cashReceived: paymentMethod === 'CASH' ? cashReceived : '',
+        changeAmount: paymentMethod === 'CASH' ? changeAmount : 0,
+        receiptDataUrl: paymentMethod === 'QRIS/TF' ? receiptDataUrl : null,
+        fileName: paymentMethod === 'QRIS/TF' ? fileName : '',
+        createdAt: new Date().toISOString()
+      }
+
+      const updatedQueue = [...currentQueue, offlineTx]
+      localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+      setOfflineQueue(updatedQueue)
+
+      setMessage({ type: 'success', text: '⚠️ Gangguan jaringan! Transaksi disimpan secara lokal di antrean.' })
+      resetForm()
+      setLoading(false)
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {/* Offline Queue Status Banner */}
+      {offlineQueue.length > 0 && (
+        <div style={{
+          padding: '1rem',
+          borderRadius: '8px',
+          backgroundColor: '#fff3cd',
+          color: '#664d03',
+          border: '1px solid #ffe69c',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 'bold' }}>⏳ Ada {offlineQueue.length} transaksi offline tertunda</span>
+            {isOnline && (
+              <button
+                type="button"
+                onClick={handleSyncQueue}
+                disabled={syncing}
+                style={{
+                  padding: '0.25rem 0.75rem',
+                  backgroundColor: '#ffc107',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {syncing ? 'Sinkron...' : 'Sinkronkan Sekarang'}
+              </button>
+            )}
+          </div>
+          <p style={{ fontSize: '0.75rem', margin: 0 }}>
+            {isOnline 
+              ? 'Koneksi internet terdeteksi. Klik tombol di atas untuk mengirim transaksi ke server.' 
+              : 'Hubungkan perangkat ke internet untuk menyinkronkan transaksi.'}
+          </p>
+        </div>
+      )}
+
       {message && (
         <div style={{
           padding: '1rem',
           borderRadius: '8px',
-          backgroundColor: message.type === 'error' ? '#f8d7da' : '#d1fae5',
-          color: message.type === 'error' ? '#842029' : '#0f5132'
+          backgroundColor: message.type === 'error' ? '#f8d7da' : message.type === 'info' ? '#cff4fc' : '#d1fae5',
+          color: message.type === 'error' ? '#842029' : message.type === 'info' ? '#055160' : '#0f5132'
         }}>
           {message.text}
         </div>
@@ -445,7 +634,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       </div>
 
       <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
-        {loading ? 'Mengirim & Mengompres Data...' : 'Kirim Laporan'}
+        {loading ? 'Mengirim & Mengompres Data...' : !isOnline ? 'Simpan Offline' : 'Kirim Laporan'}
       </button>
     </form>
   )
