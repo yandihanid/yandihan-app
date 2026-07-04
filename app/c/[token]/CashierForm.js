@@ -768,7 +768,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 gap: '0.5rem'
               }}
             >
-              📸 Buka Kamera & Simpan ke HP
+              <span role="img" aria-label="camera">📸</span> Buka Kamera &amp; Simpan ke HP
             </button>
             <input
               type="file"
@@ -808,7 +808,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 gap: '0.5rem'
               }}
             >
-              📁 Pilih Foto dari Galeri / File
+              <span role="img" aria-label="folder">📁</span> Pilih Foto dari Galeri / File
             </button>
             <input
               type="file"
