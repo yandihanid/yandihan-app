@@ -87,6 +87,15 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [offlineQueue, setOfflineQueue] = useState([])
   const [syncing, setSyncing] = useState(false)
 
+  // Register Service Worker for Offline Support
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service Worker registered successfully:', reg.scope))
+        .catch((err) => console.warn('Service Worker registration failed:', err))
+    }
+  }, [])
+
   // Monitor online/offline status
   useEffect(() => {
     if (typeof window !== 'undefined') {
