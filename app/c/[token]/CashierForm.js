@@ -4,64 +4,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitTransaction } from './actions'
 
-// Helper sederhana untuk IndexedDB agar aman menyimpan gambar berukuran besar secara offline
-const DB_NAME = 'YandihanDraftDB'
-const STORE_NAME = 'draft_images'
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') {
-      reject('Window is undefined')
-      return
-    }
-    const request = indexedDB.open(DB_NAME, 1)
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    }
-    request.onsuccess = (e) => resolve(e.target.result)
-    request.onerror = (e) => reject(e.target.error)
-  })
-}
-
-async function saveImageToIndexedDB(key, dataUrl) {
-  try {
-    const db = await openDB()
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    tx.objectStore(STORE_NAME).put(dataUrl, key)
-    return new Promise((resolve) => {
-      tx.oncomplete = () => resolve(true)
-    })
-  } catch (e) {
-    console.error('Gagal menyimpan gambar ke IndexedDB:', e)
-    return false
-  }
-}
-
-async function loadImageFromIndexedDB(key) {
-  try {
-    const db = await openDB()
-    const tx = db.transaction(STORE_NAME, 'readonly')
-    const req = tx.objectStore(STORE_NAME).get(key)
-    return new Promise((resolve) => {
-      req.onsuccess = () => resolve(req.result || null)
-      req.onerror = () => resolve(null)
-    })
-  } catch (e) {
-    return null
-  }
-}
-
-async function deleteImageFromIndexedDB(key) {
-  try {
-    const db = await openDB()
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    tx.objectStore(STORE_NAME).delete(key)
-  } catch (e) { /* ignore */ }
-}
-
 function compressImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -128,7 +70,6 @@ function readFileAsDataUrl(file) {
 export default function CashierForm({ cashierId, storeId, token, products = [] }) {
   const router = useRouter()
   const fileRef = useRef(null)
-  const cameraInputRef = useRef(null)
 
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
@@ -145,9 +86,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [isOnline, setIsOnline] = useState(true)
   const [offlineQueue, setOfflineQueue] = useState([])
   const [syncing, setSyncing] = useState(false)
-
-  const draftKey = `yandihan_draft_form_${token}`
-  const draftImageKey = `yandihan_draft_img_${token}`
 
   // Monitor online/offline status
   useEffect(() => {
@@ -178,7 +116,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     }
   }, [isOnline])
 
-  // Fungsi untuk mereset seluruh formulir ke kondisi awal dan menghapus draf
+  // Fungsi untuk mereset seluruh formulir ke kondisi awal
   const resetForm = () => {
     setAmount('');
     setItems([{ name: '', qty: 1 }]);
@@ -186,70 +124,10 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setFileName('');
     setReceiptDataUrl(null);
     if (fileRef.current) fileRef.current.value = '';
-    if (cameraInputRef.current) cameraInputRef.current.value = '';
     setMessage(null);
     setCashReceived('');
     setChangeAmount(0);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(draftKey)
-      deleteImageFromIndexedDB(draftImageKey)
-    }
   }
-
-  // Efek untuk memulihkan draf form saat pertama kali dimuat
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedDraft = localStorage.getItem(draftKey)
-      if (savedDraft) {
-        try {
-          const draft = JSON.parse(savedDraft)
-          if (draft.amount) setAmount(draft.amount)
-          if (draft.items) setItems(draft.items)
-          if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod)
-          if (draft.fileName) setFileName(draft.fileName)
-          if (draft.cashReceived) setCashReceived(draft.cashReceived)
-          if (draft.changeAmount) setChangeAmount(draft.changeAmount)
-        } catch (e) {
-          console.error("Gagal memulihkan draf form", e)
-        }
-      }
-
-      // Pulihkan gambar dari IndexedDB secara asinkron agar tidak membebani RAM
-      loadImageFromIndexedDB(draftImageKey).then((savedImg) => {
-        if (savedImg) {
-          setReceiptDataUrl(savedImg)
-        }
-      })
-    }
-  }, [token])
-
-  // Efek untuk menyimpan draf form secara otomatis setiap kali ada perubahan input (Teks ke LocalStorage, Gambar ke IndexedDB)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (amount || items.some(i => i.name) || cashReceived) {
-        const draft = {
-          amount,
-          items,
-          paymentMethod,
-          fileName,
-          cashReceived,
-          changeAmount
-        }
-        localStorage.setItem(draftKey, JSON.stringify(draft))
-      }
-    }
-  }, [amount, items, paymentMethod, fileName, cashReceived, changeAmount])
-
-  // Simpan gambar ke IndexedDB secara terpisah setiap kali receiptDataUrl berubah
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (receiptDataUrl) {
-        saveImageToIndexedDB(draftImageKey, receiptDataUrl)
-      } else {
-        deleteImageFromIndexedDB(draftImageKey)
-      }
-    }
-  }, [receiptDataUrl])
 
   // Calculate total automatically
   const calculateTotal = (currentItems) => {
@@ -306,30 +184,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     }
   }
 
-  // Langkah 1: Ambil foto langsung dari kamera, lalu otomatis unduh/simpan ke HP
-  const handleCameraCapture = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    try {
-      const compressed = await compressImage(file)
-      const dataUrl = await readFileAsDataUrl(compressed)
-      
-      // Trigger download otomatis ke HP agar tersimpan di folder Downloads/Galeri lokal
-      const link = document.createElement('a')
-      link.href = dataUrl
-      link.download = `bukti_yandihan_${Date.now()}.jpg`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      alert('📸 Foto berhasil diambil dan disimpan ke HP Anda! Sekarang silakan lanjut ke "Langkah 2" untuk memilih foto tersebut.')
-    } catch (err) {
-      alert('Gagal memproses foto kamera. Silakan coba ambil foto langsung dari aplikasi kamera bawaan HP Anda.')
-    }
-  }
-
-  // Langkah 2: Pilih foto yang sudah tersimpan di HP (Galeri/File)
+  // Alur Baru: Satu tombol untuk ambil/pilih foto, otomatis simpan ke HP, dan otomatis upload
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) {
@@ -340,13 +195,21 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
 
     const nextFileName = selectedFile.name
     setFileName(nextFileName)
-    setReceiptDataUrl(null)
 
     try {
       const compressed = await compressImage(selectedFile)
       const dataUrl = await readFileAsDataUrl(compressed)
       setReceiptDataUrl(dataUrl)
-    } catch {
+
+      // Trigger download otomatis ke HP agar tersimpan di folder Downloads/Galeri lokal
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = `bukti_yandihan_${Date.now()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+    } catch (err) {
       try {
         const dataUrl = await readFileAsDataUrl(selectedFile)
         setReceiptDataUrl(dataUrl)
@@ -443,7 +306,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       rawFile = dataUrlToFile(receiptDataUrl, fileName)
     }
     if (paymentMethod === 'QRIS/TF' && !rawFile) {
-      setMessage({ type: 'error', text: 'Silakan pilih ulang foto bukti pembayaran.' })
+      setMessage({ type: 'error', text: 'Silakan pilih atau ambil foto bukti pembayaran.' })
       setLoading(false)
       return
     }
@@ -507,11 +370,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       if (result.error) {
         setMessage({ type: 'error', text: result.error })
       } else {
-        // Hapus draf karena transaksi sukses dikirim
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(draftKey)
-          deleteImageFromIndexedDB(draftImageKey)
-        }
+        resetForm()
         router.push(`/r/${result.transactionId}`)
       }
     } catch (err) {
@@ -735,7 +594,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
         <label>Upload Bukti Pembayaran</label>
         
-        {/* Alur Baru: 2 Langkah Terpisah */}
+        {/* Alur Baru: Hanya 1 Tombol Tunggal */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -745,14 +604,10 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           borderRadius: '12px',
           border: '1px solid var(--border-color)'
         }}>
-          {/* Langkah 1 */}
           <div>
-            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 'bold', color: 'var(--text-color)' }}>
-              Langkah 1: Ambil Foto Bukti
-            </p>
             <button
               type="button"
-              onClick={() => cameraInputRef.current?.click()}
+              onClick={() => fileRef.current?.click()}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -768,47 +623,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 gap: '0.5rem'
               }}
             >
-              <span role="img" aria-label="camera">📸</span> Buka Kamera &amp; Simpan ke HP
-            </button>
-            <input
-              type="file"
-              ref={cameraInputRef}
-              accept="image/*"
-              capture="environment"
-              onChange={handleCameraCapture}
-              style={{ display: 'none' }}
-            />
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              * Foto akan otomatis diunduh ke HP Anda agar aman jika browser ter-refresh.
-            </p>
-          </div>
-
-          <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '0.25rem 0' }} />
-
-          {/* Langkah 2 */}
-          <div>
-            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 'bold', color: 'var(--text-color)' }}>
-              Langkah 2: Pilih Foto dari HP
-            </p>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <span role="img" aria-label="folder">📁</span> Pilih Foto dari Galeri / File
+              <span role="img" aria-label="camera">📸</span> Ambil / Pilih Foto Bukti
             </button>
             <input
               type="file"
@@ -817,8 +632,8 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              * Pilih foto bukti pembayaran yang baru saja Anda ambil di Langkah 1.
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+              * Foto yang diambil akan otomatis tersimpan di HP Anda dan langsung terunggah ke formulir ini.
             </p>
           </div>
         </div>
@@ -838,7 +653,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 setReceiptDataUrl(null);
                 setFileName('');
                 if (fileRef.current) fileRef.current.value = '';
-                if (cameraInputRef.current) cameraInputRef.current.value = '';
               }}
               style={{
                 width: '100%',
