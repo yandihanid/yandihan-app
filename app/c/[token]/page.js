@@ -34,10 +34,12 @@ export default function CashierWeb() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
+  const [isCapacitor, setIsCapacitor] = useState(false)
 
   // Monitor online status for header indicator
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      setIsCapacitor(navigator.userAgent.includes('YandihanKasirApp'))
       setIsOnline(navigator.onLine)
       const handleOnline = () => setIsOnline(true)
       const handleOffline = () => setIsOnline(false)
@@ -186,7 +188,34 @@ export default function CashierWeb() {
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
           {cashier.stores?.name}
         </h1>
-        <p style={{ color: 'var(--text-muted)' }}>Halo, {cashier.name || 'Kasir'}</p>
+        <p style={{ color: 'var(--text-muted)' }}>
+          Halo, {cashier.name || 'Kasir'}
+          {isCapacitor && (
+            <button 
+              onClick={() => {
+                if (confirm('Apakah Anda yakin ingin mengganti link kasir?')) {
+                  window.location.href = 'http://localhost?reset=true';
+                }
+              }}
+              style={{
+                marginLeft: '0.5rem',
+                padding: '0.2rem 0.5rem',
+                fontSize: '0.75rem',
+                backgroundColor: '#fee2e2',
+                color: '#ef4444',
+                border: '1px solid #fca5a5',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                display: 'inline-flex',
+                alignItems: 'center',
+                verticalAlign: 'middle'
+              }}
+            >
+              🔄 Ganti Link
+            </button>
+          )}
+        </p>
       </header>
 
       <main className="container animate-fade-in" style={{ maxWidth: '500px', margin: '0 auto' }}>

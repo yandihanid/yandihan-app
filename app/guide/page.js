@@ -54,17 +54,28 @@ export default function Guidebook() {
 
           <section style={{ marginBottom: '3rem' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--primary-color)' }}>
-              2. Untuk Kasir (Cara Lapor via Web)
+              2. Untuk Kasir (Cara Lapor via Web / APK Android)
             </h2>
             <div style={{ backgroundColor: '#f9fafb', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                Kasir dapat menggunakan browser HP biasa, atau menggunakan **Aplikasi Android Resmi** untuk mendukung transaksi offline.
+              </p>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <a href="/yandihan-kasir.apk" download className="btn btn-primary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--primary-color)' }}>
+                  📲 Download Aplikasi Kasir Android (APK)
+                </a>
+              </div>
+
               <ol style={{ paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', color: 'var(--text-main)' }}>
-                <li>Buka link web yang dikirimkan oleh Bos Anda (biasanya berawalan <code>yandihan.my.id/c/...</code>).</li>
-                <li>Simpan link tersebut di layar utama HP (Add to Home Screen) agar mudah diakses besok-besok.</li>
+                <li>Buka aplikasi **Yandihan Kasir** yang telah diinstal (atau buka link web <code>yandihan.my.id/c/...</code> di browser HP).</li>
+                <li>Jika menggunakan aplikasi APK, masukkan link kasir Anda pada kolom yang disediakan (hanya dilakukan sekali di awal).</li>
                 <li>Masukkan nominal uang penjualan (hanya angka).</li>
                 <li>Masukkan nama produk yang terjual.</li>
                 <li>Pilih metode pembayaran (CASH atau QRIS/Transfer).</li>
                 <li>Jika pelanggan bayar via QRIS/Transfer, <strong>Anda wajib mengunggah foto bukti bayar</strong> yang dikirim pelanggan.</li>
                 <li>Klik tombol <strong>Kirim Laporan</strong>.</li>
+                <li><strong>Fitur Offline:</strong> Jika koneksi terputus, transaksi tetap tersimpan secara lokal. Begitu terhubung ke internet kembali, transaksi akan otomatis tersinkronisasi.</li>
               </ol>
             </div>
           </section>

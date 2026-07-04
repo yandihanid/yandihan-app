@@ -37,9 +37,16 @@ export default async function SettingsPage() {
       </div>
 
       <div className="card" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.5rem' }}>Pusat Bantuan</h3>
-        <p style={{ color: '#0c4a6e', fontSize: '0.875rem', marginBottom: '1rem' }}>Bingung cara menggunakan Yandihan? Jangan khawatir, baca panduan lengkapnya di sini.</p>
-        <a href="/guide" className="btn btn-primary" style={{ backgroundColor: '#0284c7', padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Buka Panduan (Guidebook)</a>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.5rem' }}>Pusat Bantuan & Aplikasi</h3>
+        <p style={{ color: '#0c4a6e', fontSize: '0.875rem', marginBottom: '1rem' }}>Pelajari cara menggunakan Yandihan atau unduh aplikasi Android Kasir untuk input transaksi offline.</p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <a href="/guide" className="btn btn-primary" style={{ backgroundColor: '#0284c7', padding: '0.5rem 1rem', fontSize: '0.875rem', textDecoration: 'none' }}>
+            📖 Buka Panduan
+          </a>
+          <a href="/yandihan-kasir.apk" download className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', backgroundColor: 'white', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+            📲 Download APK Kasir
+          </a>
+        </div>
       </div>
 
       {store && (
