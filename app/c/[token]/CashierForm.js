@@ -128,6 +128,7 @@ function readFileAsDataUrl(file) {
 export default function CashierForm({ cashierId, storeId, token, products = [] }) {
   const router = useRouter()
   const fileRef = useRef(null)
+  const cameraInputRef = useRef(null)
 
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
@@ -185,6 +186,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setFileName('');
     setReceiptDataUrl(null);
     if (fileRef.current) fileRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
     setMessage(null);
     setCashReceived('');
     setChangeAmount(0);
@@ -304,6 +306,30 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     }
   }
 
+  // Langkah 1: Ambil foto langsung dari kamera, lalu otomatis unduh/simpan ke HP
+  const handleCameraCapture = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const compressed = await compressImage(file)
+      const dataUrl = await readFileAsDataUrl(compressed)
+      
+      // Trigger download otomatis ke HP agar tersimpan di folder Downloads/Galeri lokal
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = `bukti_yandihan_${Date.now()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      alert('📸 Foto berhasil diambil dan disimpan ke HP Anda! Sekarang silakan lanjut ke "Langkah 2" untuk memilih foto tersebut.')
+    } catch (err) {
+      alert('Gagal memproses foto kamera. Silakan coba ambil foto langsung dari aplikasi kamera bawaan HP Anda.')
+    }
+  }
+
+  // Langkah 2: Pilih foto yang sudah tersimpan di HP (Galeri/File)
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) {
@@ -709,31 +735,97 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
         <label>Upload Bukti Pembayaran</label>
         
-        {/* Banner Edukasi / Tips untuk HP RAM Kecil */}
+        {/* Alur Baru: 2 Langkah Terpisah */}
         <div style={{
-          padding: '0.75rem',
-          borderRadius: '8px',
-          backgroundColor: '#e0f2fe',
-          color: '#0369a1',
-          border: '1px solid #bae6fd',
-          fontSize: '0.8rem',
-          marginBottom: '0.5rem',
-          lineHeight: '1.4'
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          padding: '1rem',
+          backgroundColor: '#f8fafc',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color)'
         }}>
-          💡 <strong>Tips HP Lemot / Sering Refresh:</strong> Ambil foto bukti pembayaran menggunakan aplikasi kamera HP Anda terlebih dahulu (simpan ke Galeri), lalu klik tombol di bawah dan pilih foto tersebut dari Galeri.
+          {/* Langkah 1 */}
+          <div>
+            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 'bold', color: 'var(--text-color)' }}>
+              Langkah 1: Ambil Foto Bukti
+            </p>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: '#0284c7',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              📸 Buka Kamera & Simpan ke HP
+            </button>
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
+              onChange={handleCameraCapture}
+              style={{ display: 'none' }}
+            />
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              * Foto akan otomatis diunduh ke HP Anda agar aman jika browser ter-refresh.
+            </p>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '0.25rem 0' }} />
+
+          {/* Langkah 2 */}
+          <div>
+            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 'bold', color: 'var(--text-color)' }}>
+              Langkah 2: Pilih Foto dari HP
+            </p>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              📁 Pilih Foto dari Galeri / File
+            </button>
+            <input
+              type="file"
+              ref={fileRef}
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              * Pilih foto bukti pembayaran yang baru saja Anda ambil di Langkah 1.
+            </p>
+          </div>
         </div>
 
-        <input
-          type="file"
-          ref={fileRef}
-          className="input-field"
-          accept="image/*"
-          onChange={handleFileChange}
-          style={{ padding: '0.5rem' }}
-        />
         {fileName && (
-          <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: 0 }}>
-            ✓ Foto terpilih: {fileName}
+          <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: '0.5rem 0 0 0', fontWeight: 'bold' }}>
+            ✓ Foto Terpilih: {fileName}
           </p>
         )}
         {receiptDataUrl && (
@@ -746,6 +838,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 setReceiptDataUrl(null);
                 setFileName('');
                 if (fileRef.current) fileRef.current.value = '';
+                if (cameraInputRef.current) cameraInputRef.current.value = '';
               }}
               style={{
                 width: '100%',
