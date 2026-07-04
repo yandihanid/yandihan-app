@@ -79,6 +79,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [fileName, setFileName] = useState('')
   const [receiptDataUrl, setReceiptDataUrl] = useState(null)
+  const [receiptCacheUrl, setReceiptCacheUrl] = useState(null)
   const [cashReceived, setCashReceived] = useState('')
   const [changeAmount, setChangeAmount] = useState(0)
 
@@ -132,6 +133,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     setPaymentMethod('CASH');
     setFileName('');
     setReceiptDataUrl(null);
+    setReceiptCacheUrl(null);
     if (fileRef.current) fileRef.current.value = '';
     setMessage(null);
     setCashReceived('');
@@ -199,6 +201,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     if (!selectedFile) {
       setFileName('');
       setReceiptDataUrl(null);
+      setReceiptCacheUrl(null);
       return;
     }
 
@@ -224,6 +227,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           const cacheUrl = `/receipts/bukti_yandihan_${Date.now()}.jpg`
           await cache.put(cacheUrl, response)
           savedInCache = true
+          setReceiptCacheUrl(cacheUrl)
         } catch (cacheErr) {
           console.warn('Gagal menyimpan ke Cache Storage, beralih ke fallback download:', cacheErr)
         }
@@ -275,15 +279,44 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
           formData.append('changeAmount', tx.changeAmount)
         }
 
-        if (tx.receiptDataUrl && tx.paymentMethod === 'QRIS/TF') {
-          const file = dataUrlToFile(tx.receiptDataUrl, tx.fileName)
-          const compressedFile = await compressImage(file)
-          formData.append('receipt', compressedFile)
+        if (tx.paymentMethod === 'QRIS/TF') {
+          let file = null
+
+          // Coba ambil dari Cache Storage terlebih dahulu (Primary)
+          if (tx.receiptCacheUrl && typeof window !== 'undefined' && 'caches' in window) {
+            try {
+              const cache = await caches.open('yandihan-receipts')
+              const cachedResponse = await cache.match(tx.receiptCacheUrl)
+              if (cachedResponse) {
+                const blob = await cachedResponse.blob()
+                file = new File([blob], tx.fileName || 'photo.jpg', { type: blob.type })
+              }
+            } catch (cacheErr) {
+              console.warn('Gagal mengambil gambar dari Cache Storage saat sinkronisasi:', cacheErr)
+            }
+          }
+
+          // Fallback ke Base64 data URL jika Cache Storage gagal/tidak ada
+          if (!file && tx.receiptDataUrl) {
+            file = dataUrlToFile(tx.receiptDataUrl, tx.fileName)
+          }
+
+          if (file) {
+            const compressedFile = await compressImage(file)
+            formData.append('receipt', compressedFile)
+          }
         }
 
         const result = await submitTransaction(formData)
         if (result && !result.error) {
           successCount++
+          // Hapus dari Cache Storage setelah sukses sinkronisasi untuk menghemat ruang penyimpanan
+          if (tx.receiptCacheUrl && typeof window !== 'undefined' && 'caches' in window) {
+            try {
+              const cache = await caches.open('yandihan-receipts')
+              await cache.delete(tx.receiptCacheUrl)
+            } catch { /* ignore */ }
+          }
         } else {
           remainingQueue.push(tx)
         }
@@ -357,13 +390,23 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
         cashReceived: paymentMethod === 'CASH' ? cashReceived : '',
         changeAmount: paymentMethod === 'CASH' ? changeAmount : 0,
         receiptDataUrl: paymentMethod === 'QRIS/TF' ? receiptDataUrl : null,
+        receiptCacheUrl: paymentMethod === 'QRIS/TF' ? receiptCacheUrl : null,
         fileName: paymentMethod === 'QRIS/TF' ? fileName : '',
         createdAt: new Date().toISOString()
       }
 
-      const updatedQueue = [...currentQueue, offlineTx]
-      localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
-      setOfflineQueue(updatedQueue)
+      try {
+        const updatedQueue = [...currentQueue, offlineTx]
+        localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+        setOfflineQueue(updatedQueue)
+      } catch (storageErr) {
+        console.warn('LocalStorage penuh! Menyimpan transaksi tanpa Base64 (mengandalkan Cache Storage)...', storageErr)
+        // Fallback jika localStorage penuh: hapus Base64 yang berat, andalkan Cache Storage
+        offlineTx.receiptDataUrl = null
+        const updatedQueue = [...currentQueue, offlineTx]
+        localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+        setOfflineQueue(updatedQueue)
+      }
 
       setMessage({ type: 'success', text: '💾 Offline! Transaksi disimpan secara lokal di antrean. Akan otomatis dikirim saat internet terhubung.' })
       resetForm()
@@ -419,13 +462,21 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
         cashReceived: paymentMethod === 'CASH' ? cashReceived : '',
         changeAmount: paymentMethod === 'CASH' ? changeAmount : 0,
         receiptDataUrl: paymentMethod === 'QRIS/TF' ? receiptDataUrl : null,
+        receiptCacheUrl: paymentMethod === 'QRIS/TF' ? receiptCacheUrl : null,
         fileName: paymentMethod === 'QRIS/TF' ? fileName : '',
         createdAt: new Date().toISOString()
       }
 
-      const updatedQueue = [...currentQueue, offlineTx]
-      localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
-      setOfflineQueue(updatedQueue)
+      try {
+        const updatedQueue = [...currentQueue, offlineTx]
+        localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+        setOfflineQueue(updatedQueue)
+      } catch (storageErr) {
+        offlineTx.receiptDataUrl = null
+        const updatedQueue = [...currentQueue, offlineTx]
+        localStorage.setItem(queueKey, JSON.stringify(updatedQueue))
+        setOfflineQueue(updatedQueue)
+      }
 
       setMessage({ type: 'success', text: '⚠️ Gangguan jaringan! Transaksi disimpan secara lokal di antrean.' })
       resetForm()
@@ -681,6 +732,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               type="button"
               onClick={() => {
                 setReceiptDataUrl(null);
+                setReceiptCacheUrl(null);
                 setFileName('');
                 if (fileRef.current) fileRef.current.value = '';
               }}
