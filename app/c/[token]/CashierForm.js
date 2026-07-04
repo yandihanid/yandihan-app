@@ -708,6 +708,21 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
 
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
         <label>Upload Bukti Pembayaran</label>
+        
+        {/* Banner Edukasi / Tips untuk HP RAM Kecil */}
+        <div style={{
+          padding: '0.75rem',
+          borderRadius: '8px',
+          backgroundColor: '#e0f2fe',
+          color: '#0369a1',
+          border: '1px solid #bae6fd',
+          fontSize: '0.8rem',
+          marginBottom: '0.5rem',
+          lineHeight: '1.4'
+        }}>
+          💡 <strong>Tips HP Lemot / Sering Refresh:</strong> Ambil foto bukti pembayaran menggunakan aplikasi kamera HP Anda terlebih dahulu (simpan ke Galeri), lalu klik tombol di bawah dan pilih foto tersebut dari Galeri.
+        </div>
+
         <input
           type="file"
           ref={fileRef}
