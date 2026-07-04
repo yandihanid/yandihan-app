@@ -184,7 +184,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     }
   }
 
-  // Alur Baru: Satu tombol untuk ambil/pilih foto, otomatis simpan ke HP, dan otomatis upload
+  // Alur Baru: Satu tombol untuk ambil/pilih foto, simpan ke Cache Storage (Primary) / Download (Fallback), dan otomatis upload
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) {
@@ -201,13 +201,34 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       const dataUrl = await readFileAsDataUrl(compressed)
       setReceiptDataUrl(dataUrl)
 
-      // Trigger download otomatis ke HP agar tersimpan di folder Downloads/Galeri lokal
-      const link = document.createElement('a')
-      link.href = dataUrl
-      link.download = `bukti_yandihan_${Date.now()}.jpg`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      let savedInCache = false
+      // 1. Coba simpan ke Cache Storage sebagai Primary
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        try {
+          const cache = await caches.open('yandihan-receipts')
+          const response = new Response(compressed, {
+            headers: {
+              'Content-Type': compressed.type,
+              'Content-Length': compressed.size.toString(),
+            }
+          })
+          const cacheUrl = `/receipts/bukti_yandihan_${Date.now()}.jpg`
+          await cache.put(cacheUrl, response)
+          savedInCache = true
+        } catch (cacheErr) {
+          console.warn('Gagal menyimpan ke Cache Storage, beralih ke fallback download:', cacheErr)
+        }
+      }
+
+      // 2. Jika Cache Storage gagal atau tidak didukung, gunakan Fallback Download otomatis ke HP
+      if (!savedInCache) {
+        const link = document.createElement('a')
+        link.href = dataUrl
+        link.download = `bukti_yandihan_${Date.now()}.jpg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
 
     } catch (err) {
       try {
@@ -633,7 +654,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               style={{ display: 'none' }}
             />
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              * Foto yang diambil akan otomatis tersimpan di HP Anda dan langsung terunggah ke formulir ini.
+              * Foto yang diambil akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
             </p>
           </div>
         </div>
