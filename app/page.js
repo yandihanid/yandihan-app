@@ -177,140 +177,46 @@ export default function Home() {
           </div>
         </section>
 
-        {/* APK Download Section */}
-        <section id="apk" style={{ 
-          padding: '6rem 1rem', 
-          background: 'linear-gradient(135deg, var(--secondary-color) 0%, #DBEAFE 100%)',
-          borderTop: '1px solid var(--border-color)',
-          borderBottom: '1px solid var(--border-color)'
-        }}>
+        {/* Improved Features Section */}
+        <section id="fitur" style={{ padding: '5rem 1rem', backgroundColor: 'var(--card-bg)' }}>
           <div className="container">
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '3.5rem', 
-              alignItems: 'center' 
-            }}>
+            <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+              <h2 style={{ fontSize: '2.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '1rem', letterSpacing: '-1px' }}>Kenapa Memilih Yandihan?</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>Didesain khusus untuk mempermudah operasional UMKM tanpa bikin pusing kasir dan pemilik.</p>
+            </div>
+            
+            <div className="feature-grid">
+              <div className="card" style={{ borderRadius: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: 'var(--secondary-color)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                  <Smartphone size={24} />
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.75rem', letterSpacing: '-0.5px' }}>Tanpa Download Aplikasi</h3>
+                <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, fontSize: '0.95rem' }}>Kasir Anda hanya butuh satu link web. Bisa langsung lapor penjualan dari HP apa saja dalam hitungan detik.</p>
+              </div>
               
-              {/* Left Column: Benefits */}
-              <div>
-                <div style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem', 
-                  backgroundColor: 'white', 
-                  padding: '0.35rem 1rem', 
-                  borderRadius: '99px', 
-                  fontSize: '0.85rem', 
-                  fontWeight: '700', 
-                  marginBottom: '1.25rem', 
-                  color: 'var(--primary-color)',
-                  border: '1px solid var(--border-color)'
-                }}>
-                  ✨ Fitur Unggulan Offline
+              <div className="card" style={{ borderRadius: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                  <BarChart3 size={24} />
                 </div>
-                
-                <h2 style={{ 
-                  fontSize: 'clamp(1.85rem, 4vw, 2.5rem)', 
-                  fontWeight: '800', 
-                  color: 'var(--text-main)', 
-                  marginBottom: '1.25rem', 
-                  lineHeight: 1.2,
-                  letterSpacing: '-1px'
-                }}>
-                  Input Penjualan Kasir Jadi Lebih Mudah & Bebas Offline
-                </h2>
-                
-                <p style={{ 
-                  color: 'var(--text-muted)', 
-                  fontSize: '1.025rem', 
-                  lineHeight: 1.65, 
-                  marginBottom: '2rem' 
-                }}>
-                  Kami menghadirkan aplikasi Android khusus kasir (**Yandihan Kasir**) berbasis Capacitor dengan performa maksimal. Tetap produktif mencatat transaksi meski internet sedang tidak stabil atau mati.
-                </p>
-
-                {/* Benefits List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ color: 'var(--primary-color)', marginTop: '0.2rem', flexShrink: 0 }}>
-                      <Wifi size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ color: 'var(--text-main)' }}>Fitur Input Offline</strong>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginTop: '0.15rem' }}>Transaksi tetap tersimpan di penyimpanan lokal HP kasir saat tidak ada internet.</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ color: 'var(--primary-color)', marginTop: '0.2rem', flexShrink: 0 }}>
-                      <RefreshCw size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ color: 'var(--text-main)' }}>Sinkronisasi Otomatis</strong>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginTop: '0.15rem' }}>Data transaksi offline otomatis terkirim dan sinkron ke server begitu HP mendeteksi koneksi online.</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ color: 'var(--primary-color)', marginTop: '0.2rem', flexShrink: 0 }}>
-                      <CloudLightning size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ color: 'var(--text-main)' }}>Performa Cepat & Stabil</strong>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginTop: '0.15rem' }}>Aplikasi berjalan lebih mulus dibanding browser web biasa dan menghemat kuota internet.</p>
-                    </div>
-                  </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.75rem', letterSpacing: '-0.5px' }}>Laporan Analitik Cerdas</h3>
+                <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, fontSize: '0.95rem' }}>Pantau rincian omset per bulan dan per hari. Dilengkapi filter spesifik untuk pembayaran Cash vs QRIS/Transfer.</p>
+              </div>
+              
+              <div className="card" style={{ borderRadius: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                  <Zap size={24} />
                 </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.75rem', letterSpacing: '-0.5px' }}>Pembaruan Realtime</h3>
+                <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, fontSize: '0.95rem' }}>Setiap kali kasir menginput data penjualan, dashboard Anda akan langsung terupdate otomatis secara real-time.</p>
               </div>
 
-              {/* Right Column: Download Card */}
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div className="card" style={{ 
-                  width: '100%', 
-                  maxWidth: '380px', 
-                  padding: '2.5rem 2rem', 
-                  borderRadius: '16px',
-                  boxShadow: 'var(--shadow-lg)',
-                  background: 'white',
-                  textAlign: 'center',
-                  border: '1px solid rgba(255, 255, 255, 0.8)'
-                }}>
-                  <div style={{ 
-                    fontSize: '3rem', 
-                    marginBottom: '1.25rem', 
-                    animation: 'float 4s ease-in-out infinite' 
-                  }}>📲</div>
-                  
-                  <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                    Yandihan Kasir APK
-                  </h3>
-                  
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginBottom: '2rem', lineHeight: 1.5 }}>
-                    Download file instalasi APK resmi untuk tablet atau smartphone Android kasir Anda secara gratis.
-                  </p>
-
-                  <a href="/yandihan-kasir.apk" download className="btn btn-primary" style={{ 
-                    width: '100%', 
-                    padding: '0.875rem', 
-                    borderRadius: '8px', 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    textDecoration: 'none',
-                    fontWeight: '700'
-                  }}>
-                    <Download size={18} />
-                    Download APK Gratis
-                  </a>
-
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.875rem' }}>
-                    Khusus Android • Ukuran File: 3.9 MB
-                  </p>
+              <div className="card" style={{ borderRadius: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#f3e8ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                  <ShieldCheck size={24} />
                 </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.75rem', letterSpacing: '-0.5px' }}>Struk Digital Siap Cetak</h3>
+                <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, fontSize: '0.95rem' }}>Setiap transaksi akan menghasilkan link Struk Digital (format thermal 58mm/80mm) yang rapi dan siap cetak.</p>
               </div>
-
             </div>
           </div>
         </section>
