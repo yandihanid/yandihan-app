@@ -249,19 +249,19 @@ export default function Home() {
                 <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', display: 'flex', flexDirection: 'column', gap: '0.875rem', flex: 1 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Maks 30 transaksi per hari
+                    <span>Maks 30 transaksi per hari</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    1 Web Kasir & 1 Akun Telegram Bot
+                    <span>1 Web Kasir & 1 Akun Telegram Bot</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Laporan Omset Standar
+                    <span>Laporan Omset Standar</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Manajemen Gudang Produk
+                    <span>Manajemen Gudang Produk</span>
                   </li>
                 </ul>
                 
