@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function WarehousePage() {
   const [products, setProducts] = useState([]);
@@ -49,84 +50,134 @@ export default function WarehousePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '2rem 1rem' }}>
-      <div className="container mx-auto max-w-6xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Manajemen Gudang Produk</h1>
-          <p className="text-gray-600">Kelola produk Anda secara real-time</p>
-        </div>
-
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex gap-2">
-            <button
-              onClick={addProduct}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
-            >
-              <span>+</span> Tambah Produk
+    <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)' }}>
+      {/* Navbar */}
+      <header style={{ 
+        backgroundColor: 'rgba(255,255,255,0.9)', 
+        backdropFilter: 'blur(8px)', 
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 100, 
+        borderBottom: '1px solid var(--border-color)',
+        transition: 'all 0.3s ease'
+      }}>
+        <div className="container flex justify-between items-center" style={{ padding: '0.875rem 1.5rem' }}>
+          <div style={{ 
+            fontSize: '1.5rem', 
+            fontWeight: '800', 
+            color: 'var(--primary-color)', 
+            letterSpacing: '-0.5px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem' 
+          }}>
+            <div style={{ 
+              width: '32px', 
+              height: '32px', 
+              borderRadius: '8px', 
+              background: 'linear-gradient(135deg, var(--primary-color) 0%, #3B82F6 100%)', 
+              color: 'white', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              fontSize: '1.2rem',
+              fontWeight: '900'
+            }}>Y</div>
+            Yandihan.
+          </div>
+          <div className="flex gap-6 items-center hidden sm:flex">
+            <Link href="/" style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.95rem' }}>Beranda</Link>
+            <Link href="/login" style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '0.95rem' }}>Masuk</Link>
+          </div>
+          <div className="flex items-center sm:hidden">
+            <button onClick={() => {}} className="p-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
             </button>
           </div>
-          <div className="text-sm text-gray-500">
-            Total Produk: {products.length}
-          </div>
         </div>
+      </header>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Produk
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Kategori
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Harga
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{product.category}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">Rp {product.price.toLocaleString()}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => deleteProduct(product.id)}
-                          className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors duration-200 text-sm flex items-center gap-1"
-                        >
-                          <span>Hapus</span>
-                        </button>
-                      </div>
-                    </td>
+      <main style={{ flex: 1, padding: '2rem 1rem' }}>
+        <div className="container mx-auto max-w-6xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Manajemen Gudang Produk</h1>
+            <p className="text-gray-600">Kelola produk Anda secara real-time</p>
+          </div>
+
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex gap-2">
+              <button
+                onClick={addProduct}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+              >
+                <span>+</span> Tambah Produk
+              </button>
+            </div>
+            <div className="text-sm text-gray-500">
+              Total Produk: {products.length}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Produk
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Kategori
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Harga
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Aksi
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {products.map((product) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{product.category}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">Rp {product.price.toLocaleString()}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => deleteProduct(product.id)}
+                            className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors duration-200 text-sm flex items-center gap-1"
+                          >
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={() => router.back()}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center gap-2"
+            >
+              <span>←</span> Kembali
+            </button>
           </div>
         </div>
-
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={() => router.back()}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center gap-2"
-          >
-            <span>←</span> Kembali
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
