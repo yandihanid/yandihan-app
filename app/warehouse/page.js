@@ -60,9 +60,9 @@ export default function WarehousePage() {
           <div className="flex gap-2">
             <button
               onClick={addProduct}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
             >
-              Tambah Produk
+              <span>+</span> Tambah Produk
             </button>
           </div>
           <div className="text-sm text-gray-500">
@@ -105,9 +105,9 @@ export default function WarehousePage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => deleteProduct(product.id)}
-                          className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors duration-200 text-sm"
+                          className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors duration-200 text-sm flex items-center gap-1"
                         >
-                          Hapus
+                          <span>Hapus</span>
                         </button>
                       </div>
                     </td>
@@ -121,9 +121,9 @@ export default function WarehousePage() {
         <div className="mt-6 flex justify-end">
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center gap-2"
           >
-            Kembali
+            <span>←</span> Kembali
           </button>
         </div>
       </div>
