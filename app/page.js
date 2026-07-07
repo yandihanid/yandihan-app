@@ -1,3 +1,5 @@
+"use client";
+
 import Link from 'next/link'
 import { ArrowRight, BarChart3, Smartphone, Zap, ShieldCheck, CheckCircle2, Download, RefreshCw, Wifi, CloudLightning } from 'lucide-react'
 
