@@ -36,7 +36,7 @@ export async function GET(req) {
   // Fetch products
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, price')
+    .select('id, name, price, stock')
     .eq('store_id', cashier.store_id)
     .order('name', { ascending: true })
 
