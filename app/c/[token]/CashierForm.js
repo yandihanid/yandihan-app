@@ -558,18 +558,38 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
               
               {products && products.length > 0 ? (
-                <select 
-                  className="input-field"
-                  value={item.name}
-                  onChange={e => handleItemChange(index, 'name', e.target.value)}
-                  style={{ flex: 1, padding: '0.5rem' }}
-                  required
-                >
-                  <option value="" disabled>Pilih Produk</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.name}>{p.name} (Rp {parseInt(p.price).toLocaleString('id-ID')})</option>
-                  ))}
-                </select>
+                <>
+                  <select 
+                    className="input-field"
+                    value={item.name}
+                    onChange={e => handleItemChange(index, 'name', e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem' }}
+                    required
+                  >
+                    <option value="" disabled>Pilih Produk</option>
+                    {products.map(p => {
+                      const stok = p.stock ?? '?';
+                      const stokWarning = (typeof stok === 'number' && stok < 5) ? ' ⚠️' : '';
+                      return (
+                        <option key={p.id} value={p.name}>
+                          {p.name} (Rp {parseInt(p.price).toLocaleString('id-ID')}) - Stok: {stok}{stokWarning}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {/* Tampilkan stok terpilih di samping dropdown */}
+                  {item.name && (() => {
+                    const prod = products.find(p => p.name === item.name);
+                    if (!prod) return null;
+                    const stok = prod.stock ?? '?';
+                    const color = (typeof stok === 'number' && stok === 0) ? 'red' : (typeof stok === 'number' && stok < 5) ? 'orange' : 'green';
+                    return (
+                      <span style={{ marginLeft: '0.25rem', fontSize: '0.8rem', color, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                        Stok: {stok}
+                      </span>
+                    );
+                  })()}
+                </>
               ) : (
                 <input
                   type="text"
