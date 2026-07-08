@@ -368,11 +368,6 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     if (!rawFile && receiptDataUrl) {
       rawFile = dataUrlToFile(receiptDataUrl, fileName)
     }
-    if (paymentMethod === 'QRIS/TF' && !rawFile) {
-      setMessage({ type: 'error', text: 'Silakan pilih atau ambil foto bukti pembayaran.' })
-      setLoading(false)
-      return
-    }
 
     // Handle Offline Mode
     if (!isOnline) {
@@ -568,7 +563,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                   >
                     <option value="" disabled>Pilih Produk</option>
                     {products.map(p => {
-                      const stok = p.stock ?? '?';
+                      const stok = p.stock ?? 0;
                       const stokWarning = (typeof stok === 'number' && stok < 5) ? ' ⚠️' : '';
                       return (
                         <option key={p.id} value={p.name}>
@@ -581,7 +576,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                   {item.name && (() => {
                     const prod = products.find(p => p.name === item.name);
                     if (!prod) return null;
-                    const stok = prod.stock ?? '?';
+                    const stok = prod.stock ?? 0;
                     const color = (typeof stok === 'number' && stok === 0) ? 'red' : (typeof stok === 'number' && stok < 5) ? 'orange' : 'green';
                     return (
                       <span style={{ marginLeft: '0.25rem', fontSize: '0.8rem', color, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
@@ -693,7 +688,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       )}
 
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
-        <label>Upload Bukti Pembayaran</label>
+        <label>Upload Bukti Pembayaran (Opsional)</label>
         
         {/* Alur Baru: Hanya 1 Tombol Tunggal */}
         <div style={{
@@ -724,7 +719,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 gap: '0.5rem'
               }}
             >
-              <span role="img" aria-label="camera">📸</span> Ambil / Pilih Foto Bukti
+              <span role="img" aria-label="camera">📸</span> Ambil / Pilih Foto Bukti (Opsional)
             </button>
             <input
               type="file"
@@ -734,7 +729,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               style={{ display: 'none' }}
             />
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              * Foto yang diambil akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
+              * Foto tidak wajib. Jika diisi, akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
             </p>
           </div>
         </div>
