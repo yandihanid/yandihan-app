@@ -694,89 +694,91 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
         </div>
       )}
 
-      <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
-        <label>{receiptRequired ? 'Upload Bukti Pembayaran (Wajib)' : 'Upload Bukti Pembayaran (Opsional)'}</label>
-        
-        {/* Alur Baru: Hanya 1 Tombol Tunggal */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem',
-          padding: '1rem',
-          backgroundColor: '#f8fafc',
-          borderRadius: '12px',
-          border: '1px solid var(--border-color)'
-        }}>
-          <div>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: '#0284c7',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <span role="img" aria-label="camera">📸</span> {receiptRequired ? 'Ambil / Pilih Foto Bukti (Wajib)' : 'Ambil / Pilih Foto Bukti (Opsional)'}
-            </button>
-            <input
-              type="file"
-              ref={fileRef}
-              accept="image/*"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              * {receiptRequired ? 'Foto wajib diisi.' : 'Foto tidak wajib.'} Jika diisi, akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
-            </p>
+      {/* Hanya tampilkan upload bukti jika receiptRequired bernilai true */}
+      {receiptRequired && paymentMethod === 'QRIS/TF' && (
+        <div className="input-group" style={{ display: 'flex' }}>
+          <label>Upload Bukti Pembayaran (Wajib)</label>
+          
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            padding: '1rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)'
+          }}>
+            <div>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#0284c7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span role="img" aria-label="camera">📸</span> Ambil / Pilih Foto Bukti (Wajib)
+              </button>
+              <input
+                type="file"
+                ref={fileRef}
+                accept="image/*"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                * Foto wajib diisi. Akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
+              </p>
+            </div>
           </div>
-        </div>
 
-        {fileName && (
-          <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: '0.5rem 0 0 0', fontWeight: 'bold' }}>
-            ✓ Foto Terpilih: {fileName}
+          {fileName && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--success-color)', margin: '0.5rem 0 0 0', fontWeight: 'bold' }}>
+              ✓ Foto Terpilih: {fileName}
+            </p>
+          )}
+          {receiptDataUrl && (
+            <div style={{ marginTop: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+              <p style={{ margin: '0.5rem 0.75rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Preview Foto Bukti:</p>
+              <img src={receiptDataUrl} alt="Bukti Pembayaran" style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiptDataUrl(null);
+                  setReceiptCacheUrl(null);
+                  setFileName('');
+                  if (fileRef.current) fileRef.current.value = '';
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  backgroundColor: '#fef2f2',
+                  color: '#ef4444',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  borderTop: '1px solid var(--border-color)'
+                }}
+              >
+                Hapus Foto Ini
+              </button>
+            </div>
+          )}
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+            Foto akan dikompres otomatis saat dikirim agar cepat dan hemat kuota.
           </p>
-        )}
-        {receiptDataUrl && (
-          <div style={{ marginTop: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-            <p style={{ margin: '0.5rem 0.75rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Preview Foto Bukti:</p>
-            <img src={receiptDataUrl} alt="Bukti Pembayaran" style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
-            <button
-              type="button"
-              onClick={() => {
-                setReceiptDataUrl(null);
-                setReceiptCacheUrl(null);
-                setFileName('');
-                if (fileRef.current) fileRef.current.value = '';
-              }}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                backgroundColor: '#fef2f2',
-                color: '#ef4444',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '600',
-                borderTop: '1px solid var(--border-color)'
-              }}
-            >
-              Hapus Foto Ini
-            </button>
-          </div>
-        )}
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-          Foto akan dikompres otomatis saat dikirim agar cepat dan hemat kuota.
-        </p>
-      </div>
+        </div>
+      )}
 
       <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
         {loading ? 'Mengirim & Mengompres Data...' : !isOnline ? 'Simpan Offline' : 'Kirim Laporan'}
