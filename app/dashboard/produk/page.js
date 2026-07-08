@@ -6,6 +6,22 @@ export const metadata = {
   title: 'Gudang Produk - Yandihan'
 }
 
+export async function editStock(formData) {
+  'use server'
+  const supabase = await createClient()
+  const productId = formData.get('productId')
+  const newStock = parseInt(formData.get('newStock'), 10)
+  if (isNaN(newStock) || newStock < 0) {
+    // fallback: redirect back without changes
+    return redirect('/dashboard/produk')
+  }
+  await supabase
+    .from('products')
+    .update({ stock: newStock })
+    .eq('id', productId)
+  redirect('/dashboard/produk')
+}
+
 export default async function GudangProduk() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -61,6 +77,7 @@ export default async function GudangProduk() {
                 <tr>
                   <th>Nama Produk</th>
                   <th>Harga Satuan</th>
+                  <th>Stok</th>
                   <th style={{ textAlign: 'right' }}>Aksi</th>
                 </tr>
               </thead>
@@ -69,14 +86,57 @@ export default async function GudangProduk() {
                   <tr key={prod.id}>
                     <td style={{ fontWeight: '500' }}>{prod.name}</td>
                     <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <form action={async () => {
-                        'use server'
-                        const sb = await createClient()
-                        await sb.from('products').delete().eq('id', prod.id)
-                        redirect('/dashboard/produk')
-                      }}>
-                        <button type="submit" style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '0.875rem' }}>
+                    <td>{prod.stock ?? 0}</td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <form action={editStock} method="post" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input type="hidden" name="productId" value={prod.id} />
+                        <input
+                          type="number"
+                          name="newStock"
+                          min="0"
+                          defaultValue={prod.stock ?? 0}
+                          style={{
+                            width: '60px',
+                            padding: '0.2rem',
+                            fontSize: '0.875rem',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px'
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--primary-color)',
+                            fontWeight: '500',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          Simpan
+                        </button>
+                      </form>
+                      <form
+                        action={async () => {
+                          'use server'
+                          const sb = await createClient()
+                          await sb.from('products').delete().eq('id', prod.id)
+                          redirect('/dashboard/produk')
+                        }}
+                        style={{ display: 'inline-block', marginLeft: '0.5rem' }}
+                      >
+                        <button
+                          type="submit"
+                          style={{
+                            color: '#ef4444',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            fontSize: '0.875rem'
+                          }}
+                        >
                           Hapus
                         </button>
                       </form>
