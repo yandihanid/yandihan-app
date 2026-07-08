@@ -41,7 +41,7 @@ export default async function SettingsPage() {
       </div>
 
       <div className="card" style={{ backgroundColor: 'var(--secondary-color)', border: '1px solid var(--primary-light, #DBEAFE)' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Pusat Bantuan & Aplikasi</h3>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Pusat Bantuan &amp; Aplikasi</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.6 }}>Pelajari cara menggunakan Yandihan atau unduh aplikasi Android Kasir untuk input transaksi offline.</p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <a href="/guide" className="btn btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem', textDecoration: 'none', borderRadius: '8px' }}>
