@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowRight, BarChart3, Smartphone, Zap, ShieldCheck, CheckCircle2, Download, RefreshCw, Wifi, CloudLightning, Menu, X, ChevronDown, Star } from 'lucide-react'
+import { ArrowRight, BarChart3, Smartphone, Zap, ShieldCheck, CheckCircle2, Menu, X, ChevronDown, Star } from 'lucide-react'
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -201,7 +201,7 @@ export default function Home() {
                   backgroundColor: 'var(--success-color)',
                 }}
               ></span>
-              SaaS Kasir & Laporan Keuangan UMKM #1
+              SaaS Kasir &amp; Laporan Keuangan UMKM #1
             </div>
 
             {/* Judul utama */}
@@ -627,7 +627,7 @@ export default function Home() {
                     ))}
                   </div>
                   <p style={{ color: 'var(--text-main)', lineHeight: 1.7, marginBottom: '1.25rem', fontStyle: 'italic' }}>
-                    &ldquo;{t.text}&rdquo;
+                    {'\u201C'}{t.text}{'\u201D'}
                   </p>
                   <div>
                     <p style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text-main)' }}>{t.name}</p>
@@ -791,7 +791,7 @@ export default function Home() {
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>1 Web Kasir & 1 Akun Telegram Bot</span>
+                    <span>1 Web Kasir &amp; 1 Akun Telegram Bot</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -885,7 +885,7 @@ export default function Home() {
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{ fontWeight: '700' }}>Unlimited</span> Web Kasir & Telegram
+                    <span style={{ fontWeight: '700' }}>Unlimited</span> Web Kasir &amp; Telegram
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -893,7 +893,7 @@ export default function Home() {
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Analitik Lanjutan & Prioritas Support
+                    Analitik Lanjutan &amp; Prioritas Support
                   </li>
                 </ul>
 
@@ -979,7 +979,7 @@ export default function Home() {
           </div>
 
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: '500' }}>
-            &copy; {new Date().getFullYear()} Yandihan SaaS. All rights reserved.
+            © {new Date().getFullYear()} Yandihan SaaS. All rights reserved.
           </p>
         </div>
       </footer>
