@@ -73,11 +73,15 @@ export default async function ReceiptPage({ params }) {
 
         {tx.payment_method === 'CASH' && tx.cash_received && (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderTop: '1px dashed #eee', paddingTop: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingTop: '0.5rem' }}>
               <span>Uang Diterima:</span>
               <span>Rp {Number(tx.cash_received).toLocaleString('id-ID')}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.125rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.125rem', borderTop: '1px dashed #eee', paddingTop: '0.5rem' }}>
+              <span>Total Harga Barang Produk:</span>
+              <span>Rp {Number(tx.amount).toLocaleString('id-ID')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <span>Kembalian:</span>
               <span>Rp {Number(tx.change_amount).toLocaleString('id-ID')}</span>
             </div>
