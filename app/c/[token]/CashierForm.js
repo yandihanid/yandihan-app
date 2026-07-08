@@ -67,7 +67,7 @@ function readFileAsDataUrl(file) {
   })
 }
 
-export default function CashierForm({ cashierId, storeId, token, products = [] }) {
+export default function CashierForm({ cashierId, storeId, token, products = [], receiptRequired = true }) {
   const router = useRouter()
   const fileRef = useRef(null)
 
@@ -367,6 +367,13 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
     let rawFile = fileRef.current?.files?.[0]
     if (!rawFile && receiptDataUrl) {
       rawFile = dataUrlToFile(receiptDataUrl, fileName)
+    }
+
+    // Validation for receipt when receiptRequired is true and payment method is QRIS/TF
+    if (paymentMethod === 'QRIS/TF' && receiptRequired && !rawFile) {
+      setMessage({ type: 'error', text: 'Bukti pembayaran wajib diisi. Silakan ambil atau pilih foto bukti transfer.' })
+      setLoading(false)
+      return
     }
 
     // Handle Offline Mode
@@ -688,7 +695,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
       )}
 
       <div className="input-group" style={{ display: paymentMethod === 'QRIS/TF' ? 'flex' : 'none' }}>
-        <label>Upload Bukti Pembayaran (Opsional)</label>
+        <label>{receiptRequired ? 'Upload Bukti Pembayaran (Wajib)' : 'Upload Bukti Pembayaran (Opsional)'}</label>
         
         {/* Alur Baru: Hanya 1 Tombol Tunggal */}
         <div style={{
@@ -719,7 +726,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
                 gap: '0.5rem'
               }}
             >
-              <span role="img" aria-label="camera">📸</span> Ambil / Pilih Foto Bukti (Opsional)
+              <span role="img" aria-label="camera">📸</span> {receiptRequired ? 'Ambil / Pilih Foto Bukti (Wajib)' : 'Ambil / Pilih Foto Bukti (Opsional)'}
             </button>
             <input
               type="file"
@@ -729,7 +736,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [] }
               style={{ display: 'none' }}
             />
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              * Foto tidak wajib. Jika diisi, akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
+              * {receiptRequired ? 'Foto wajib diisi.' : 'Foto tidak wajib.'} Jika diisi, akan otomatis tersimpan di penyimpanan lokal browser (Cache Storage) atau diunduh ke HP Anda, lalu langsung terunggah ke formulir ini.
             </p>
           </div>
         </div>

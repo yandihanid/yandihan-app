@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import SettingsForm from './SettingsForm'
 import AddCashierForm from './AddCashierForm'
 import CashierRow from './CashierRow'
+import ToggleReceiptRequired from './ToggleReceiptRequired'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,9 @@ export default async function SettingsPage() {
       <div className="card">
         <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Profil Toko</h3>
         <SettingsForm store={store} userId={user.id} />
+        <div style={{ marginTop: '1.5rem' }}>
+          <ToggleReceiptRequired storeId={store?.id} initial={store?.receipt_required ?? true} />
+        </div>
       </div>
 
       <div className="card" style={{ backgroundColor: 'var(--secondary-color)', border: '1px solid var(--primary-light, #DBEAFE)' }}>

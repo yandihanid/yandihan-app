@@ -156,6 +156,9 @@ export default function CashierWeb() {
     )
   }
 
+  // receiptRequired default to true if not set
+  const receiptRequired = cashier.stores?.receipt_required !== undefined ? cashier.stores.receipt_required : true
+
   return (
     <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
       <header style={{ textAlign: 'center', margin: '2rem 0', position: 'relative' }}>
@@ -221,7 +224,7 @@ export default function CashierWeb() {
       <main className="container animate-fade-in" style={{ maxWidth: '500px', margin: '0 auto' }}>
         <div className="card">
           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem' }}>Lapor Transaksi</h2>
-          <CashierForm cashierId={cashier.id} storeId={cashier.store_id} token={token} products={cashier.products} />
+          <CashierForm cashierId={cashier.id} storeId={cashier.store_id} token={token} products={cashier.products} receiptRequired={receiptRequired} />
         </div>
       </main>
     </div>

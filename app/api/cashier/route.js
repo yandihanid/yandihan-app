@@ -14,7 +14,7 @@ export async function GET(req) {
 
   const { data: cashier, error } = await supabase
     .from('cashiers')
-    .select('id, name, store_id, device_id, stores(name, subscription_tier)')
+    .select('id, name, store_id, device_id, stores(name, subscription_tier, receipt_required)')
     .eq('token', token)
     .single()
 
