@@ -1,11 +1,9 @@
 // app/api/pricing/route.js
-import { PRO_MONTHLY_PRICE, PRO_MONTHLY_PRICE_FORMATTED } from '@/lib/pricingConstants';
-
 export async function GET() {
   const pricing = {
     pro: {
-      monthlyPrice: PRO_MONTHLY_PRICE,
-      monthlyPriceFormatted: PRO_MONTHLY_PRICE_FORMATTED,
+      monthlyPrice: 78000,
+      monthlyPriceFormatted: 'Rp78.000',
       currency: 'IDR',
     },
   };

@@ -655,7 +655,7 @@ export default function Home() {
               {[
                 {
                   q: 'Apakah benar-benar gratis?',
-                  a: 'Ya, paket GRATIS berlaku selamanya dengan batas 30 transaksi per hari. Cocok untuk UMKM yang baru mulai.',
+                  a: 'Ya, paket GRATIS berlaku selamanya tanpa batas transaksi. Cocok untuk UMKM yang baru mulai.',
                 },
                 {
                   q: 'Bagaimana cara mendapatkan link kasir?',
@@ -787,7 +787,7 @@ export default function Home() {
                 >
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>Maks 30 transaksi per hari</span>
+                    <span>Transaksi tanpa batas</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.92rem' }}>
                     <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -861,7 +861,7 @@ export default function Home() {
                     PRO
                   </span>
                   <h3 style={{ fontSize: '1.85rem', fontWeight: '800', marginTop: '0.875rem' }}>
-                    Rp 189.000 <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: '500' }}>/ bln</span>
+                    Rp 78.000 <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: '500' }}>/ bln</span>
                   </h3>
                   <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.875rem' }}>
                     Untuk bisnis yang sedang berkembang dengan cabang/kasir banyak.
