@@ -15,6 +15,13 @@ export default function ProductForm({ storeId }) {
   const [hasVariants, setHasVariants] = useState(false)
   const [variantGroups, setVariantGroups] = useState([])
 
+  // discount & additional settings
+  const [discountType, setDiscountType] = useState('none') // none, percent, amount
+  const [discountPercent, setDiscountPercent] = useState('')
+  const [discountAmount, setDiscountAmount] = useState('')
+  const [selfOrderEnabled, setSelfOrderEnabled] = useState(false)
+  const [loyaltyPoints, setLoyaltyPoints] = useState('')
+
   function addVariantGroup() {
     setVariantGroups([
       ...variantGroups,
@@ -71,6 +78,21 @@ export default function ProductForm({ storeId }) {
     formData.append('price', price)
     formData.append('stock', stock)
 
+    // diskon
+    if (discountType === 'percent' && discountPercent) {
+      formData.append('discountPercent', discountPercent)
+    } else if (discountType === 'amount' && discountAmount) {
+      formData.append('discountAmount', discountAmount)
+    }
+
+    if (selfOrderEnabled) {
+      formData.append('selfOrder', 'on')
+    }
+
+    if (loyaltyPoints) {
+      formData.append('loyaltyPoints', loyaltyPoints)
+    }
+
     // sertakan data varian sebagai JSON string
     if (hasVariants && variantGroups.length > 0) {
       formData.append('variants', JSON.stringify(variantGroups))
@@ -85,6 +107,11 @@ export default function ProductForm({ storeId }) {
       setStock('')
       setHasVariants(false)
       setVariantGroups([])
+      setDiscountPercent('')
+      setDiscountAmount('')
+      setDiscountType('none')
+      setSelfOrderEnabled(false)
+      setLoyaltyPoints('')
       router.refresh()
       router.replace('/dashboard/produk')
     } else {
@@ -133,6 +160,78 @@ export default function ProductForm({ storeId }) {
         <button type="submit" className="btn btn-primary" disabled={loading} style={{ height: '52px', padding: '0 1.5rem' }}>
           {loading ? <div className="spinner-sm"></div> : '+ Tambah'}
         </button>
+      </div>
+
+      {/* Diskon & Pengaturan Tambahan */}
+      <div style={{ width: '100%', marginTop: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1rem' }}>
+        <h4 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: '600' }}>Diskon & Pengaturan Tambahan</h4>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <span style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>Diskon</span>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+                <input type="radio" name="discountType" value="none" checked={discountType === 'none'} onChange={() => setDiscountType('none')} /> Tanpa
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+                <input type="radio" name="discountType" value="percent" checked={discountType === 'percent'} onChange={() => setDiscountType('percent')} /> Persen (%)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+                <input type="radio" name="discountType" value="amount" checked={discountType === 'amount'} onChange={() => setDiscountType('amount')} /> Nominal (Rp)
+              </label>
+            </div>
+          </div>
+          {discountType === 'percent' && (
+            <div style={{ flex: '1', minWidth: '120px' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Persen Diskon</label>
+              <input
+                type="number"
+                className="input-field"
+                value={discountPercent}
+                onChange={e => setDiscountPercent(e.target.value)}
+                placeholder="Misal: 10"
+                min="0"
+                max="100"
+              />
+            </div>
+          )}
+          {discountType === 'amount' && (
+            <div style={{ flex: '1', minWidth: '120px' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Diskon (Rp)</label>
+              <input
+                type="number"
+                className="input-field"
+                value={discountAmount}
+                onChange={e => setDiscountAmount(e.target.value)}
+                placeholder="Misal: 5000"
+                min="0"
+              />
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start' }}>
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: '600' }}>
+              <input
+                type="checkbox"
+                checked={selfOrderEnabled}
+                onChange={(e) => setSelfOrderEnabled(e.target.checked)}
+              />
+              Tersedia untuk Self-Order
+            </label>
+          </div>
+          <div style={{ flex: '1', minWidth: '150px' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Poin Loyalitas per Item</label>
+            <input
+              type="number"
+              className="input-field"
+              value={loyaltyPoints}
+              onChange={e => setLoyaltyPoints(e.target.value)}
+              placeholder="0"
+              min="0"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Toggle varian */}

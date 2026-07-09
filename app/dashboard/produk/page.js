@@ -74,6 +74,9 @@ export default async function GudangProduk() {
                 <tr>
                   <th>Nama Produk</th>
                   <th>Harga Satuan</th>
+                  <th>Diskon</th>
+                  <th>Self-Order</th>
+                  <th>Poin Loyal</th>
                   <th>Stok</th>
                   <th>Varian</th>
                   <th style={{ textAlign: 'right' }}>Aksi</th>
@@ -82,10 +85,24 @@ export default async function GudangProduk() {
               <tbody>
                 {products.map((prod) => {
                   const variantCount = prod.variants ? (Array.isArray(prod.variants) ? prod.variants.length : 'Ya') : '-';
+                  const discountDisplay = prod.discount_percent
+                    ? `${prod.discount_percent}%`
+                    : prod.discount_amount
+                      ? `Rp ${prod.discount_amount.toLocaleString('id-ID')}`
+                      : '-';
                   return (
                     <tr key={prod.id}>
                       <td style={{ fontWeight: '500' }}>{prod.name}</td>
                       <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
+                      <td style={{ textAlign: 'center', fontSize: '0.875rem' }}>{discountDisplay}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {prod.self_order_enabled ? (
+                          <span style={{ color: 'green', fontWeight: 'bold' }}>✔</span>
+                        ) : (
+                          <span style={{ color: '#999' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>{prod.loyalty_points ?? 0}</td>
                       <td>{prod.stock ?? 0}</td>
                       <td>{variantCount}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
