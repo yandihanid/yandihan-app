@@ -164,7 +164,7 @@ export default function ProductForm({ storeId }) {
 
       {/* Diskon & Pengaturan Tambahan */}
       <div style={{ width: '100%', marginTop: '1.5rem', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1rem' }}>
-        <h4 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: '600' }}>Diskon & Pengaturan Tambahan</h4>
+        <h4 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: '600' }}>Diskon {'&'} Pengaturan Tambahan</h4>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
           <div>
             <span style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>Diskon</span>
