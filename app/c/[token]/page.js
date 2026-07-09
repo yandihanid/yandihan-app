@@ -36,6 +36,13 @@ export default function CashierWeb() {
   const [isOnline, setIsOnline] = useState(true)
   const [isCapacitor, setIsCapacitor] = useState(false)
 
+  // --- customer data ---
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [savingCustomer, setSavingCustomer] = useState(false)
+  const [customerSaved, setCustomerSaved] = useState(false)
+  // ---------------------
+
   // Monitor online status for header indicator
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -113,6 +120,39 @@ export default function CashierWeb() {
       cancelled = true
     }
   }, [token])
+
+  const handleSaveCustomer = async () => {
+    if (!customerName || !customerPhone) {
+      alert('Silakan isi nama dan nomor WhatsApp pelanggan')
+      return
+    }
+    setSavingCustomer(true)
+    try {
+      const res = await fetch('/api/pelanggan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          name: customerName,
+          phone: customerPhone
+        })
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.message || 'Gagal menyimpan')
+      }
+      setCustomerSaved(true)
+      setTimeout(() => {
+        setCustomerName('')
+        setCustomerPhone('')
+        setCustomerSaved(false)
+      }, 2000)
+    } catch (err) {
+      alert('Gagal menyimpan: ' + err.message)
+    } finally {
+      setSavingCustomer(false)
+    }
+  }
 
   if (!token) {
     return (
@@ -226,6 +266,62 @@ export default function CashierWeb() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem' }}>Lapor Transaksi</h2>
           <CashierForm cashierId={cashier.id} storeId={cashier.store_id} token={token} products={cashier.products} receiptRequired={receiptRequired} />
         </div>
+
+        { cashier.stores?.plan === 'pro' && cashier.stores?.pelanggan_enabled !== false && (
+          <div className="card" style={{ marginTop: '1rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Data Pelanggan</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Nama Pelanggan</label>
+              <input
+                type="text"
+                placeholder="Masukkan nama pelanggan"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)'
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Nomor WhatsApp</label>
+              <input
+                type="text"
+                placeholder="08xxx..."
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                inputMode="numeric"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)'
+                }}
+              />
+            </div>
+            <button
+              onClick={handleSaveCustomer}
+              disabled={savingCustomer}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: savingCustomer ? 'var(--border-color)' : 'var(--primary-color)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: savingCustomer ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {savingCustomer ? 'Menyimpan...' : 'Simpan Data Pelanggan'}
+            </button>
+            { customerSaved && (
+              <p style={{ color: '#22c55e', fontWeight: '500', textAlign: 'center', marginTop: '0.5rem' }}>✓ Data pelanggan tersimpan</p>
+            )}
+          </div>
+        )}
       </main>
     </div>
   )
