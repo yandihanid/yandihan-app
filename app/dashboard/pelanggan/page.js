@@ -1,10 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function PelangganPage() {
-  const router = useRouter()
   const [store, setStore] = useState(null)
   const [storeLoading, setStoreLoading] = useState(true)
   const [customers, setCustomers] = useState([])
@@ -125,7 +123,7 @@ export default function PelangganPage() {
           Fitur ini hanya tersedia untuk <strong>Paket Pro</strong>. Silakan upgrade untuk mengakses loyalty customer.
         </p>
         <button
-          onClick={() => router.push('/pricing')}
+          onClick={() => { window.location.href = '/pricing' }}
           style={{
             padding: '0.75rem 2rem',
             backgroundColor: 'var(--primary-color)',
