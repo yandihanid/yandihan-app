@@ -12,7 +12,6 @@ export async function editStock(formData) {
   const productId = formData.get('productId')
   const newStock = parseInt(formData.get('newStock'), 10)
   if (isNaN(newStock) || newStock < 0) {
-    // fallback: redirect back without changes
     return redirect('/dashboard/produk')
   }
   await supabase
@@ -30,7 +29,6 @@ export default async function GudangProduk() {
     redirect('/login')
   }
 
-  // Ambil store pertama milik user
   const { data: stores } = await supabase
     .from('stores')
     .select('*')
@@ -48,7 +46,6 @@ export default async function GudangProduk() {
 
   const activeStore = stores[0]
 
-  // Ambil produk
   const { data: products } = await supabase
     .from('products')
     .select('*')
@@ -78,71 +75,76 @@ export default async function GudangProduk() {
                   <th>Nama Produk</th>
                   <th>Harga Satuan</th>
                   <th>Stok</th>
+                  <th>Varian</th>
                   <th style={{ textAlign: 'right' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((prod) => (
-                  <tr key={prod.id}>
-                    <td style={{ fontWeight: '500' }}>{prod.name}</td>
-                    <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
-                    <td>{prod.stock ?? 0}</td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <form action={editStock} method="post" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input type="hidden" name="productId" value={prod.id} />
-                        <input
-                          type="number"
-                          name="newStock"
-                          min="0"
-                          defaultValue={prod.stock ?? 0}
-                          style={{
-                            width: '60px',
-                            padding: '0.2rem',
-                            fontSize: '0.875rem',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px'
+                {products.map((prod) => {
+                  const variantCount = prod.variants ? (Array.isArray(prod.variants) ? prod.variants.length : 'Ya') : '-';
+                  return (
+                    <tr key={prod.id}>
+                      <td style={{ fontWeight: '500' }}>{prod.name}</td>
+                      <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
+                      <td>{prod.stock ?? 0}</td>
+                      <td>{variantCount}</td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <form action={editStock} method="post" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input type="hidden" name="productId" value={prod.id} />
+                          <input
+                            type="number"
+                            name="newStock"
+                            min="0"
+                            defaultValue={prod.stock ?? 0}
+                            style={{
+                              width: '60px',
+                              padding: '0.2rem',
+                              fontSize: '0.875rem',
+                              border: '1px solid #ccc',
+                              borderRadius: '4px'
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--primary-color)',
+                              fontWeight: '500',
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            Simpan
+                          </button>
+                        </form>
+                        <form
+                          action={async () => {
+                            'use server'
+                            const sb = await createClient()
+                            await sb.from('products').delete().eq('id', prod.id)
+                            redirect('/dashboard/produk')
                           }}
-                        />
-                        <button
-                          type="submit"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--primary-color)',
-                            fontWeight: '500',
-                            fontSize: '0.875rem'
-                          }}
+                          style={{ display: 'inline-block', marginLeft: '0.5rem' }}
                         >
-                          Simpan
-                        </button>
-                      </form>
-                      <form
-                        action={async () => {
-                          'use server'
-                          const sb = await createClient()
-                          await sb.from('products').delete().eq('id', prod.id)
-                          redirect('/dashboard/produk')
-                        }}
-                        style={{ display: 'inline-block', marginLeft: '0.5rem' }}
-                      >
-                        <button
-                          type="submit"
-                          style={{
-                            color: '#ef4444',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontWeight: '500',
-                            fontSize: '0.875rem'
-                          }}
-                        >
-                          Hapus
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            type="submit"
+                            style={{
+                              color: '#ef4444',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: '500',
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            Hapus
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
