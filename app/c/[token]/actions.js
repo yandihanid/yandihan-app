@@ -4,10 +4,14 @@ import { createServiceClient } from '@/utils/supabase/service'
 
 export async function submitTransaction(formData) {
   try {
-    const cashierId = formData.get('cashierId')
+        const cashierId = formData.get('cashierId')
     const storeId = formData.get('storeId')
     const token = formData.get('token')
     const amount = formData.get('amount')
+    const originalAmount = formData.get('originalAmount')
+    const discountPercent = parseInt(formData.get('discountPercent') || '0', 10)
+    const customerName = formData.get('customerName') || null
+    const customerPhone = formData.get('customerPhone') || null
     const productName = formData.get('productName')
     const paymentMethod = formData.get('paymentMethod')
     const receiptFile = formData.get('receipt')
@@ -107,12 +111,16 @@ export async function submitTransaction(formData) {
       receiptUrl = publicUrlData.publicUrl
     }
 
-    const { data: insertData, error: insertError } = await supabase
+        const { data: insertData, error: insertError } = await supabase
       .from('transactions')
       .insert({
         store_id: storeId,
         cashier_id: cashierId,
         amount: parseInt(amount, 10),
+        original_amount: originalAmount ? parseInt(originalAmount, 10) : parseInt(amount, 10),
+        discount_percent: discountPercent,
+        customer_name: customerName,
+        customer_phone: customerPhone,
         product_name: productName,
         payment_method: paymentMethod,
         receipt_url: receiptUrl,
@@ -121,6 +129,28 @@ export async function submitTransaction(formData) {
       })
       .select()
       .single()
+
+    // Update total_spent pelanggan jika ada customer data
+    if (!insertError && customerPhone && storeId) {
+      try {
+        const { data: existingCust } = await supabase
+          .from('customers')
+          .select('id, total_spent')
+          .eq('store_id', storeId)
+          .eq('phone', customerPhone)
+          .single()
+
+        if (existingCust) {
+          await supabase
+            .from('customers')
+            .update({
+              total_spent: (existingCust.total_spent || 0) + parseInt(amount, 10),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingCust.id)
+        }
+      } catch { /* non-critical, ignore */ }
+    }
 
     if (insertError) {
       console.error("Insert Error:", insertError)
