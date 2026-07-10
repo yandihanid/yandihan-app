@@ -4,7 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 
 export async function submitTransaction(formData) {
   try {
-        const cashierId = formData.get('cashierId')
+    const cashierId = formData.get('cashierId')
     const storeId = formData.get('storeId')
     const token = formData.get('token')
     const amount = formData.get('amount')
@@ -111,7 +111,7 @@ export async function submitTransaction(formData) {
       receiptUrl = publicUrlData.publicUrl
     }
 
-        const { data: insertData, error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await supabase
       .from('transactions')
       .insert({
         store_id: storeId,
