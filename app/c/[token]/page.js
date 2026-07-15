@@ -36,11 +36,14 @@ export default function CashierWeb() {
   const [isOnline, setIsOnline] = useState(true)
   const [isCapacitor, setIsCapacitor] = useState(false)
 
-  // --- customer data ---
+    // --- customer data ---
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [savingCustomer, setSavingCustomer] = useState(false)
   const [customerSaved, setCustomerSaved] = useState(false)
+  const [discountPercent, setDiscountPercent] = useState(0)
+  const [discountMessage, setDiscountMessage] = useState('')
+  const [customerConfirmed, setCustomerConfirmed] = useState(false)
   // ---------------------
 
   // Monitor online status for header indicator
@@ -121,12 +124,15 @@ export default function CashierWeb() {
     }
   }, [token])
 
-  const handleSaveCustomer = async () => {
+    const handleSaveCustomer = async () => {
     if (!customerName || !customerPhone) {
       alert('Silakan isi nama dan nomor WhatsApp pelanggan')
       return
     }
     setSavingCustomer(true)
+    setDiscountMessage('')
+    setDiscountPercent(0)
+    setCustomerConfirmed(false)
     try {
       const res = await fetch('/api/pelanggan', {
         method: 'POST',
@@ -137,16 +143,14 @@ export default function CashierWeb() {
           phone: customerPhone
         })
       })
+      const resData = await res.json()
       if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.message || 'Gagal menyimpan')
+        throw new Error(resData.error || resData.message || 'Gagal menyimpan')
       }
       setCustomerSaved(true)
-      setTimeout(() => {
-        setCustomerName('')
-        setCustomerPhone('')
-        setCustomerSaved(false)
-      }, 2000)
+      setCustomerConfirmed(true)
+      setDiscountPercent(resData.discount_percent || 0)
+      setDiscountMessage(resData.message || '')
     } catch (err) {
       alert('Gagal menyimpan: ' + err.message)
     } finally {
@@ -264,61 +268,140 @@ export default function CashierWeb() {
       <main className="container animate-fade-in" style={{ maxWidth: '500px', margin: '0 auto' }}>
         <div className="card">
           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem' }}>Lapor Transaksi</h2>
-          <CashierForm cashierId={cashier.id} storeId={cashier.store_id} token={token} products={cashier.products} receiptRequired={receiptRequired} />
+          <CashierForm
+            cashierId={cashier.id}
+            storeId={cashier.store_id}
+            token={token}
+            products={cashier.products}
+            receiptRequired={receiptRequired}
+            discountPercent={discountPercent}
+            customerName={customerConfirmed ? customerName : ''}
+            customerPhone={customerConfirmed ? customerPhone : ''}
+          />
         </div>
 
-        { cashier.stores?.plan === 'pro' && cashier.stores?.pelanggan_enabled !== false && (
+                { cashier.stores?.subscription_tier === 'PRO' && cashier.stores?.pelanggan_enabled !== false && (
           <div className="card" style={{ marginTop: '1rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Data Pelanggan</h2>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Nama Pelanggan</label>
-              <input
-                type="text"
-                placeholder="Masukkan nama pelanggan"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)'
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>Nomor WhatsApp</label>
-              <input
-                type="text"
-                placeholder="08xxx..."
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                inputMode="numeric"
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)'
-                }}
-              />
-            </div>
-            <button
-              onClick={handleSaveCustomer}
-              disabled={savingCustomer}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: savingCustomer ? 'var(--border-color)' : 'var(--primary-color)',
-                color: '#fff',
-                border: 'none',
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.25rem' }}>👥 Data Pelanggan</h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Isi data pelanggan untuk mendapatkan potongan harga loyalitas</p>
+
+            {customerConfirmed && discountPercent > 0 && (
+              <div style={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #86efac',
                 borderRadius: '8px',
-                fontWeight: 'bold',
-                cursor: savingCustomer ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {savingCustomer ? 'Menyimpan...' : 'Simpan Data Pelanggan'}
-            </button>
-            { customerSaved && (
-              <p style={{ color: '#22c55e', fontWeight: '500', textAlign: 'center', marginTop: '0.5rem' }}>✓ Data pelanggan tersimpan</p>
+                padding: '0.75rem 1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span style={{ fontSize: '1.25rem' }}>🎉</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: '700', color: '#16a34a', fontSize: '0.95rem' }}>Diskon {discountPercent}% aktif!</p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#15803d' }}>{discountMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {customerConfirmed && discountPercent === 0 && (
+              <div style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #93c5fd',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span style={{ fontSize: '1.25rem' }}>✅</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: '600', color: '#1d4ed8', fontSize: '0.9rem' }}>Pelanggan tercatat</p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#1e40af' }}>{discountMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {!customerConfirmed && (
+              <>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Nama Pelanggan</label>
+                  <input
+                    type="text"
+                    placeholder="Masukkan nama pelanggan"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '0.95rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Nomor WhatsApp</label>
+                  <input
+                    type="text"
+                    placeholder="08xxx..."
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    inputMode="numeric"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '0.95rem'
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={handleSaveCustomer}
+                  disabled={savingCustomer || !customerName || !customerPhone}
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem',
+                    backgroundColor: (savingCustomer || !customerName || !customerPhone) ? '#d1d5db' : 'var(--primary-color)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    cursor: (savingCustomer || !customerName || !customerPhone) ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  {savingCustomer ? 'Memeriksa...' : 'Cek & Simpan Pelanggan'}
+                </button>
+              </>
+            )}
+
+            {customerConfirmed && (
+              <button
+                onClick={() => {
+                  setCustomerConfirmed(false)
+                  setCustomerSaved(false)
+                  setDiscountPercent(0)
+                  setDiscountMessage('')
+                  setCustomerName('')
+                  setCustomerPhone('')
+                }}
+                style={{
+                  marginTop: '0.5rem',
+                  width: '100%',
+                  padding: '0.4rem',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}
+              >
+                Ganti Pelanggan
+              </button>
             )}
           </div>
         )}

@@ -2,6 +2,17 @@
 
 import { createServiceClient } from '@/utils/supabase/service'
 
+function normalizePhone(phone) {
+  if (!phone) return null
+  let cleaned = phone.replace(/\D/g, '')
+  if (cleaned.startsWith('62')) {
+    cleaned = '0' + cleaned.slice(2)
+  } else if (cleaned.length > 0 && !cleaned.startsWith('0')) {
+    cleaned = '0' + cleaned
+  }
+  return cleaned || null
+}
+
 export async function submitTransaction(formData) {
   try {
     const cashierId = formData.get('cashierId')
@@ -11,7 +22,7 @@ export async function submitTransaction(formData) {
     const originalAmount = formData.get('originalAmount')
     const discountPercent = parseInt(formData.get('discountPercent') || '0', 10)
     const customerName = formData.get('customerName') || null
-    const customerPhone = formData.get('customerPhone') || null
+    const customerPhone = normalizePhone(formData.get('customerPhone'))
     const productName = formData.get('productName')
     const paymentMethod = formData.get('paymentMethod')
     const receiptFile = formData.get('receipt')

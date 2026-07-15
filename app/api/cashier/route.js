@@ -12,9 +12,9 @@ export async function GET(req) {
 
   const supabase = createServiceClient()
 
-  const { data: cashier, error } = await supabase
+    const { data: cashier, error } = await supabase
     .from('cashiers')
-    .select('id, name, store_id, device_id, stores(name, subscription_tier, receipt_required)')
+    .select('id, name, store_id, device_id, stores(name, subscription_tier, receipt_required, pelanggan_enabled, visit_threshold, discount_percent)')
     .eq('token', token)
     .single()
 

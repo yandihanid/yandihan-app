@@ -68,6 +68,7 @@ export default function PelangganPage() {
       })
       if (!res.ok) throw new Error('Gagal mengubah pengaturan')
       setPelangganEnabled(newValue)
+      setStore(prev => prev ? { ...prev, pelanggan_enabled: newValue } : null)
     } catch (err) {
       alert('Gagal: ' + err.message)
     } finally {
@@ -89,6 +90,11 @@ export default function PelangganPage() {
         }),
       })
       if (!res.ok) throw new Error('Gagal menyimpan pengaturan')
+      setStore(prev => prev ? { 
+        ...prev, 
+        visit_threshold: Number(visitThreshold), 
+        discount_percent: Number(discountPercent) 
+      } : null)
       alert('Pengaturan diskon tersimpan')
     } catch (err) {
       alert('Gagal: ' + err.message)
@@ -290,33 +296,77 @@ export default function PelangganPage() {
             </p>
           )}
           {!customersLoading && customers.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Nama</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>
-                    Nomor WA
-                  </th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>
-                    Kunjungan
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((cust) => (
-                  <tr
-                    key={cust.id}
-                    style={{ borderBottom: '1px solid var(--border-color)' }}
-                  >
-                    <td style={{ padding: '0.5rem' }}>{cust.name}</td>
-                    <td style={{ padding: '0.5rem' }}>{cust.phone}</td>
-                    <td style={{ padding: '0.5rem' }}>
-                      {cust.visit_count ?? 0}
-                    </td>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-color)', backgroundColor: '#f8fafc' }}>
+                    <th style={{ textAlign: 'left', padding: '0.625rem 0.75rem' }}>Nama</th>
+                    <th style={{ textAlign: 'left', padding: '0.625rem 0.75rem' }}>Nomor WA</th>
+                    <th style={{ textAlign: 'center', padding: '0.625rem 0.75rem' }}>Kunjungan</th>
+                    <th style={{ textAlign: 'right', padding: '0.625rem 0.75rem' }}>Total Belanja</th>
+                    <th style={{ textAlign: 'center', padding: '0.625rem 0.75rem' }}>Diskon Aktif</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {customers.map((cust) => {
+                    const getsDiscount = cust.visit_count >= visitThreshold
+                    return (
+                      <tr
+                        key={cust.id}
+                        style={{ borderBottom: '1px solid var(--border-color)' }}
+                      >
+                        <td style={{ padding: '0.625rem 0.75rem', fontWeight: '500' }}>{cust.name}</td>
+                        <td style={{ padding: '0.625rem 0.75rem' }}>
+                          <a
+                            href={`https://wa.me/62${cust.phone.replace(/^0/, '').replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#16a34a', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          >
+                            💬 {cust.phone}
+                          </a>
+                        </td>
+                        <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            minWidth: '2rem',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '999px',
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontWeight: '700',
+                            fontSize: '0.85rem'
+                          }}>
+                            {cust.visit_count ?? 0}x
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.625rem 0.75rem', textAlign: 'right', fontWeight: '500' }}>
+                          Rp {(cust.total_spent ?? 0).toLocaleString('id-ID')}
+                        </td>
+                        <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center' }}>
+                          {pelangganEnabled && getsDiscount ? (
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '999px',
+                              backgroundColor: '#f0fdf4',
+                              color: '#16a34a',
+                              fontWeight: '700',
+                              fontSize: '0.8rem',
+                              border: '1px solid #86efac'
+                            }}>
+                              🏷️ {discountPercent}% OFF
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                              {pelangganEnabled ? `${visitThreshold - (cust.visit_count ?? 0)} lagi` : '—'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
           )}
         </div>
       )}

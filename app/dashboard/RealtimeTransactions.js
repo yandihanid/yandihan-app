@@ -146,7 +146,14 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
                   <tr key={tx.id} className="animate-fade-in">
                     <td>{new Date(tx.created_at).toLocaleString('id-ID')}</td>
                     <td>{tx.cashiers?.name || 'Tidak diketahui'}</td>
-                    <td>{tx.product_name}</td>
+                    <td>
+                      <div>{tx.product_name}</div>
+                      {tx.customer_name && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                          👤 {tx.customer_name} ({tx.customer_phone})
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <span style={{ 
                         padding: '0.25rem 0.5rem', 
@@ -159,7 +166,14 @@ export default function RealtimeTransactions({ initialTransactions, storeId, fil
                         {tx.payment_method}
                       </span>
                     </td>
-                    <td style={{ fontWeight: '500' }}>Rp {Number(tx.amount).toLocaleString('id-ID')}</td>
+                    <td style={{ fontWeight: '500' }}>
+                      <div>Rp {Number(tx.amount).toLocaleString('id-ID')}</div>
+                      {tx.discount_percent > 0 && (
+                        <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: '700', marginTop: '0.15rem' }}>
+                          🏷️ {tx.discount_percent}% OFF
+                        </div>
+                      )}
+                    </td>
                     <td>
                       {tx.receipt_url ? (
                         <a href={tx.receipt_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--primary-color)' }}>Lihat</a>

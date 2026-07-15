@@ -67,7 +67,7 @@ function readFileAsDataUrl(file) {
   })
 }
 
-export default function CashierForm({ cashierId, storeId, token, products = [], receiptRequired = true }) {
+export default function CashierForm({ cashierId, storeId, token, products = [], receiptRequired = true, discountPercent = 0, customerName = '', customerPhone = '' }) {
   const router = useRouter()
   const fileRef = useRef(null)
 
@@ -157,16 +157,20 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
     return autoCalcPossible && total > 0 ? String(total) : amount;
   }
 
+    // Hitung total setelah diskon
+  const discountAmount = discountPercent > 0 && amount ? Math.round(parseFloat(amount) * discountPercent / 100) : 0
+  const finalAmount = amount ? Math.max(0, parseFloat(amount) - discountAmount) : 0
+
   // Effect to calculate change whenever amount or cashReceived changes
   useEffect(() => {
-    const totalAmount = parseFloat(amount);
+    const totalAmount = finalAmount;
     const received = parseFloat(cashReceived);
     if (!isNaN(totalAmount) && !isNaN(received) && received >= totalAmount) {
       setChangeAmount(received - totalAmount);
     } else {
       setChangeAmount(0);
     }
-  }, [amount, cashReceived]);
+  }, [amount, cashReceived, discountPercent]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items]
@@ -416,17 +420,21 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
       return
     }
 
-    const formData = new FormData()
+        const formData = new FormData()
     formData.append('cashierId', cashierId)
     formData.append('storeId', storeId)
     formData.append('token', token)
-    formData.append('amount', amount)
+    formData.append('amount', String(finalAmount || parseFloat(amount)))
+    formData.append('originalAmount', amount)
+    formData.append('discountPercent', String(discountPercent))
+    formData.append('customerName', customerName)
+    formData.append('customerPhone', customerPhone)
     formData.append('productName', combinedProductName)
     formData.append('paymentMethod', paymentMethod)
 
     if (paymentMethod === 'CASH') {
       formData.append('cashReceived', cashReceived);
-      formData.append('changeAmount', changeAmount);
+      formData.append('changeAmount', String(changeAmount));
     }
 
     if (rawFile && paymentMethod === 'QRIS/TF') {
@@ -632,7 +640,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
         </button>
       </div>
 
-      <div className="input-group">
+            <div className="input-group">
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Total Nominal (Rp)
           {products && products.length > 0 && (
@@ -655,6 +663,31 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
         />
         {products && products.length > 0 && (
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>💡 Total dihitung otomatis dari pilihan produk di atas.</p>
+        )}
+
+        {/* Tampilkan ringkasan diskon jika ada */}
+        {discountPercent > 0 && amount && parseFloat(amount) > 0 && (
+          <div style={{
+            marginTop: '0.75rem',
+            padding: '0.75rem 1rem',
+            backgroundColor: '#f0fdf4',
+            border: '1px solid #86efac',
+            borderRadius: '8px',
+            fontSize: '0.875rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
+              <span>Subtotal</span>
+              <span>Rp {parseFloat(amount).toLocaleString('id-ID')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: '600' }}>
+              <span>🏷️ Diskon {discountPercent}%</span>
+              <span>- Rp {discountAmount.toLocaleString('id-ID')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d', fontWeight: '700', borderTop: '1px solid #86efac', marginTop: '0.5rem', paddingTop: '0.5rem', fontSize: '1rem' }}>
+              <span>Total Bayar</span>
+              <span>Rp {finalAmount.toLocaleString('id-ID')}</span>
+            </div>
+          </div>
         )}
       </div>
 
@@ -780,8 +813,15 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
         </div>
       )}
 
-      <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
-        {loading ? 'Mengirim & Mengompres Data...' : !isOnline ? 'Simpan Offline' : 'Kirim Laporan'}
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', fontSize: '1.125rem' }}>
+        {loading
+          ? 'Mengirim & Mengompres Data...'
+          : !isOnline
+          ? 'Simpan Offline'
+          : discountPercent > 0 && finalAmount > 0
+          ? `Kirim — Rp ${finalAmount.toLocaleString('id-ID')}`
+          : 'Kirim Laporan'
+        }
       </button>
     </form>
   )

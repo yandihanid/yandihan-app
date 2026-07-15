@@ -1,0 +1,7 @@
+node_modules/
+.git/
+vendor/
+dist/
+build/
+.env
+*.log
