@@ -28,6 +28,7 @@ export async function submitTransaction(formData) {
     const receiptFile = formData.get('receipt')
     const cashReceived = formData.get('cashReceived')
     const changeAmount = formData.get('changeAmount')
+    const buyerName = formData.get('buyerName') || null
 
     const supabase = createServiceClient()
 
@@ -41,7 +42,7 @@ export async function submitTransaction(formData) {
 
     if (!cashier) throw new Error("Unauthorized")
 
-    // Check Free Tier Limits (Max 40 transactions/day)
+    // Check Free Tier Limits (Max 30 transactions/day)
     if (cashier.stores.subscription_tier === 'FREE') {
       const today = new Date().toISOString().split('T')[0]
       const { count } = await supabase
@@ -57,7 +58,7 @@ export async function submitTransaction(formData) {
     }
 
     // Parse items to check and update stock
-    // Format productName: "2x Nasi Goreng, 1x Es Teh"
+    // Format productName: "2x Nasi Goreng + 1x Mayonaise, 1x Es Teh"
     const itemsToProcess = productName.split(', ').map(itemStr => {
       const match = itemStr.match(/^(\d+)x\s+(.+)$/)
       if (match) {
@@ -66,7 +67,7 @@ export async function submitTransaction(formData) {
       return null
     }).filter(Boolean)
 
-    // Verify and deduct stock for each product
+    // Verify and deduct stock for each product (including sub‑produk)
     for (const item of itemsToProcess) {
       const { data: product, error: prodError } = await supabase
         .from('products')
@@ -80,7 +81,6 @@ export async function submitTransaction(formData) {
           throw new Error(`Stok untuk "${product.name}" tidak mencukupi (Sisa: ${product.stock}).`)
         }
 
-        // Deduct stock
         const { error: updateStockError } = await supabase
           .from('products')
           .update({ stock: product.stock - item.qty })
@@ -132,11 +132,13 @@ export async function submitTransaction(formData) {
         discount_percent: discountPercent,
         customer_name: customerName,
         customer_phone: customerPhone,
+        buyer_name: buyerName,
         product_name: productName,
         payment_method: paymentMethod,
         receipt_url: receiptUrl,
         cash_received: paymentMethod === 'CASH' ? parseInt(cashReceived, 10) : null,
         change_amount: paymentMethod === 'CASH' ? parseInt(changeAmount, 10) : null,
+        status: 'pending',
       })
       .select()
       .single()
