@@ -150,6 +150,7 @@ export default function CashierWeb() {
   const receiptRequired = cashier.stores?.receipt_required !== undefined ? cashier.stores.receipt_required : true
   const requireSubProduct = cashier.stores?.require_sub_product ?? false
   const requireCustomerName = cashier.stores?.require_customer_name ?? false
+  const waitingListEnabled = cashier.stores?.waiting_list_enabled ?? false
 
   return (
     <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
@@ -205,7 +206,7 @@ export default function CashierWeb() {
         )}
       </main>
 
-      <WaitingList storeId={cashier.store_id} token={token} />
+      {waitingListEnabled && <WaitingList storeId={cashier.store_id} token={token} />}
     </div>
   )
 

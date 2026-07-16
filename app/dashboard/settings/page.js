@@ -40,6 +40,7 @@ export default async function SettingsPage() {
           <ToggleReceiptRequired storeId={store?.id} initial={store?.receipt_required ?? true} />
           <ToggleStoreSettings storeId={store?.id} field="require_sub_product" label="Wajib ada Sub‑Produk" initial={store?.require_sub_product ?? false} />
           <ToggleStoreSettings storeId={store?.id} field="require_customer_name" label="Wajib ada Nama Pembeli" initial={store?.require_customer_name ?? false} />
+          <ToggleStoreSettings storeId={store?.id} field="waiting_list_enabled" label="Aktifkan Waiting List Ticket" initial={store?.waiting_list_enabled ?? false} />
         </div>
       </div>
 
