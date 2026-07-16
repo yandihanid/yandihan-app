@@ -17,7 +17,6 @@ export default function PelangganPage() {
   useEffect(() => {
     async function loadStore() {
       try {
-        // Expected response: { id, name, plan, pelanggan_enabled, visit_threshold, discount_percent }
         const res = await fetch('/api/store/my')
         if (!res.ok) throw new Error('Gagal memuat data toko')
         const data = await res.json()

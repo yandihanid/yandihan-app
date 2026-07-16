@@ -232,6 +232,7 @@ export default function CashierForm({
     setLoading(true)
     setMessage(null)
 
+    // Validation
     if (requireCustomerName && !buyerName.trim()) {
       setMessage({ type: 'error', text: 'Nama pembeli wajib diisi.' })
       setLoading(false)

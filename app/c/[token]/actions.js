@@ -27,8 +27,14 @@ export async function submitTransaction(formData) {
     const changeAmount = formData.get('changeAmount')
     const buyerName = formData.get('buyerName') || null
 
+    // Validation
+    if (!cashierId || !storeId || !token) {
+      return { error: 'Data tidak lengkap' }
+    }
+
     const supabase = createServiceClient()
 
+    // Verify cashier belongs to store
     const { data: cashier, error: cashierErr } = await supabase
       .from('cashiers')
       .select('id, stores(id, subscription_tier)')
@@ -38,6 +44,7 @@ export async function submitTransaction(formData) {
 
     if (cashierErr || !cashier) throw new Error('Unauthorized')
 
+    // Check daily limit for FREE tier
     if (cashier.stores.subscription_tier === 'FREE') {
       const today = new Date().toISOString().split('T')[0]
       const { count } = await supabase
@@ -49,6 +56,7 @@ export async function submitTransaction(formData) {
       if (count >= 30) throw new Error('Batas transaksi harian GRATIS (30) tercapai.')
     }
 
+    // Parse items and check stock
     const items = productName.split(', ').map((s) => {
       const m = s.match(/^(\d+)x\s+(.+)$/)
       return m ? { qty: +m[1], name: m[2].trim() } : null
@@ -71,6 +79,7 @@ export async function submitTransaction(formData) {
       }
     }
 
+    // Handle receipt upload
     let receiptUrl = null
     if (receiptFile && paymentMethod === 'QRIS/TF') {
       const buffer = Buffer.from(await receiptFile.arrayBuffer())
@@ -80,6 +89,7 @@ export async function submitTransaction(formData) {
       receiptUrl = supabase.storage.from('receipts').getPublicUrl(fileName).data.publicUrl
     }
 
+    // Insert transaction
     const { data: inserted, error: insErr } = await supabase
       .from('transactions')
       .insert({
@@ -103,6 +113,7 @@ export async function submitTransaction(formData) {
 
     if (insErr) throw new Error('Gagal catat transaksi.')
 
+    // Update customer total spent
     if (customerPhone) {
       const { data: cust } = await supabase
         .from('customers')

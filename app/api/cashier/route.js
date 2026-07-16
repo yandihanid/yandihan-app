@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
-  const deviceId = searchParams.get('deviceId') // Added deviceId
+  const deviceId = searchParams.get('deviceId')
 
   if (!token) {
     return NextResponse.json({ error: 'Token diperlukan' }, { status: 400 })
@@ -12,9 +12,9 @@ export async function GET(req) {
 
   const supabase = createServiceClient()
 
-    const { data: cashier, error } = await supabase
+  const { data: cashier, error } = await supabase
     .from('cashiers')
-    .select('id, name, store_id, device_id, stores(name, subscription_tier, receipt_required, pelanggan_enabled, visit_threshold, discount_percent)')
+    .select('id, name, store_id, device_id, stores(id, name, subscription_tier, receipt_required, pelanggan_enabled, visit_threshold, discount_percent)')
     .eq('token', token)
     .single()
 
