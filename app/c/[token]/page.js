@@ -12,6 +12,7 @@ export default function CashierWeb() {
   const [cashier, setCashier] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isOnline, setIsOnline] = useState(true)
+  const [discountPercent, setDiscountPercent] = useState(0)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -31,6 +32,7 @@ export default function CashierWeb() {
     const cached = JSON.parse(localStorage.getItem(PREFIX + token) || 'null')
     if (cached?.id) {
       setCashier(cached)
+      setDiscountPercent(cached.stores?.discount_percent || 0)
       setLoading(false)
     }
     let cancelled = false
@@ -42,6 +44,7 @@ export default function CashierWeb() {
       if (res.ok) {
         const data = await res.json()
         setCashier(data)
+        setDiscountPercent(data.stores?.discount_percent || 0)
         localStorage.setItem(PREFIX + token, JSON.stringify(data))
       } else if (!cached?.id) {
         setCashier({ error: 'Link tidak valid' })
@@ -71,6 +74,7 @@ export default function CashierWeb() {
             token={token}
             products={cashier.products || []}
             receiptRequired={store.receipt_required ?? true}
+            discountPercent={discountPercent}
             requireSubProduct={store.require_sub_product ?? false}
             requireCustomerName={store.require_customer_name ?? false}
           />

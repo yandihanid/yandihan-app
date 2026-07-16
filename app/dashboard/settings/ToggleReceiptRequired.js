@@ -12,7 +12,6 @@ export default function ToggleReceiptRequired({ storeId, initial }) {
     setSaving(true)
     const newValue = !isOn
     try {
-      // Call server action to update receipt_required
       const res = await fetch('/api/settings/receipt-required', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -21,11 +20,9 @@ export default function ToggleReceiptRequired({ storeId, initial }) {
       if (res.ok) {
         setIsOn(newValue)
         router.refresh()
-      } else {
-        alert('Gagal menyimpan pengaturan.')
-      }
+      } else alert('Gagal menyimpan')
     } catch {
-      alert('Gagal menyimpan pengaturan.')
+      alert('Gagal menyimpan')
     } finally {
       setSaving(false)
     }
@@ -33,39 +30,11 @@ export default function ToggleReceiptRequired({ storeId, initial }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 0' }}>
-      <span style={{ fontWeight: '500' }}>Wajibkan Upload Bukti QRIS/TF:</span>
-      <button
-        onClick={handleToggle}
-        disabled={saving}
-        style={{
-          position: 'relative',
-          width: '48px',
-          height: '26px',
-          borderRadius: '13px',
-          border: 'none',
-          backgroundColor: isOn ? '#22c55e' : '#d1d5db',
-          cursor: 'pointer',
-          padding: 0,
-          transition: 'background-color 0.2s',
-        }}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: '2px',
-            left: isOn ? '24px' : '2px',
-            width: '22px',
-            height: '22px',
-            borderRadius: '50%',
-            backgroundColor: 'white',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-            transition: 'left 0.2s',
-          }}
-        />
+      <span style={{ fontWeight: 500 }}>Wajib Bukti (QRIS/TF):</span>
+      <button onClick={handleToggle} disabled={saving} style={{ width: 48, height: 26, borderRadius: 13, border: 'none', background: isOn ? '#22c55e' : '#d1d5db', cursor: 'pointer', position: 'relative' }}>
+        <span style={{ position: 'absolute', top: 2, left: isOn ? 24 : 2, width: 22, height: 22, borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
       </button>
-      <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-        {isOn ? 'Aktif (wajib foto)' : 'Nonaktif (opsional foto)'}
-      </span>
+      <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{isOn ? 'Aktif' : 'Nonaktif'}</span>
     </div>
   )
 }

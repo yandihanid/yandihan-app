@@ -142,7 +142,7 @@ export default function CashierForm({
     return auto && total > 0 ? String(total) : amount
   }
 
-  const discountAmount = discountPercent > 0 && amount ? Math.round(amount * discountPercent) / 100 : 0
+  const discountAmount = discountPercent > 0 && amount ? Math.round((amount * discountPercent) / 100) : 0
   const finalAmount = amount ? Math.max(0, amount - discountAmount) : 0
 
   useEffect(() => {
@@ -216,7 +216,9 @@ export default function CashierForm({
     const remaining = []
     for (const tx of queue) {
       const fd = new FormData()
-      Object.entries(tx).forEach(([k, v]) => fd.append(k, v))
+      Object.entries(tx).forEach(([k, v]) => {
+        if (k !== 'receiptFile' && v !== null && v !== undefined) fd.append(k, v)
+      })
       const res = await submitTransaction(fd)
       if (res.error) remaining.push(tx)
     }
@@ -312,8 +314,24 @@ export default function CashierForm({
       }
     } catch {
       const queueKey = `yandihan_offline_queue_${token}`
+      const offlineTx = {
+        cashierId, storeId, token,
+        amount: String(finalAmount || amount),
+        originalAmount: amount,
+        discountPercent: String(discountPercent),
+        customerName: buyerName || customerName,
+        customerPhone,
+        productName: combined,
+        paymentMethod,
+        buyerName,
+        cashReceived: paymentMethod === 'CASH' ? cashReceived : '',
+        changeAmount: paymentMethod === 'CASH' ? String(changeAmount) : '',
+        receiptDataUrl: paymentMethod === 'QRIS/TF' ? receiptDataUrl : null,
+        receiptCacheUrl: paymentMethod === 'QRIS/TF' ? receiptCacheUrl : null,
+        fileName: paymentMethod === 'QRIS/TF' ? fileName : '',
+      }
       const queue = JSON.parse(localStorage.getItem(queueKey) || '[]')
-      queue.push(Object.fromEntries(fd))
+      queue.push(offlineTx)
       localStorage.setItem(queueKey, JSON.stringify(queue))
       setOfflineQueue(queue)
       setMessage({ type: 'success', text: 'Offline tersimpan.' })

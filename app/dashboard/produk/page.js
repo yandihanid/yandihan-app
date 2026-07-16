@@ -11,62 +11,40 @@ export async function editStock(formData) {
   const supabase = await createClient()
   const productId = formData.get('productId')
   const newStock = parseInt(formData.get('newStock'), 10)
-  if (isNaN(newStock) || newStock < 0) {
-    return redirect('/dashboard/produk')
-  }
-  await supabase
-    .from('products')
-    .update({ stock: newStock })
-    .eq('id', productId)
+  if (isNaN(newStock) || newStock < 0) return redirect('/dashboard/produk')
+  await supabase.from('products').update({ stock: newStock }).eq('id', productId)
   redirect('/dashboard/produk')
 }
 
 export default async function GudangProduk() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  if (!user) {
-    redirect('/login')
-  }
-
-  const { data: stores } = await supabase
-    .from('stores')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
-
+  const { data: stores } = await supabase.from('stores').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
   if (!stores || stores.length === 0) {
     return (
       <div className="card">
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Gudang Produk</h2>
+        <h2>Gudang Produk</h2>
         <p>Anda belum memiliki toko.</p>
       </div>
     )
   }
-
   const activeStore = stores[0]
-
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('store_id', activeStore.id)
-    .order('created_at', { ascending: false })
+  const { data: products } = await supabase.from('products').select('*').eq('store_id', activeStore.id).order('created_at', { ascending: false })
 
   return (
     <div className="animate-fade-in">
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Gudang Produk</h2>
-        <p style={{ color: 'var(--text-muted)' }}>Atur produk dan harga di sini agar kasir tinggal memilih produk tanpa repot mengetik.</p>
-        
+        <h2>Gudang Produk</h2>
+        <p>Atur produk dan harga di sini.</p>
         <div style={{ marginTop: '2rem' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1rem' }}>Tambah Produk Baru</h3>
+          <h3>Tambah Produk Baru</h3>
           <ProductForm storeId={activeStore.id} />
         </div>
       </div>
-
       <div className="card">
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1rem' }}>Daftar Produk ({products?.length || 0})</h3>
-        
+        <h3>Daftar Produk ({products?.length || 0})</h3>
         {products && products.length > 0 ? (
           <div className="table-container">
             <table>
@@ -74,91 +52,33 @@ export default async function GudangProduk() {
                 <tr>
                   <th>Nama Produk</th>
                   <th>Harga Satuan</th>
-                  <th>Self-Order</th>
-                  <th>Poin Loyal</th>
                   <th>Stok</th>
                   <th style={{ textAlign: 'right' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((prod) => {
-                  return (
-                    <tr key={prod.id}>
-                      <td style={{ fontWeight: '500' }}>{prod.name}</td>
-                      <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        {prod.self_order_enabled ? (
-                          <span style={{ color: 'green', fontWeight: 'bold' }}>✔</span>
-                        ) : (
-                          <span style={{ color: '#999' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>{prod.loyalty_points ?? 0}</td>
-                      <td>{prod.stock ?? 0}</td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <form action={editStock} method="post" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input type="hidden" name="productId" value={prod.id} />
-                          <input
-                            type="number"
-                            name="newStock"
-                            min="0"
-                            defaultValue={prod.stock ?? 0}
-                            style={{
-                              width: '60px',
-                              padding: '0.2rem',
-                              fontSize: '0.875rem',
-                              border: '1px solid #ccc',
-                              borderRadius: '4px'
-                            }}
-                          />
-                          <button
-                            type="submit"
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: 'var(--primary-color)',
-                              fontWeight: '500',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            Simpan
-                          </button>
-                        </form>
-                        <form
-                          action={async () => {
-                            'use server'
-                            const sb = await createClient()
-                            await sb.from('products').delete().eq('id', prod.id)
-                            redirect('/dashboard/produk')
-                          }}
-                          style={{ display: 'inline-block', marginLeft: '0.5rem' }}
-                        >
-                          <button
-                            type="submit"
-                            style={{
-                              color: '#ef4444',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '500',
-                              fontSize: '0.875rem'
-                            }}
-                          >
-                            Hapus
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {products.map((prod) => (
+                  <tr key={prod.id}>
+                    <td style={{ fontWeight: 500 }}>{prod.name}</td>
+                    <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
+                    <td>{prod.stock ?? 0}</td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <form action={editStock} method="post" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input type="hidden" name="productId" value={prod.id} />
+                        <input type="number" name="newStock" min="0" defaultValue={prod.stock ?? 0} style={{ width: 60, padding: '0.2rem', fontSize: '0.875rem', border: '1px solid #ccc', borderRadius: 4 }} />
+                        <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', fontWeight: 500, fontSize: '0.875rem' }}>Simpan</button>
+                      </form>
+                      <form action={async () => { 'use server'; const sb = await createClient(); await sb.from('products').delete().eq('id', prod.id); redirect('/dashboard/produk') }} style={{ display: 'inline-block', marginLeft: '0.5rem' }}>
+                        <button type="submit" style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: '0.875rem' }}>Hapus</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
-            <p style={{ color: 'var(--text-muted)' }}>Belum ada produk. Tambahkan produk pertama Anda!</p>
-          </div>
+          <p>Belum ada produk.</p>
         )}
       </div>
     </div>
