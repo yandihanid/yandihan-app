@@ -1,17 +1,15 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Yandihan - Laporan Keuangan UMKM',
-  description: 'Sistem Laporan Keuangan UMKM via Telegram Bot',
+  title: 'Yandihan - Keuangan UMKM',
+  description: 'Sistem Laporan Keuangan UMKM',
   manifest: '/manifest.json',
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="id">
-      <body>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

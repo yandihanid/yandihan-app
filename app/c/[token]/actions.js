@@ -5,11 +5,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 function normalizePhone(phone) {
   if (!phone) return null
   let cleaned = phone.replace(/\D/g, '')
-  if (cleaned.startsWith('62')) {
-    cleaned = '0' + cleaned.slice(2)
-  } else if (cleaned.length > 0 && !cleaned.startsWith('0')) {
-    cleaned = '0' + cleaned
-  }
+  if (cleaned.startsWith('62')) cleaned = '0' + cleaned.slice(2)
+  else if (cleaned.length && !cleaned.startsWith('0')) cleaned = '0' + cleaned
   return cleaned || null
 }
 
@@ -32,17 +29,15 @@ export async function submitTransaction(formData) {
 
     const supabase = createServiceClient()
 
-    // Verify token matches cashier and fetch store subscription
-    const { data: cashier } = await supabase
+    const { data: cashier, error: cashierErr } = await supabase
       .from('cashiers')
       .select('id, stores(id, subscription_tier)')
       .eq('token', token)
       .eq('id', cashierId)
       .single()
 
-    if (!cashier) throw new Error("Unauthorized")
+    if (cashierErr || !cashier) throw new Error('Unauthorized')
 
-    // Check Free Tier Limits (Max 30 transactions/day)
     if (cashier.stores.subscription_tier === 'FREE') {
       const today = new Date().toISOString().split('T')[0]
       const { count } = await supabase
@@ -51,84 +46,47 @@ export async function submitTransaction(formData) {
         .eq('store_id', storeId)
         .gte('created_at', `${today}T00:00:00Z`)
         .lt('created_at', `${today}T23:59:59Z`)
-
-      if (count >= 30) {
-        throw new Error("Batas transaksi harian paket GRATIS (30 transaksi) telah tercapai. Silakan upgrade ke PRO.")
-      }
+      if (count >= 30) throw new Error('Batas transaksi harian GRATIS (30) tercapai.')
     }
 
-    // Parse items to check and update stock
-    // Format productName: "2x Nasi Goreng + 1x Mayonaise, 1x Es Teh"
-    const itemsToProcess = productName.split(', ').map(itemStr => {
-      const match = itemStr.match(/^(\d+)x\s+(.+)$/)
-      if (match) {
-        return { qty: parseInt(match[1], 10), name: match[2].trim() }
-      }
-      return null
+    const items = productName.split(', ').map((s) => {
+      const m = s.match(/^(\d+)x\s+(.+)$/)
+      return m ? { qty: +m[1], name: m[2].trim() } : null
     }).filter(Boolean)
 
-    // Verify and deduct stock for each product (including sub‑produk)
-    for (const item of itemsToProcess) {
-      const { data: product, error: prodError } = await supabase
+    for (const item of items) {
+      const { data: product, error: prodErr } = await supabase
         .from('products')
         .select('id, name, stock')
         .eq('store_id', storeId)
         .eq('name', item.name)
         .single()
-
-      if (!prodError && product) {
-        if (product.stock < item.qty) {
-          throw new Error(`Stok untuk "${product.name}" tidak mencukupi (Sisa: ${product.stock}).`)
-        }
-
-        const { error: updateStockError } = await supabase
+      if (!prodErr && product) {
+        if (product.stock < item.qty) throw new Error(`Stok "${product.name}" tidak cukup.`)
+        const { error: updErr } = await supabase
           .from('products')
           .update({ stock: product.stock - item.qty })
           .eq('id', product.id)
-
-        if (updateStockError) {
-          console.error("Update Stock Error:", updateStockError)
-          throw new Error(`Gagal memperbarui stok untuk "${product.name}".`)
-        }
+        if (updErr) throw new Error(`Gagal update stok "${product.name}".`)
       }
     }
 
     let receiptUrl = null
-
     if (receiptFile && paymentMethod === 'QRIS/TF') {
-      const bytes = await receiptFile.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-
+      const buffer = Buffer.from(await receiptFile.arrayBuffer())
       const fileName = `${storeId}/${Date.now()}-${receiptFile.name.replace(/[^a-zA-Z0-9.-]/g, '')}`
-      
-      const { error: uploadError } = await supabase
-        .storage
-        .from('receipts')
-        .upload(fileName, buffer, {
-          contentType: receiptFile.type,
-          upsert: false
-        })
-
-      if (uploadError) {
-        console.error("Upload Error:", uploadError)
-        throw new Error("Gagal mengunggah foto bukti.")
-      }
-
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('receipts')
-        .getPublicUrl(fileName)
-      
-      receiptUrl = publicUrlData.publicUrl
+      const { error: upErr } = await supabase.storage.from('receipts').upload(fileName, buffer, { contentType: receiptFile.type })
+      if (upErr) throw new Error('Gagal unggah bukti.')
+      receiptUrl = supabase.storage.from('receipts').getPublicUrl(fileName).data.publicUrl
     }
 
-    const { data: insertData, error: insertError } = await supabase
+    const { data: inserted, error: insErr } = await supabase
       .from('transactions')
       .insert({
         store_id: storeId,
         cashier_id: cashierId,
-        amount: parseInt(amount, 10),
-        original_amount: originalAmount ? parseInt(originalAmount, 10) : parseInt(amount, 10),
+        amount: +amount,
+        original_amount: originalAmount ? +originalAmount : +amount,
         discount_percent: discountPercent,
         customer_name: customerName,
         customer_phone: customerPhone,
@@ -136,43 +94,29 @@ export async function submitTransaction(formData) {
         product_name: productName,
         payment_method: paymentMethod,
         receipt_url: receiptUrl,
-        cash_received: paymentMethod === 'CASH' ? parseInt(cashReceived, 10) : null,
-        change_amount: paymentMethod === 'CASH' ? parseInt(changeAmount, 10) : null,
+        cash_received: paymentMethod === 'CASH' ? +cashReceived : null,
+        change_amount: paymentMethod === 'CASH' ? +changeAmount : null,
         status: 'pending',
       })
       .select()
       .single()
 
-    // Update total_spent pelanggan jika ada customer data
-    if (!insertError && customerPhone && storeId) {
-      try {
-        const { data: existingCust } = await supabase
-          .from('customers')
-          .select('id, total_spent')
-          .eq('store_id', storeId)
-          .eq('phone', customerPhone)
-          .single()
+    if (insErr) throw new Error('Gagal catat transaksi.')
 
-        if (existingCust) {
-          await supabase
-            .from('customers')
-            .update({
-              total_spent: (existingCust.total_spent || 0) + parseInt(amount, 10),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingCust.id)
-        }
-      } catch { /* non-critical, ignore */ }
+    if (customerPhone) {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('id, total_spent')
+        .eq('store_id', storeId)
+        .eq('phone', customerPhone)
+        .single()
+      if (cust) {
+        await supabase.from('customers').update({ total_spent: (cust.total_spent || 0) + +amount }).eq('id', cust.id)
+      }
     }
 
-    if (insertError) {
-      console.error("Insert Error:", insertError)
-      throw new Error("Gagal mencatat transaksi.")
-    }
-
-    return { success: true, transactionId: insertData.id }
+    return { success: true, transactionId: inserted.id }
   } catch (error) {
-    console.error("Action error:", error)
     return { error: error.message }
   }
 }

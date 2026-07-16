@@ -7,74 +7,42 @@ import { addProduct } from './actions'
 export default function ProductForm({ storeId }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [name, setName] = useState('')
-  const [price, setPrice] = useState('')
-  const [stock, setStock] = useState('')
+  const [form, setForm] = useState({ name: '', price: '', stock: '' })
 
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-
-    const formData = new FormData()
-    formData.append('storeId', storeId)
-    formData.append('name', name)
-    formData.append('price', price)
-    formData.append('stock', stock)
-
-    const result = await addProduct(formData)
-
+    const fd = new FormData()
+    fd.append('storeId', storeId)
+    Object.entries(form).forEach(([k, v]) => fd.append(k, v))
+    const res = await addProduct(fd)
     setLoading(false)
-    if (!result.error) {
-      setName('')
-      setPrice('')
-      setStock('')
+    if (res.error) alert(res.error)
+    else {
+      setForm({ name: '', price: '', stock: '' })
       router.refresh()
-      router.replace('/dashboard/produk')
-    } else {
-      alert(result.error)
     }
   }
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-      <div style={{ flex: '2', minWidth: '200px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Nama Produk</label>
-        <input
-          type="text"
-          className="input-field"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="Misal: Nasi Goreng Spesial"
-          required
-        />
+      <div style={{ flex: 2, minWidth: 200 }}>
+        <label style={labelStyle}>Nama Produk</label>
+        <input className="input-field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nasi Goreng" required />
       </div>
-      <div style={{ flex: '1', minWidth: '120px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Harga (Rp)</label>
-        <input
-          type="number"
-          className="input-field"
-          value={price}
-          onChange={e => setPrice(e.target.value)}
-          placeholder="Misal: 25000"
-          required
-          min="0"
-        />
+      <div style={{ flex: 1, minWidth: 120 }}>
+        <label style={labelStyle}>Harga (Rp)</label>
+        <input type="number" className="input-field" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="25000" required min="0" />
       </div>
-      <div style={{ flex: '1', minWidth: '100px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>Stok Awal</label>
-        <input
-          type="number"
-          className="input-field"
-          value={stock}
-          onChange={e => setStock(e.target.value)}
-          placeholder="Misal: 50"
-          required
-          min="0"
-        />
+      <div style={{ flex: 1, minWidth: 100 }}>
+        <label style={labelStyle}>Stok Awal</label>
+        <input type="number" className="input-field" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="50" required min="0" />
       </div>
-      <button type="submit" className="btn btn-primary" disabled={loading} style={{ height: '52px', padding: '0 1.5rem' }}>
-        {loading ? <div className="spinner-sm"></div> : '+ Tambah'}
+      <button type="submit" className="btn btn-primary" disabled={loading} style={{ height: 52, padding: '0 1.5rem' }}>
+        {loading ? '...' : '+ Tambah'}
       </button>
     </form>
   )
 }
+
+const labelStyle = { display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }

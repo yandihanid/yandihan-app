@@ -10,24 +10,16 @@ export async function addProduct(formData) {
   const price = formData.get('price')
   const stock = formData.get('stock')
 
-  if (!storeId || !name || !price || stock === null || stock === undefined) return { error: 'Data tidak lengkap' }
+  if (!storeId || !name || !price || stock === null) return { error: 'Data tidak lengkap' }
 
-  const insertData = {
+  const { error } = await supabase.from('products').insert({
     store_id: storeId,
-    name: name,
+    name,
     price: parseInt(price, 10),
     stock: parseInt(stock, 10),
-  }
+  })
 
-  const { error } = await supabase
-    .from('products')
-    .insert(insertData)
-
-  if (error) {
-    console.error(error)
-    return { error: 'Gagal menambahkan produk' }
-  }
-
+  if (error) return { error: 'Gagal menambahkan produk' }
   revalidatePath('/dashboard/produk')
   return { success: true }
 }
