@@ -96,7 +96,9 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
     currentItems.forEach(item => {
       const prod = products.find(p => p.name === item.name)
       if (prod) { total += (parseFloat(prod.price) || 0) * (parseInt(item.qty) || 0); auto = true }
-      (item.subs || []).forEach(sub => { const sp = products.find(p => p.name === sub.name); if (sp) { total += (parseFloat(sp.price) || 0) * (parseInt(sub.qty) || 0); auto = true } })
+      if (requireSubProduct) {
+        (item.subs || []).forEach(sub => { const sp = products.find(p => p.name === sub.name); if (sp) { total += (parseFloat(sp.price) || 0) * (parseInt(sub.qty) || 0); auto = true } })
+      }
     })
     return auto && total > 0 ? String(total) : amount
   }
@@ -139,7 +141,12 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
     }
     const totalAmount = parseFloat(amount)
     if (paymentMethod === 'CASH') { const r = parseFloat(cashReceived); if (isNaN(r) || r < totalAmount) { setMessage({ type: 'error', text: 'Uang tidak cukup' }); setLoading(false); return } }
-    const combined = items.filter(it => it.name.trim() !== '').map(it => { const b = `${it.qty}x ${it.name.trim()}`; const s = (it.subs || []).filter(x => x.name.trim() !== '').map(x => `${x.qty}x ${x.name.trim()}`).join(' + '); return s ? `${b} + ${s}` : b }).join(', ')
+    const combined = items.filter(it => it.name.trim() !== '').map(it => {
+      const b = `${it.qty}x ${it.name.trim()}`
+      if (!requireSubProduct) return b
+      const s = (it.subs || []).filter(x => x.name.trim() !== '').map(x => `${x.qty}x ${x.name.trim()}`).join(' + ')
+      return s ? `${b} + ${s}` : b
+    }).join(', ')
     if (!combined) { setMessage({ type: 'error', text: 'Minimal satu produk' }); setLoading(false); return }
     let raw = fileRef.current?.files?.[0]; if (!raw && receiptDataUrl) raw = dataUrlToFile(receiptDataUrl, fileName)
     if (paymentMethod === 'QRIS/TF' && receiptRequired && !raw) { setMessage({ type: 'error', text: 'Bukti wajib' }); setLoading(false); return }
@@ -175,17 +182,19 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
               </select>
               {items.length > 1 && <button type="button" onClick={() => removeItem(index)}>✕</button>}
             </div>
-            <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', borderLeft: '2px dashed #ccc' }}>
-              {(item.subs || []).map((sub, si) => (
-                <div key={si} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <select className="input-field" value={sub.qty} onChange={e => handleSubChange(index, si, 'qty', parseInt(e.target.value) || 1)} style={{ width: '60px' }}><option value={1}>1</option><option value={2}>2</option></select>
-                  <span>x</span>
-                  <select className="input-field" value={sub.name} onChange={e => handleSubChange(index, si, 'name', e.target.value)} style={{ flex: 1 }}><option value="" disabled>Sub‑produk</option>{products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select>
-                  <button type="button" onClick={() => removeSub(index, si)}>✕</button>
-                </div>
-              ))}
-              <button type="button" onClick={() => addSub(index)}>+ Sub‑produk</button>
-            </div>
+            {requireSubProduct && (
+              <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', borderLeft: '2px dashed #ccc' }}>
+                {(item.subs || []).map((sub, si) => (
+                  <div key={si} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <select className="input-field" value={sub.qty} onChange={e => handleSubChange(index, si, 'qty', parseInt(e.target.value) || 1)} style={{ width: '60px' }}><option value={1}>1</option><option value={2}>2</option></select>
+                    <span>x</span>
+                    <select className="input-field" value={sub.name} onChange={e => handleSubChange(index, si, 'name', e.target.value)} style={{ flex: 1 }}><option value="" disabled>Sub‑produk</option>{products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select>
+                    <button type="button" onClick={() => removeSub(index, si)}>✕</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => addSub(index)}>+ Sub‑produk</button>
+              </div>
+            )}
           </div>
         ))}
         <button type="button" onClick={addItem}>+ Produk Lain</button>
