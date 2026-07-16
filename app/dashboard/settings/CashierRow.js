@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { deleteCashier } from './actions'
 
@@ -8,9 +8,14 @@ export default function CashierRow({ cashier }) {
   const router = useRouter()
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [origin, setOrigin] = useState('')
+
+  useEffect(() => {
+    setOrigin(window?.location?.origin || 'https://yandihan-app.vercel.app')
+  }, [])
 
   const linkUrl = cashier.token
-    ? `${window?.location?.origin || 'https://yandihan-app.vercel.app'}/c/${cashier.token}`
+    ? `${origin}/c/${cashier.token}`
     : null
 
   const handleCopy = async () => {
