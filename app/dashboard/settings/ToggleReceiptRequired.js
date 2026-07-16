@@ -1,12 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function ToggleReceiptRequired({ storeId, initial }) {
   const [isOn, setIsOn] = useState(initial)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
+
+  // Ensure we're on client side before any window operations
+  useEffect(() => {
+    // This ensures component is mounted on client
+  }, [])
 
   const handleToggle = async () => {
     setSaving(true)
@@ -20,8 +25,10 @@ export default function ToggleReceiptRequired({ storeId, initial }) {
       if (res.ok) {
         setIsOn(newValue)
         router.refresh()
-      } else alert('Gagal menyimpan')
-    } catch {
+      } else {
+        alert('Gagal menyimpan')
+      }
+    } catch (error) {
       alert('Gagal menyimpan')
     } finally {
       setSaving(false)
@@ -31,8 +38,29 @@ export default function ToggleReceiptRequired({ storeId, initial }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 0' }}>
       <span style={{ fontWeight: 500 }}>Wajib Bukti (QRIS/TF):</span>
-      <button onClick={handleToggle} disabled={saving} style={{ width: 48, height: 26, borderRadius: 13, border: 'none', background: isOn ? '#22c55e' : '#d1d5db', cursor: 'pointer', position: 'relative' }}>
-        <span style={{ position: 'absolute', top: 2, left: isOn ? 24 : 2, width: 22, height: 22, borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
+      <button 
+        onClick={handleToggle} 
+        disabled={saving} 
+        style={{ 
+          width: 48, 
+          height: 26, 
+          borderRadius: 13, 
+          border: 'none', 
+          background: isOn ? '#22c55e' : '#d1d5db', 
+          cursor: 'pointer', 
+          position: 'relative' 
+        }}
+      >
+        <span style={{ 
+          position: 'absolute', 
+          top: 2, 
+          left: isOn ? 24 : 2, 
+          width: 22, 
+          height: 22, 
+          borderRadius: '50%', 
+          background: 'white', 
+          transition: 'left 0.2s' 
+        }} />
       </button>
       <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{isOn ? 'Aktif' : 'Nonaktif'}</span>
     </div>
