@@ -12,25 +12,11 @@ export async function addProduct(formData) {
 
   if (!storeId || !name || !price || stock === null || stock === undefined) return { error: 'Data tidak lengkap' }
 
-  // --- self‑order, loyalty ---
-  const selfOrderRaw = formData.get('selfOrder')
-  const loyaltyPointsRaw = formData.get('loyaltyPoints')
-
-  const selfOrderEnabled = selfOrderRaw === 'on' ? true : false
-
-  let loyaltyPoints = 0
-  if (loyaltyPointsRaw) {
-    const val = parseInt(loyaltyPointsRaw, 10)
-    if (!isNaN(val) && val >= 0) loyaltyPoints = val
-  }
-
   const insertData = {
     store_id: storeId,
     name: name,
     price: parseInt(price, 10),
     stock: parseInt(stock, 10),
-    self_order_enabled: selfOrderEnabled,
-    loyalty_points: loyaltyPoints,
   }
 
   const { error } = await supabase

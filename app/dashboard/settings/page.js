@@ -4,6 +4,7 @@ import SettingsForm from './SettingsForm'
 import AddCashierForm from './AddCashierForm'
 import CashierRow from './CashierRow'
 import ToggleReceiptRequired from './ToggleReceiptRequired'
+import ToggleStoreSettings from './ToggleStoreSettings'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,8 @@ export default async function SettingsPage() {
         <SettingsForm store={store} userId={user.id} />
         <div style={{ marginTop: '1.5rem' }}>
           <ToggleReceiptRequired storeId={store?.id} initial={store?.receipt_required ?? true} />
+          <ToggleStoreSettings storeId={store?.id} field="require_sub_product" label="Wajib ada Sub‑Produk" initial={store?.require_sub_product ?? false} />
+          <ToggleStoreSettings storeId={store?.id} field="require_customer_name" label="Wajib ada Nama Pembeli" initial={store?.require_customer_name ?? false} />
         </div>
       </div>
 
