@@ -585,7 +585,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
       )}
 
       <div className="input-group">
-        <label>Daftar Produk & Sub‑Produk</label>
+        <label>Daftar Produk &amp; Sub‑Produk</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {items.map((item, index) => (
             <div key={index} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem' }}>
@@ -735,7 +735,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
           style={products && products.length > 0 ? { backgroundColor: '#f8fafc', cursor: 'default', color: 'var(--text-muted)' } : {}}
         />
         {products && products.length > 0 && (
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>💡 Total dihitung otomatis dari pilihan produk & sub‑produk di atas.</p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>💡 Total dihitung otomatis dari pilihan produk &amp; sub‑produk di atas.</p>
         )}
 
         {/* Tampilkan ringkasan diskon jika ada */}
