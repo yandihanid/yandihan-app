@@ -75,7 +75,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
   const [message, setMessage] = useState(null)
 
   const [amount, setAmount] = useState('')
-  const [items, setItems] = useState([{ name: '', qty: 1 }])
+  const [items, setItems] = useState([{ name: '', qty: 1, subs: [] }])
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [fileName, setFileName] = useState('')
   const [receiptDataUrl, setReceiptDataUrl] = useState(null)
@@ -129,7 +129,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
   // Fungsi untuk mereset seluruh formulir ke kondisi awal
   const resetForm = () => {
     setAmount('');
-    setItems([{ name: '', qty: 1 }]);
+    setItems([{ name: '', qty: 1, subs: [] }]);
     setPaymentMethod('CASH');
     setFileName('');
     setReceiptDataUrl(null);
@@ -140,7 +140,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
     setChangeAmount(0);
   }
 
-  // Calculate total automatically
+  // Calculate total automatically including sub-products
   const calculateTotal = (currentItems) => {
     if (!products || products.length === 0) return amount;
     let total = 0;
@@ -152,6 +152,13 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
         total += (parseFloat(prod.price) || 0) * (parseInt(item.qty) || 0);
         autoCalcPossible = true;
       }
+      (item.subs || []).forEach(sub => {
+        const subProd = products.find(p => p.name === sub.name);
+        if (subProd) {
+          total += (parseFloat(subProd.price) || 0) * (parseInt(sub.qty) || 0);
+          autoCalcPossible = true;
+        }
+      });
     });
 
     return autoCalcPossible && total > 0 ? String(total) : amount;
@@ -183,14 +190,37 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
     }
   }
 
+  const addSub = (itemIndex) => {
+    const newItems = [...items]
+    newItems[itemIndex].subs = [...(newItems[itemIndex].subs || []), { name: '', qty: 1 }]
+    setItems(newItems)
+  }
+
+  const removeSub = (itemIndex, subIndex) => {
+    const newItems = [...items]
+    newItems[itemIndex].subs = newItems[itemIndex].subs.filter((_, i) => i !== subIndex)
+    setItems(newItems)
+    const newAmount = calculateTotal(newItems);
+    if (newAmount !== amount) setAmount(newAmount)
+  }
+
+  const handleSubChange = (itemIndex, subIndex, field, value) => {
+    const newItems = [...items]
+    if (!newItems[itemIndex].subs) newItems[itemIndex].subs = []
+    newItems[itemIndex].subs[subIndex][field] = value
+    setItems(newItems)
+    const newAmount = calculateTotal(newItems);
+    if (newAmount !== amount) setAmount(newAmount)
+  }
+
   const addItem = () => {
-    const newItems = [...items, { name: '', qty: 1 }]
+    const newItems = [...items, { name: '', qty: 1, subs: [] }]
     setItems(newItems)
   }
 
   const removeItem = (index) => {
     const newItems = items.filter((_, i) => i !== index)
-    if (newItems.length === 0) newItems.push({ name: '', qty: 1 })
+    if (newItems.length === 0) newItems.push({ name: '', qty: 1, subs: [] })
     setItems(newItems)
     
     const newAmount = calculateTotal(newItems);
@@ -359,7 +389,14 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
 
     const combinedProductName = items
       .filter(item => item.name.trim() !== '')
-      .map(item => `${item.qty}x ${item.name.trim()}`)
+      .map(item => {
+        const base = `${item.qty}x ${item.name.trim()}`
+        const subsStr = (item.subs || [])
+          .filter(sub => sub.name.trim() !== '')
+          .map(sub => `${sub.qty}x ${sub.name.trim()}`)
+          .join(' + ')
+        return subsStr ? `${base} + ${subsStr}` : base
+      })
       .join(', ')
 
     if (!combinedProductName) {
@@ -548,75 +585,111 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
       )}
 
       <div className="input-group">
-        <label>Daftar Produk</label>
+        <label>Daftar Produk & Sub‑Produk</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {items.map((item, index) => (
-            <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              {/* Dropdown Kuantitas */}
-              <select
-                className="input-field"
-                value={item.qty}
-                onChange={e => handleItemChange(index, 'qty', parseInt(e.target.value) || 1)}
-                style={{ width: '70px', padding: '0.5rem' }}
-                title="Kuantitas"
-                required
-              >
-                {[...Array(10).keys()].map(i => (
-                  <option key={i + 1} value={i + 1}>{i + 1}</option>
-                ))}
-              </select>
-              <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
-              
-              {products && products.length > 0 ? (
-                <>
-                  <select 
+            <div key={index} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {/* Dropdown Kuantitas */}
+                <select
+                  className="input-field"
+                  value={item.qty}
+                  onChange={e => handleItemChange(index, 'qty', parseInt(e.target.value) || 1)}
+                  style={{ width: '70px', padding: '0.5rem' }}
+                  title="Kuantitas"
+                  required
+                >
+                  {[...Array(10).keys()].map(i => (
+                    <option key={i + 1} value={i + 1}>{i + 1}</option>
+                  ))}
+                </select>
+                <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
+                
+                {products && products.length > 0 ? (
+                  <>
+                    <select 
+                      className="input-field"
+                      value={item.name}
+                      onChange={e => handleItemChange(index, 'name', e.target.value)}
+                      style={{ flex: 1, padding: '0.5rem' }}
+                      required
+                    >
+                      <option value="" disabled>Pilih Produk Utama</option>
+                      {products.map(p => {
+                        const stok = p.stock ?? 0;
+                        const stokWarning = (typeof stok === 'number' && stok < 5) ? ' ⚠️' : '';
+                        return (
+                          <option key={p.id} value={p.name}>
+                            {p.name} (Rp {parseInt(p.price).toLocaleString('id-ID')}) - Stok: {stok}{stokWarning}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {item.name && (() => {
+                      const prod = products.find(p => p.name === item.name);
+                      if (!prod) return null;
+                      const stok = prod.stock ?? 0;
+                      const color = (typeof stok === 'number' && stok === 0) ? 'red' : (typeof stok === 'number' && stok < 5) ? 'orange' : 'green';
+                      return (
+                        <span style={{ marginLeft: '0.25rem', fontSize: '0.8rem', color, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                          Stok: {stok}
+                        </span>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <input
+                    type="text"
                     className="input-field"
                     value={item.name}
                     onChange={e => handleItemChange(index, 'name', e.target.value)}
+                    placeholder="Nama Produk"
                     style={{ flex: 1, padding: '0.5rem' }}
                     required
-                  >
-                    <option value="" disabled>Pilih Produk</option>
-                    {products.map(p => {
-                      const stok = p.stock ?? 0;
-                      const stokWarning = (typeof stok === 'number' && stok < 5) ? ' ⚠️' : '';
-                      return (
-                        <option key={p.id} value={p.name}>
-                          {p.name} (Rp {parseInt(p.price).toLocaleString('id-ID')}) - Stok: {stok}{stokWarning}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  {/* Tampilkan stok terpilih di samping dropdown */}
-                  {item.name && (() => {
-                    const prod = products.find(p => p.name === item.name);
-                    if (!prod) return null;
-                    const stok = prod.stock ?? 0;
-                    const color = (typeof stok === 'number' && stok === 0) ? 'red' : (typeof stok === 'number' && stok < 5) ? 'orange' : 'green';
-                    return (
-                      <span style={{ marginLeft: '0.25rem', fontSize: '0.8rem', color, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                        Stok: {stok}
-                      </span>
-                    );
-                  })()}
-                </>
-              ) : (
-                <input
-                  type="text"
-                  className="input-field"
-                  value={item.name}
-                  onChange={e => handleItemChange(index, 'name', e.target.value)}
-                  placeholder="Nama Produk"
-                  style={{ flex: 1, padding: '0.5rem' }}
-                  required
-                />
-              )}
+                  />
+                )}
 
-              {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(index)} style={{ padding: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.25rem' }}>
-                  ✕
+                {items.length > 1 && (
+                  <button type="button" onClick={() => removeItem(index)} style={{ padding: '0.5rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.25rem' }}>
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Sub‑produk */}
+              <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', borderLeft: '2px dashed var(--border-color)' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.25rem' }}>Tambahan / Sub‑produk (misal: Mayonaise):</p>
+                {(item.subs || []).map((sub, subIdx) => (
+                  <div key={subIdx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
+                    <select
+                      className="input-field"
+                      value={sub.qty}
+                      onChange={e => handleSubChange(index, subIdx, 'qty', parseInt(e.target.value) || 1)}
+                      style={{ width: '60px', padding: '0.4rem' }}
+                    >
+                      {[...Array(10).keys()].map(i => (
+                        <option key={i + 1} value={i + 1}>{i + 1}</option>
+                      ))}
+                    </select>
+                    <span style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>x</span>
+                    <select
+                      className="input-field"
+                      value={sub.name}
+                      onChange={e => handleSubChange(index, subIdx, 'name', e.target.value)}
+                      style={{ flex: 1, padding: '0.4rem' }}
+                    >
+                      <option value="" disabled>Pilih Sub‑produk</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.name}>{p.name} (Rp {parseInt(p.price).toLocaleString('id-ID')})</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => removeSub(index, subIdx)} style={{ padding: '0.4rem', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>✕</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => addSub(index)} style={{ marginTop: '0.25rem', background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>
+                  + Tambah Sub‑produk
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </div>
@@ -662,7 +735,7 @@ export default function CashierForm({ cashierId, storeId, token, products = [], 
           style={products && products.length > 0 ? { backgroundColor: '#f8fafc', cursor: 'default', color: 'var(--text-muted)' } : {}}
         />
         {products && products.length > 0 && (
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>💡 Total dihitung otomatis dari pilihan produk di atas.</p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>💡 Total dihitung otomatis dari pilihan produk & sub‑produk di atas.</p>
         )}
 
         {/* Tampilkan ringkasan diskon jika ada */}
