@@ -30,3 +30,31 @@ export async function addProduct(formData) {
   revalidatePath('/dashboard/produk')
   return { success: true }
 }
+
+export async function updateStock(formData) {
+  const supabase = await createClient()
+  const productId = formData.get('productId')
+  const newStock = parseInt(formData.get('newStock'), 10)
+
+  if (!productId || isNaN(newStock) || newStock < 0) {
+    return { error: 'Stok tidak valid' }
+  }
+
+  const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', productId)
+  if (error) return { error: 'Gagal mengubah stok' }
+  revalidatePath('/dashboard/produk')
+  return { success: true }
+}
+
+export async function deleteProduct(formData) {
+  const supabase = await createClient()
+  const productId = formData.get('productId')
+
+  if (!productId) return { error: 'ID produk tidak valid' }
+
+  const { error } = await supabase.from('products').delete().eq('id', productId)
+  if (error) return { error: 'Gagal menghapus produk' }
+  revalidatePath('/dashboard/produk')
+  return { success: true }
+}
+

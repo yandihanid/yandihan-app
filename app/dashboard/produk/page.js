@@ -1,19 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import ProductForm from './ProductForm'
+import { updateStock, deleteProduct } from './actions'
 
 export const metadata = {
   title: 'Gudang Produk - Yandihan'
-}
-
-export async function editStock(formData) {
-  'use server'
-  const supabase = await createClient()
-  const productId = formData.get('productId')
-  const newStock = parseInt(formData.get('newStock'), 10)
-  if (isNaN(newStock) || newStock < 0) return redirect('/dashboard/produk')
-  await supabase.from('products').update({ stock: newStock }).eq('id', productId)
-  redirect('/dashboard/produk')
 }
 
 export default async function GudangProduk() {
@@ -63,12 +54,13 @@ export default async function GudangProduk() {
                     <td>Rp {parseInt(prod.price).toLocaleString('id-ID')}</td>
                     <td>{prod.stock ?? 0}</td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <form action={editStock} method="post" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <form action={updateStock} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                         <input type="hidden" name="productId" value={prod.id} />
                         <input type="number" name="newStock" min="0" defaultValue={prod.stock ?? 0} style={{ width: 60, padding: '0.2rem', fontSize: '0.875rem', border: '1px solid #ccc', borderRadius: 4 }} />
                         <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', fontWeight: 500, fontSize: '0.875rem' }}>Simpan</button>
                       </form>
-                      <form action={async () => { 'use server'; const sb = await createClient(); await sb.from('products').delete().eq('id', prod.id); redirect('/dashboard/produk') }} style={{ display: 'inline-block', marginLeft: '0.5rem' }}>
+                      <form action={deleteProduct} style={{ display: 'inline-block', marginLeft: '0.5rem' }}>
+                        <input type="hidden" name="productId" value={prod.id} />
                         <button type="submit" style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: '0.875rem' }}>Hapus</button>
                       </form>
                     </td>
