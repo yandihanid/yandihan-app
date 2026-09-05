@@ -1,80 +1,102 @@
-import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
+import { createServiceClient } from '@/utils/supabase/service'
+import { requireStoreOwnership } from '@/lib/dal'
+import { PRO_PRICE_IDR } from '@/lib/plan'
+import { snapApiUrl, midtransAuthHeader } from '@/lib/midtrans'
+import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
   try {
     const { storeId } = await req.json()
-    if (!storeId) {
-      return NextResponse.json({ error: 'Store ID required' }, { status: 400 })
+
+    const { store, user, error: ownErr } = await requireStoreOwnership(storeId)
+    if (ownErr) return NextResponse.json({ error: ownErr }, { status: 403 })
+
+    const rate = await checkRateLimit(`payment:create:${user.id}`, { limit: 10, windowSeconds: 300 })
+    if (!rate.allowed) return tooManyRequests(rate.retryAfter)
+
+    // order_id tidak lagi `PRO-${Date.now()}`.
+    // Timestamp milidetik mudah ditebak, dan order lama tidak terikat ke toko
+    // mana pun sehingga webhook harus mempercayai metadata dari body request.
+    // Sekarang: UUID acak, dan pemetaan order -> toko/user disimpan di DB.
+    // Midtrans membatasi order_id 50 karakter; 'PRO-' + 32 hex = 36.
+    const orderId = `PRO-${randomUUID().replace(/-/g, '')}`
+    const grossAmount = PRO_PRICE_IDR
+
+    const service = createServiceClient()
+
+    // Catat order SEBELUM memanggil Midtrans. Kalau dicatat setelahnya dan
+    // pencatatannya gagal, pembayaran yang sudah lunas tidak akan pernah bisa
+    // dikaitkan ke toko mana pun.
+    const { error: orderErr } = await service.from('subscription_orders').insert({
+      order_id: orderId,
+      store_id: store.id,
+      user_id: user.id,
+      amount: grossAmount,
+      plan: 'PRO',
+      status: 'pending',
+    })
+
+    if (orderErr) {
+      return NextResponse.json({ error: 'Gagal membuat order. Coba lagi.' }, { status: 500 })
     }
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const serviceSupabase = createServiceClient()
-
-    // Get Store details
-    const { data: store, error: storeError } = await serviceSupabase
-      .from('stores')
-      .select('id, user_id')
-      .eq('id', storeId)
-      .single()
-
-    if (storeError || !store) {
-      return NextResponse.json({ error: 'Store not found' }, { status: 404 })
-    }
-
-    // Verify ownership
-    if (store.user_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Use timestamp as unique suffix. storeId is a UUID (36 chars), keep it intact.
-    // Format: PRO__<storeId>__<timestamp>
-    // 1. Buat orderId yang pendek & unik (Sangat aman dari limit 50 karakter)
-    const timestamp = Date.now();
-    const orderId = `PRO-${timestamp}`;
-    const grossAmount = 189000;
-
-    // Request to Midtrans Snap API
-    const authString = Buffer.from(`${process.env.MIDTRANS_SERVER_KEY}:`).toString('base64');
-    
-    // 2. Kirim ke Midtrans beserta data TITIPAN (metadata)
-    const midtransRes = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
+    const midtransRes = await fetch(snapApiUrl(), {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${authString}`
+        Authorization: midtransAuthHeader(),
       },
       body: JSON.stringify({
         transaction_details: {
           order_id: orderId,
-          gross_amount: grossAmount
+          gross_amount: grossAmount,
         },
-        // 👇 TITIPKAN STORE ID ASLI DI SINI (Otomatis dikirim balik oleh Midtrans)
+        item_details: [
+          {
+            id: 'PRO-1M',
+            name: 'Yandihan Kasir PRO - 1 bulan',
+            price: grossAmount,
+            quantity: 1,
+          },
+        ],
+        customer_details: {
+          email: user.email,
+        },
+        // metadata tetap dikirim untuk memudahkan pelacakan di dashboard
+        // Midtrans, TAPI tidak pernah dipercaya lagi oleh webhook. Sumber
+        // kebenarannya tabel subscription_orders.
         metadata: {
-          store_id: storeId
-        }
-      })
-    });
+          store_id: store.id,
+        },
+      }),
+    })
 
     const midtransData = await midtransRes.json()
 
-    if (!midtransRes.ok) {
-      console.error('Midtrans Error:', midtransData)
-      return NextResponse.json({ error: 'Payment gateway error: ' + JSON.stringify(midtransData) }, { status: 500 })
+    if (!midtransRes.ok || !midtransData?.token) {
+      await service
+        .from('subscription_orders')
+        .update({ status: 'gateway_error', updated_at: new Date().toISOString() })
+        .eq('order_id', orderId)
+
+      // Detail error gateway hanya untuk log server, bukan untuk client.
+      console.error('Midtrans Snap error', {
+        orderId,
+        status: midtransRes.status,
+        code: midtransData?.status_code,
+      })
+      return NextResponse.json(
+        { error: 'Gagal menghubungi gateway pembayaran. Coba lagi.' },
+        { status: 502 }
+      )
     }
 
     return NextResponse.json({ token: midtransData.token, orderId })
-
   } catch (error) {
-    console.error('Payment Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 })
+    console.error('Payment create error', { ip: clientIp(req), message: error?.message })
+    return NextResponse.json({ error: 'Terjadi kesalahan. Coba lagi.' }, { status: 500 })
   }
 }

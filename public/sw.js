@@ -1,4 +1,7 @@
-const CACHE_NAME = 'yandihan-cashier-cache-v1';
+// v2: cache lama dibuang karena entri /api/cashier?token=... menyimpan token
+// kasir di dalam cache key. Token sekarang dikirim lewat header dan respons
+// API tidak di-cache lagi di sini.
+const CACHE_NAME = 'yandihan-cashier-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -35,8 +38,15 @@ self.addEventListener('fetch', (event) => {
 
   // Hanya tangani request GET untuk halaman kasir dan API kasir
   if (request.method === 'GET') {
-    // Strategi Network-First, Fallback-to-Cache untuk halaman kasir (/c/[token]) dan API kasir (/api/cashier)
-    if (url.pathname.startsWith('/c/') || url.pathname.startsWith('/api/cashier')) {
+    // Strategi Network-First, Fallback-to-Cache untuk halaman kasir (/c/[token]).
+    //
+    // /api/cashier sengaja TIDAK ikut di-cache lagi:
+    //   * dulu tokennya ada di query string, jadi ikut tersimpan di cache key
+    //   * sekarang tokennya di header, dan Cache API hanya memakai URL sebagai
+    //     key -- dua kasir di satu perangkat akan saling menimpa entri
+    // Fallback offline-nya sekarang ada di app/c/[token]/page.js, yang menyimpan
+    // profil kasir di localStorage per token.
+    if (url.pathname.startsWith('/c/')) {
       event.respondWith(
         fetch(request)
           .then((response) => {

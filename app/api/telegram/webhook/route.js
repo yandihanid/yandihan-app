@@ -1,237 +1,420 @@
 import { NextResponse } from 'next/server'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { createServiceClient } from '@/utils/supabase/service'
+import { maxCashiers, planTier } from '@/lib/plan'
+import { checkRateLimit } from '@/lib/rateLimit'
+import { formatRupiah } from '@/lib/format'
+import { submitTransactionRpc, MAX_LINES, MAX_QTY } from '@/lib/transaction'
+
+// KEAMANAN (temuan A3). Sebelumnya endpoint ini menerima POST dari siapa pun.
+// Siapa pun yang tahu `unique_code` sebuah toko (8 karakter, dibagikan pemilik
+// ke pegawainya) bisa mendaftarkan dirinya sebagai kasir toko itu lalu
+// menyuntikkan transaksi palsu ke ledger. Sekarang setiap update wajib membawa
+// header X-Telegram-Bot-Api-Secret-Token yang cocok dengan
+// TELEGRAM_WEBHOOK_SECRET.
+//
+// Pasang sekali di sisi Telegram (ganti dengan nilai Anda sendiri):
+//   curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
+//     -d "url=https://<domain>/api/telegram/webhook" \
+//     -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+//
+// Selama TELEGRAM_WEBHOOK_SECRET belum diisi, endpoint ini menolak semua
+// request. Itu disengaja (fail-closed): bot mati lebih baik daripada bot yang
+// bisa dipakai orang lain untuk menulis ke pembukuan toko.
+//
+// INTEGRITAS (temuan C10). Jalur ini dulu punya aturan bisnisnya sendiri:
+// nominal diambil apa adanya dari teks pesan, stok tidak pernah dikurangi,
+// `status` tidak pernah di-set, dan tidak ada diskon maupun pencatatan
+// pelanggan. Sekarang ia memanggil RPC `submit_transaction()` yang sama dengan
+// jalur web, jadi harga dibaca dari daftar produk, stok berkurang, dan status
+// mengikuti setelan toko. Konsekuensinya: laporan harus menyebut PRODUK, bukan
+// sekadar nominal.
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`
 
+function secretMatches(received) {
+  const expected = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (!expected || !received) return false
+  const a = Buffer.from(String(received))
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
+
 async function sendMessage(chatId, text) {
-  if (!BOT_TOKEN) return; // Skip if dev no token
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  })
+  if (!BOT_TOKEN) return
+  try {
+    await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    })
+  } catch (err) {
+    // Gagal membalas tidak boleh menggagalkan transaksi yang sudah tercatat.
+    console.error('Telegram sendMessage gagal', { message: err?.message })
+  }
 }
 
 async function getFileUrl(fileId) {
-  if (!BOT_TOKEN) return null;
-  const res = await fetch(`${TELEGRAM_API}/getFile?file_id=${fileId}`)
-  const data = await res.json()
-  if (!data.ok) return null;
-  return `https://api.telegram.org/file/bot${BOT_TOKEN}/${data.result.file_path}`
+  if (!BOT_TOKEN) return null
+  try {
+    const res = await fetch(`${TELEGRAM_API}/getFile?file_id=${encodeURIComponent(fileId)}`)
+    const data = await res.json()
+    if (!data.ok) return null
+    return `https://api.telegram.org/file/bot${BOT_TOKEN}/${data.result.file_path}`
+  } catch {
+    return null
+  }
 }
 
-export async function POST(req) {
+/** Basis URL struk. Dulu di-hardcode ke yandihan-app.vercel.app, jadi struk
+ *  selalu menunjuk ke domain itu sekalipun aplikasi dijalankan di tempat lain.
+ *  Prioritas: env eksplisit -> domain Vercel -> origin request webhook ini
+ *  (Telegram memanggil domain kita sendiri, jadi ini selalu benar). */
+function siteOrigin(req) {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL
+  if (explicit) return explicit.replace(/\/+$/, '')
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
   try {
-    const update = await req.json()
-    const message = update.message
+    return new URL(req.url).origin
+  } catch {
+    return ''
+  }
+}
 
-    if (!message) return NextResponse.json({ ok: true })
+/** client_tx_id deterministik dari identitas pesan Telegram. Telegram mengirim
+ *  ulang update yang gagal (5xx atau timeout), dan tanpa ini pengiriman ulang
+ *  itu tercatat sebagai transaksi kedua. Dengan kolom unik
+ *  transactions.client_tx_id, percobaan kedua mengembalikan transaksi yang sama
+ *  (temuan C6, jalur Telegram). */
+function updateTxId(chatKey, messageId) {
+  const hex = createHash('sha256').update(`tg:${chatKey}:${messageId}`).digest('hex')
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20, 32),
+  ].join('-')
+}
 
-    const chatId = message.chat.id
-    const text = message.text || message.caption || ''
-    const photo = message.photo
-    const fromName = message.from.first_name || 'Kasir'
+const HELP_TEXT = [
+  'Format laporan transaksi (sebut PRODUK, harganya diambil dari daftar produk):',
+  '',
+  'Satu item:',
+  '  2 Nasi Goreng',
+  '',
+  'Beberapa item:',
+  '  2 Nasi Goreng',
+  '  1 Es Teh',
+  '',
+  'Kalau ingin mencatat uang yang diterima, tulis nominalnya di baris pertama:',
+  '  100000',
+  '  2 Nasi Goreng',
+  '  1 Es Teh',
+  '',
+  'Tanpa baris nominal, pembayaran dianggap uang pas.',
+  'Untuk QRIS/Transfer: kirim foto bukti dengan keterangan berformat sama.',
+  '',
+  'Nama produk harus sama dengan yang ada di dashboard.',
+].join('\n')
 
+export async function POST(req) {
+  // Gerbang pertama: tanpa secret yang cocok, tidak ada yang diproses.
+  if (!secretMatches(req.headers.get('x-telegram-bot-api-secret-token'))) {
+    return NextResponse.json({ ok: false }, { status: 401 })
+  }
+
+  let update
+  try {
+    update = await req.json()
+  } catch {
+    return NextResponse.json({ ok: true })
+  }
+
+  const message = update?.message
+  const chatId = message?.chat?.id
+  if (!message || chatId == null) return NextResponse.json({ ok: true })
+
+  // Kasir manusia tidak mengirim 30 pesan dalam satu menit. Kalau iya, ada yang
+  // salah (atau secret-nya bocor) -- balas 200 supaya Telegram tidak retry.
+  const rate = await checkRateLimit(`telegram:chat:${chatId}`, { limit: 30, windowSeconds: 60 })
+  if (!rate.allowed) return NextResponse.json({ ok: true })
+
+  const chatKey = String(chatId)
+  const text = message.text || message.caption || ''
+  const photo = message.photo
+  const fromName = message.from?.first_name || 'Kasir'
+
+  try {
     const supabase = createServiceClient()
 
-    // Handle /start command
     if (text.startsWith('/start')) {
-      const parts = text.split(' ')
-      if (parts.length < 2) {
-        await sendMessage(chatId, 'Format salah. Gunakan: /start KODE_TOKO')
-        return NextResponse.json({ ok: true })
-      }
-      const code = parts[1]
-
-      // Find store
-      const { data: store } = await supabase
-        .from('stores')
-        .select('id, name, subscription_tier')
-        .eq('unique_code', code)
-        .single()
-
-      if (!store) {
-        await sendMessage(chatId, 'Toko tidak ditemukan. Periksa kembali kode unik.')
-        return NextResponse.json({ ok: true })
-      }
-
-      // Check Free Tier Cashier Limit
-      if (store.subscription_tier === 'FREE') {
-        const { count } = await supabase
-          .from('cashiers')
-          .select('*', { count: 'exact', head: true })
-          .eq('store_id', store.id)
-          .neq('telegram_chat_id', chatId) // don't count if they are just re-registering
-
-        if (count >= 1) {
-          await sendMessage(chatId, '❌ Batas maksimal kasir (1 Kasir/Weblink) untuk paket GRATIS telah tercapai. Minta owner toko untuk upgrade ke PRO.')
-          return NextResponse.json({ ok: true })
-        }
-      }
-
-      // Upsert cashier
-      const { error } = await supabase
-        .from('cashiers')
-        .upsert({ 
-          store_id: store.id, 
-          telegram_chat_id: chatId,
-          name: fromName 
-        }, { onConflict: 'telegram_chat_id' })
-
-      if (error) {
-        console.error(error)
-        await sendMessage(chatId, 'Terjadi kesalahan sistem saat mendaftar.')
-      } else {
-        await sendMessage(chatId, `✅ Berhasil terhubung ke toko: *${store.name}*\n\nMulai laporkan transaksi dengan format:\n\n*Single item:*\n\`<nominal> <jumlah> <nama_produk>\`\nContoh: \`50000 2 Nasi Goreng\`\n\n*Multi-item:*\n\`<total_nominal>\`\n\`<jumlah> <nama_produk_1>\`\n\`<jumlah> <nama_produk_2>\`\nContoh:\n\`65000\`\n\`2 Nasi Goreng\`\n\`1 Es Teh\`\n\nUntuk QRIS/Transfer, kirimkan foto bukti dengan caption/keterangan yang sama.`)
-      }
+      await handleStart({ supabase, chatId, chatKey, text, fromName })
       return NextResponse.json({ ok: true })
     }
 
-    // Check if cashier is registered and fetch store info
+    if (text.startsWith('/help') || text.startsWith('/bantuan')) {
+      await sendMessage(chatId, HELP_TEXT)
+      return NextResponse.json({ ok: true })
+    }
+
+    // Token kasir dibutuhkan RPC sebagai kredensial. store_id tetap tidak pernah
+    // datang dari luar -- RPC menurunkannya sendiri dari token ini.
     const { data: cashier } = await supabase
       .from('cashiers')
-      .select('id, store_id, stores(id, subscription_tier)')
-      .eq('telegram_chat_id', chatId)
-      .single()
+      .select('id, store_id, token')
+      .eq('telegram_chat_id', chatKey)
+      .maybeSingle()
 
     if (!cashier) {
-      await sendMessage(chatId, 'Anda belum terhubung ke toko mana pun. Kirim /start KODE_TOKO')
+      await sendMessage(chatId, 'Anda belum terhubung ke toko mana pun. Kirim: /start KODE_TOKO')
       return NextResponse.json({ ok: true })
     }
 
-    // Check Free Tier Limits (Max 40 transactions/day)
-    if (cashier.stores.subscription_tier === 'FREE') {
-      const today = new Date().toISOString().split('T')[0]
-      const { count } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('store_id', cashier.store_id)
-        .gte('created_at', `${today}T00:00:00Z`)
-        .lt('created_at', `${today}T23:59:59Z`)
+    // Batas 30 transaksi/hari dihapus: paket GRATIS sekarang tanpa batas
+    // transaksi (pembedanya multi-kasir, loyalitas, dan laporan lanjutan).
+    // Blok lamanya juga salah hitung -- memakai batas hari UTC padahal
+    // penggunanya WIB, dan `count` yang null diperlakukan sebagai "belum penuh".
 
-      if (count >= 30) {
-        await sendMessage(chatId, '❌ Batas transaksi harian paket GRATIS (30 transaksi) telah tercapai. Minta owner toko untuk upgrade ke PRO.')
-        return NextResponse.json({ ok: true })
-      }
-    }
-
-    // Parse transaction
-    let amount = 0
-    let productName = ''
-
-    const lines = text.trim().split('\n').filter(l => l.trim() !== '')
-
-    if (lines.length === 0) {
-      await sendMessage(chatId, '❌ Pesan kosong. Kirimkan nominal dan nama produk.')
+    const parsed = parseReport(text)
+    if (parsed.error) {
+      await sendMessage(chatId, `${parsed.error}\n\n${HELP_TEXT}`)
       return NextResponse.json({ ok: true })
     }
 
-    if (lines.length === 1) {
-      // Format: <nominal> <kuantitas> <produk> ATAU <nominal> <produk>
-      const match = lines[0].trim().match(/^(\d+)\s+(.+)$/)
-      if (!match) {
-        await sendMessage(chatId, '❌ Format salah.\nGunakan:\n`<nominal> <jumlah> <nama_produk>`\nContoh:\n`50000 2 Nasi Goreng`\n\nUntuk multi-item:\n`<total_nominal>`\n`<jumlah> <nama_produk_1>`\n`<jumlah> <nama_produk_2>`\nContoh:\n`65000`\n`2 Nasi Goreng`\n`1 Es Teh`')
-        return NextResponse.json({ ok: true })
-      }
-      amount = parseInt(match[1], 10)
-      
-      // Ensure productName always starts with a quantity prefix
-      const prodDescription = match[2].trim()
-      const prodParts = prodDescription.match(/^(\d+)\s+(.+)$/)
-      if (prodParts) {
-        productName = `${prodParts[1]}x ${prodParts[2]}`
-      } else {
-        productName = `1x ${prodDescription}`
-      }
-    } else {
-      // Format multi-line:
-      // <total_nominal>
-      // <kuantitas> <produk 1>
-      // <kuantitas> <produk 2>
-      const firstLine = lines[0].trim()
-      if (!/^\d+$/.test(firstLine)) {
-        await sendMessage(chatId, '❌ Format salah untuk multi-item.\nBaris pertama harus total nominal (angka saja).\nContoh:\n`65000`\n`2 Nasi Goreng`\n`1 Es Teh`')
-        return NextResponse.json({ ok: true })
-      }
-      amount = parseInt(firstLine, 10)
-
-      const items = []
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim()
-        const prodParts = line.match(/^(\d+)\s+(.+)$/)
-        if (prodParts) {
-          items.push(`${prodParts[1]}x ${prodParts[2]}`)
-        } else {
-          items.push(`1x ${line}`) // Default to 1x if quantity is missing
-        }
-      }
-      productName = items.join(', ')
+    // Nama produk -> product_id. Versi lama hanya menyimpan nama sebagai teks
+    // tampilan, jadi laporan Telegram tidak pernah menyentuh stok (C10).
+    const resolved = await resolveProducts(supabase, cashier.store_id, parsed.items)
+    if (resolved.error) {
+      await sendMessage(chatId, resolved.error)
+      return NextResponse.json({ ok: true })
     }
 
     let paymentMethod = 'CASH'
     let receiptUrl = null
 
-    // If there is a photo, it is QRIS/TF
     if (photo && photo.length > 0) {
       paymentMethod = 'QRIS/TF'
-      // Get the highest resolution photo
       const bestPhoto = photo[photo.length - 1]
       const fileUrl = await getFileUrl(bestPhoto.file_id)
 
       if (fileUrl) {
-        // Download photo
         const photoRes = await fetch(fileUrl)
         const blob = await photoRes.blob()
-
-        // Upload to Supabase Storage
         const fileName = `${cashier.store_id}/${Date.now()}.jpg`
-        const { error: uploadError } = await supabase
-          .storage
+        const { error: uploadError } = await supabase.storage
           .from('receipts')
-          .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            upsert: false
-          })
+          .upload(fileName, blob, { contentType: 'image/jpeg', upsert: false })
 
-        if (!uploadError) {
-          const { data: publicUrlData } = supabase
-            .storage
-            .from('receipts')
-            .getPublicUrl(fileName)
-          
-          receiptUrl = publicUrlData.publicUrl
+        if (uploadError) {
+          console.error('Upload bukti Telegram gagal', { message: uploadError.message })
         } else {
-          console.error("Upload error:", uploadError)
+          const { data: publicUrlData } = supabase.storage.from('receipts').getPublicUrl(fileName)
+          receiptUrl = publicUrlData.publicUrl
         }
       }
     }
 
-    // Insert transaction
-    const { data: insertData, error: insertError } = await supabase
-      .from('transactions')
-      .insert({
-        store_id: cashier.store_id,
-        cashier_id: cashier.id,
-        amount,
-        product_name: productName,
-        payment_method: paymentMethod,
-        receipt_url: receiptUrl
-      })
-      .select()
-      .single()
+    const result = await submitTransactionRpc(supabase, {
+      token: cashier.token,
+      items: resolved.items,
+      paymentMethod,
+      // null = uang pas. Kasir Telegram tidak selalu menyebut uang diterima.
+      cashReceived: paymentMethod === 'CASH' ? parsed.cash : null,
+      clientTxId: updateTxId(chatKey, message.message_id),
+      receiptUrl,
+    })
 
-    if (insertError) {
-      console.error(insertError)
-      await sendMessage(chatId, 'Terjadi kesalahan sistem saat mencatat transaksi.')
-    } else {
-      await sendMessage(chatId, `✅ Transaksi berhasil dicatat!\n\nLihat/Cetak Struk:\nhttps://yandihan-app.vercel.app/r/${insertData.id}`)
+    if (result.error) {
+      await sendMessage(chatId, result.error)
+      return NextResponse.json({ ok: true })
     }
 
-    return NextResponse.json({ ok: true })
+    await sendMessage(chatId, replyFor(result, paymentMethod, siteOrigin(req)))
 
+    return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Webhook Error:', error)
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    // Pesan error internal tidak pernah dikirim ke pemanggil.
+    console.error('Telegram webhook error', { message: error?.message })
+    return NextResponse.json({ ok: false }, { status: 500 })
   }
+}
+
+/** Balasan sukses: sekarang menyebut rincian yang dihitung server (total,
+ *  diskon, kembalian, status) supaya kasir tahu angka yang benar-benar tercatat,
+ *  bukan angka yang ia ketik. */
+function replyFor(result, paymentMethod, origin) {
+  const lines = [
+    result.idempotent ? 'Transaksi ini sudah tercatat sebelumnya.' : 'Transaksi berhasil dicatat.',
+    result.productName,
+  ]
+  if (result.discount > 0) {
+    lines.push(`Subtotal: ${formatRupiah(result.subtotal)}`)
+    lines.push(`Diskon ${result.discountPercent}%: -${formatRupiah(result.discount)}`)
+  }
+  lines.push(`Total: ${formatRupiah(result.total)}`)
+  if (paymentMethod === 'CASH' && result.changeAmount != null) {
+    lines.push(`Uang diterima: ${formatRupiah(result.cashReceived)}`)
+    lines.push(`Kembalian: ${formatRupiah(result.changeAmount)}`)
+  }
+  if (result.status === 'pending') lines.push('Status: masuk daftar tunggu.')
+  if (origin) lines.push('', 'Lihat/Cetak Struk:', `${origin}/r/${result.transactionId}`)
+  return lines.join('\n')
+}
+
+async function handleStart({ supabase, chatId, chatKey, text, fromName }) {
+  const code = text.split(/\s+/)[1]?.trim().toUpperCase()
+  if (!code) {
+    await sendMessage(chatId, 'Format salah. Gunakan: /start KODE_TOKO')
+    return
+  }
+
+  const { data: store, error: storeErr } = await supabase
+    .from('stores')
+    .select('id, name, subscription_tier, subscription_end_date')
+    .eq('unique_code', code)
+    .maybeSingle()
+
+  if (storeErr || !store) {
+    await sendMessage(chatId, 'Toko tidak ditemukan. Periksa kembali kode unik toko.')
+    return
+  }
+
+  // Kalau chat ini sudah jadi kasir toko yang sama, ini pendaftaran ulang dan
+  // jumlah kasir tidak bertambah -- kuota tidak perlu diperiksa.
+  const { data: existing } = await supabase
+    .from('cashiers')
+    .select('id, store_id')
+    .eq('telegram_chat_id', chatKey)
+    .maybeSingle()
+
+  if (existing?.store_id !== store.id) {
+    const limit = maxCashiers(store)
+    if (Number.isFinite(limit)) {
+      // Dulu: .neq('telegram_chat_id', chatId). Kasir web punya
+      // telegram_chat_id NULL, dan NULL <> apa pun tidak pernah TRUE, jadi
+      // semua kasir web tidak terhitung -- toko GRATIS bisa punya 1 kasir web
+      // PLUS 1 kasir Telegram (temuan C7). Sekarang dihitung semuanya.
+      const { count, error: countErr } = await supabase
+        .from('cashiers')
+        .select('id', { count: 'exact', head: true })
+        .eq('store_id', store.id)
+
+      // count null (query gagal) dulu berarti kuota tak terbatas. Sekarang tolak.
+      if (countErr || count == null) {
+        await sendMessage(chatId, 'Gagal memeriksa kuota kasir. Coba lagi sebentar.')
+        return
+      }
+      if (count >= limit) {
+        await sendMessage(
+          chatId,
+          `Batas kasir paket ${planTier(store)} (${limit} kasir) sudah tercapai. Minta pemilik toko upgrade ke PRO.`
+        )
+        return
+      }
+    }
+  }
+
+  const { error } = await supabase
+    .from('cashiers')
+    .upsert(
+      { store_id: store.id, telegram_chat_id: chatKey, name: fromName },
+      { onConflict: 'telegram_chat_id' }
+    )
+
+  if (error) {
+    console.error('Registrasi kasir Telegram gagal', { code: error.code })
+    await sendMessage(chatId, 'Terjadi kesalahan sistem saat mendaftar. Coba lagi.')
+    return
+  }
+
+  await sendMessage(chatId, `Berhasil terhubung ke toko: ${store.name}\n\n${HELP_TEXT}`)
+}
+
+/**
+ * Memparsing pesan laporan jadi { items: [{ qty, name }], cash } atau { error }.
+ *
+ * Perbedaan dari versi lama: nominal BUKAN lagi sumber uang. Harga dihitung
+ * server dari products.price (temuan C1), jadi angka di baris pertama kini
+ * dibaca sebagai "uang yang diterima" dan boleh dikosongkan.
+ */
+function parseReport(text) {
+  const lines = text
+    .trim()
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return { error: 'Pesan kosong.' }
+
+  let cash = null
+  let itemLines = lines
+
+  if (lines.length > 1 && /^\d+$/.test(lines[0])) {
+    cash = Number.parseInt(lines[0], 10)
+    itemLines = lines.slice(1)
+  } else if (lines.length === 1) {
+    // Kompatibilitas format lama satu baris: "<nominal> <jumlah> <nama produk>".
+    const three = lines[0].match(/^(\d+)\s+(\d+)\s+(.+)$/)
+    if (three) {
+      cash = Number.parseInt(three[1], 10)
+      itemLines = [`${three[2]} ${three[3]}`]
+    }
+  }
+
+  if (itemLines.length === 0) return { error: 'Belum ada produk yang disebutkan.' }
+  if (itemLines.length > MAX_LINES) return { error: `Maksimal ${MAX_LINES} baris item.` }
+
+  const items = []
+  for (const line of itemLines) {
+    const match = line.match(/^(\d+)\s+(.+)$/)
+    const qty = match ? Number.parseInt(match[1], 10) : 1
+    const name = (match ? match[2] : line).trim()
+
+    if (!name) return { error: `Baris "${line}" tidak menyebut nama produk.` }
+    if (!(qty >= 1 && qty <= MAX_QTY)) {
+      return { error: `Jumlah pada baris "${line}" harus antara 1 dan ${MAX_QTY}.` }
+    }
+    items.push({ qty, name })
+  }
+
+  return { items, cash }
+}
+
+/** Cocokkan nama produk (tanpa peduli huruf besar/kecil) ke product_id milik
+ *  toko ini. Nama yang tidak dikenal ditolak dengan daftar produk yang ada --
+ *  dulu nama apa pun diterima dan disimpan sebagai teks. */
+async function resolveProducts(supabase, storeId, items) {
+  const { data: products, error } = await supabase
+    .from('products')
+    .select('id, name')
+    .eq('store_id', storeId)
+    .limit(1000)
+
+  if (error) return { error: 'Gagal memuat daftar produk. Coba lagi.' }
+  if (!products || products.length === 0) {
+    return { error: 'Toko ini belum punya produk. Tambahkan produk dulu di dashboard.' }
+  }
+
+  const byName = new Map(products.map((p) => [String(p.name).trim().toLowerCase(), p]))
+  const resolved = []
+  const unknown = []
+
+  for (const item of items) {
+    const product = byName.get(item.name.toLowerCase())
+    if (product) resolved.push({ product_id: product.id, qty: item.qty, subs: [] })
+    else unknown.push(item.name)
+  }
+
+  if (unknown.length > 0) {
+    const available = products.slice(0, 20).map((p) => `- ${p.name}`).join('\n')
+    const more = products.length > 20 ? `\n(dan ${products.length - 20} produk lain)` : ''
+    return {
+      error: `Produk tidak dikenal: ${unknown.join(', ')}.\n\nProduk yang tersedia:\n${available}${more}`,
+    }
+  }
+
+  return { items: resolved }
 }

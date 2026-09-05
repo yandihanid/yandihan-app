@@ -46,27 +46,33 @@ export default function SignUp() {
       return
     }
     
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-    
-    if (signUpError) {
-      setError(signUpError.message)
-      setLoading(false)
-    } else {
-      setSignUpSuccess(true) // Pendaftaran berhasil dikirim
-      setLoading(false)
-      if (data.session) {
-        // Pengguna langsung login (misal: konfirmasi email dinonaktifkan)
-        setTimeout(() => {
-          router.replace('/dashboard') // Use replace to prevent going back to signup
-          router.refresh()
-        }, 2000)
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+      
+      if (signUpError) {
+        setError(signUpError.message)
+        setLoading(false)
       } else {
-        // Konfirmasi email diperlukan
-        setRequiresEmailVerification(true)
+        setSignUpSuccess(true) // Pendaftaran berhasil dikirim
+        setLoading(false)
+        if (data.session) {
+          // Pengguna langsung login (misal: konfirmasi email dinonaktifkan)
+          setTimeout(() => {
+            router.replace('/dashboard') // Use replace to prevent going back to signup
+            router.refresh()
+          }, 2000)
+        } else {
+          // Konfirmasi email diperlukan
+          setRequiresEmailVerification(true)
+        }
       }
+    } catch (err) {
+      console.error('Sign up error:', err)
+      setError('Gagal terhubung ke server Supabase (Failed to fetch). Periksa koneksi internet atau NEXT_PUBLIC_SUPABASE_URL.')
+      setLoading(false)
     }
   }
 

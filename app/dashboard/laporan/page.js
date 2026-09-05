@@ -1,83 +1,71 @@
-import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/utils/supabase/server'
+import { verifySession, getMyStore } from '@/lib/dal'
+import { wibDateString, wibLabel } from '@/lib/time'
 import ReportAccordion from './ReportAccordion'
 
 export const dynamic = 'force-dynamic'
 
+const PAYMENT_FILTERS = new Set(['ALL', 'CASH', 'QRIS/TF'])
+
 export default async function LaporanPage({ searchParams }) {
-  const filter = (await searchParams).filter || 'ALL'
+  const params = (await searchParams) || {}
+  const filter = PAYMENT_FILTERS.has(params.filter) ? params.filter : 'ALL'
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  await verifySession('/dashboard/laporan')
 
-  if (!user) redirect('/login')
-
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
+  // maybeSingle() lewat DAL: .single() dulu meledak (PGRST116) untuk pemilik
+  // dengan lebih dari satu toko (temuan C11).
+  const store = await getMyStore()
   if (!store) redirect('/dashboard/settings')
 
+  const supabase = await createClient()
   let query = supabase
     .from('transactions')
     .select('amount, created_at')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 
-  if (filter !== 'ALL') {
-    query = query.eq('payment_method', filter)
-  }
+  if (filter !== 'ALL') query = query.eq('payment_method', filter)
 
   const { data: transactions } = await query
 
-  // Grouping Logic
-  const grouped = {}
-  
-  if (transactions) {
-    transactions.forEach(tx => {
-      const dateObj = new Date(tx.created_at)
-      
-      const monthYear = dateObj.toLocaleString('id-ID', { month: 'long', year: 'numeric' })
-      const dayDate = dateObj.toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-      
-      if (!grouped[monthYear]) {
-        grouped[monthYear] = { total: 0, days: {} }
-      }
-      
-      grouped[monthYear].total += Number(tx.amount)
-      
-      if (!grouped[monthYear].days[dayDate]) {
-        grouped[monthYear].days[dayDate] = 0
-      }
-      
-      grouped[monthYear].days[dayDate] += Number(tx.amount)
-    })
+  // Pengelompokan memakai tanggal WIB, bukan zona waktu mesin yang merender.
+  // Dulu labelnya dibuat dengan toLocaleString('id-ID') tanpa timeZone, jadi di
+  // Vercel (UTC) transaksi jam 06:30 WIB masuk ke hari sebelumnya (temuan C5).
+  // Kunci pengelompokannya juga tanggal ISO WIB, bukan teks tampilan — teks
+  // tampilan dulu diurutkan dengan parseInt() atas nama bulan Indonesia.
+  const months = new Map()
+
+  for (const tx of transactions || []) {
+    const day = wibDateString(tx.created_at)
+    const monthKey = day.slice(0, 7)
+    const amount = Number(tx.amount) || 0
+
+    let month = months.get(monthKey)
+    if (!month) {
+      month = { key: monthKey, total: 0, days: new Map() }
+      months.set(monthKey, month)
+    }
+
+    month.total += amount
+    month.days.set(day, (month.days.get(day) || 0) + amount)
   }
 
-  // Convert to array for rendering
-  const reports = Object.keys(grouped).map(monthStr => {
-    const monthData = grouped[monthStr]
-    const dailyData = Object.keys(monthData.days).map(dayStr => ({
-      date: dayStr,
-      total: monthData.days[dayStr]
+  const reports = [...months.values()]
+    .sort((a, b) => (a.key < b.key ? 1 : -1))
+    .map((month) => ({
+      key: month.key,
+      month: wibLabel(`${month.key}-01T00:00:00+07:00`, { month: 'long', year: 'numeric' }),
+      total: month.total,
+      dailyData: [...month.days.entries()]
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+        .map(([day, total]) => ({
+          date: wibLabel(`${day}T00:00:00+07:00`, { day: 'numeric', month: 'long', year: 'numeric' }),
+          total,
+        })),
     }))
-    
-    // Sort days descending (e.g. 19 Juni, 18 Juni)
-    dailyData.sort((a, b) => {
-       const [dayA] = a.date.split(' ')
-       const [dayB] = b.date.split(' ')
-       return parseInt(dayB) - parseInt(dayA)
-    })
-
-    return {
-      month: monthStr,
-      total: monthData.total,
-      dailyData
-    }
-  })
 
   return (
     <div className="animate-fade-in flex flex-col gap-4">
@@ -113,9 +101,9 @@ export default async function LaporanPage({ searchParams }) {
             Belum ada data transaksi untuk ditampilkan.
           </div>
         ) : (
-          reports.map((report, idx) => (
-            <ReportAccordion 
-              key={idx} 
+          reports.map((report) => (
+            <ReportAccordion
+              key={report.key}
               month={report.month} 
               total={report.total} 
               dailyData={report.dailyData} 

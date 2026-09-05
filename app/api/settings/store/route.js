@@ -7,13 +7,21 @@ export async function PATCH(req) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { storeId, requireSubProduct, requireCustomerName } = body
+  const { storeId } = body
 
   if (!storeId) return NextResponse.json({ error: 'storeId diperlukan' }, { status: 400 })
 
+  // Whitelist of columns the client is allowed to toggle
+  const ALLOWED_FIELDS = ['require_sub_product', 'require_customer_name', 'waiting_list_enabled']
+
   const update = {}
-  if (typeof requireSubProduct === 'boolean') update.require_sub_product = requireSubProduct
-  if (typeof requireCustomerName === 'boolean') update.require_customer_name = requireCustomerName
+  for (const field of ALLOWED_FIELDS) {
+    if (typeof body[field] === 'boolean') update[field] = body[field]
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: 'Tidak ada perubahan valid' }, { status: 400 })
+  }
 
   const { error } = await supabase
     .from('stores')

@@ -1,5 +1,11 @@
+// KEAMANAN (temuan A4): halaman ini PUBLIK — link struk dibagikan ke pembeli.
+// Sebelumnya select-nya mengambil `cashiers(name, token)` dan token itu
+// diteruskan ke komponen client, jadi ikut ter-serialize ke HTML. Setiap
+// pembeli yang membuka struknya mendapat kredensial POS permanen milik toko.
+// Sekarang token tidak pernah dibaca di sini; tombol "Kembali ke Kasir"
+// mengambil token dari localStorage perangkat kasir itu sendiri.
 import { createServiceClient } from '@/utils/supabase/service'
-import { notFound } from 'next/navigation'
+import { formatDateTimeWib } from '@/lib/format'
 import PrintButton from './PrintButton'
 
 export const dynamic = 'force-dynamic'
@@ -11,16 +17,15 @@ export default async function ReceiptPage({ params }) {
 
   const { data: tx, error: txError } = await supabase
     .from('transactions')
-    .select('*, stores(name), cashiers(name, token), cash_received, change_amount')
+    .select('*, stores(name), cashiers(name), cash_received, change_amount')
     .eq('id', id)
-    .single()
+    .maybeSingle()
 
   if (txError || !tx) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <h1>Struk Tidak Ditemukan</h1>
-        <p>ID Transaksi: {id}</p>
-        <p>Detail Error: {txError?.message || 'Data transaksi kosong.'}</p>
+        <p>Link struk ini tidak berlaku atau sudah dihapus.</p>
       </div>
     )
   }
@@ -44,7 +49,7 @@ export default async function ReceiptPage({ params }) {
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0', fontWeight: 'bold' }}>{tx.stores?.name}</h1>
           <p style={{ margin: 0, fontSize: '0.875rem' }}>Bukti Pembayaran</p>
-          <p style={{ margin: 0, fontSize: '0.875rem' }}>{new Date(tx.created_at).toLocaleString('id-ID')}</p>
+          <p style={{ margin: 0, fontSize: '0.875rem' }}>{formatDateTimeWib(tx.created_at)}</p>
         </div>
 
         <div style={{ borderTop: '2px dashed #ccc', margin: '1rem 0' }}></div>
@@ -71,7 +76,7 @@ export default async function ReceiptPage({ params }) {
           <span>Rp {Number(tx.amount).toLocaleString('id-ID')}</span>
         </div>
 
-        {tx.payment_method === 'CASH' && tx.cash_received && (
+        {tx.payment_method === 'CASH' && tx.cash_received != null && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingTop: '0.5rem' }}>
               <span>Uang Diterima:</span>
@@ -104,7 +109,7 @@ export default async function ReceiptPage({ params }) {
         }
       `}} />
       
-      <PrintButton cashierToken={tx.cashiers?.token} />
+      <PrintButton />
     </div>
   )
 }

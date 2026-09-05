@@ -27,17 +27,23 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else {
+        router.replace('/dashboard') // Use replace to prevent going back to login
+        router.refresh()
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('Gagal terhubung ke server Supabase (Failed to fetch). Periksa koneksi internet atau NEXT_PUBLIC_SUPABASE_URL.')
       setLoading(false)
-    } else {
-      router.replace('/dashboard') // Use replace to prevent going back to login
-      router.refresh()
     }
   }
 

@@ -1,50 +1,75 @@
-import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireStoreOwnership } from '@/lib/dal'
+import { isPro } from '@/lib/plan'
+import { createClient } from '@/utils/supabase/server'
 
 // PATCH /api/pelanggan/settings
 // Body: { storeId, pelanggan_enabled?, visit_threshold?, discount_percent? }
+//
+// Perubahan: kepemilikan toko lewat lib/dal, gerbang PRO memakai isPro() yang
+// ikut memeriksa subscription_end_date (dulu `subscription_tier !== 'PRO'`
+// mentah, jadi langganan kedaluwarsa tetap lolos -- temuan C9), dan nilai
+// numerik divalidasi rentangnya. Tanpa validasi itu discount_percent bisa
+// diisi 500 atau NaN dan langsung masuk ke kolom yang dipakai menghitung uang.
 export async function PATCH(req) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Body tidak valid' }, { status: 400 })
+  }
 
-  const body = await req.json()
-  const { storeId, pelanggan_enabled, visit_threshold, discount_percent } = body
-
+  const { storeId, pelanggan_enabled, visit_threshold, discount_percent } = body || {}
   if (!storeId) return NextResponse.json({ error: 'storeId diperlukan' }, { status: 400 })
 
-  // Pastikan store milik user dan plan PRO
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id, subscription_tier')
-    .eq('id', storeId)
-    .eq('user_id', user.id)
-    .single()
+  const { store, error: ownErr } = await requireStoreOwnership(storeId)
+  if (ownErr) return NextResponse.json({ error: ownErr }, { status: 403 })
 
-  if (!store) return NextResponse.json({ error: 'Toko tidak ditemukan' }, { status: 404 })
-
-  if (store.subscription_tier !== 'PRO') {
-    return NextResponse.json({ error: 'Fitur pelanggan hanya untuk plan PRO' }, { status: 403 })
+  if (!isPro(store)) {
+    return NextResponse.json(
+      { error: 'Program pelanggan setia hanya tersedia di paket PRO yang masih aktif.' },
+      { status: 403 }
+    )
   }
 
-  // Build update object — hanya field yang dikirim
   const updates = {}
   if (typeof pelanggan_enabled === 'boolean') updates.pelanggan_enabled = pelanggan_enabled
-  if (visit_threshold !== undefined) updates.visit_threshold = Number(visit_threshold)
-  if (discount_percent !== undefined) updates.discount_percent = Number(discount_percent)
 
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'Tidak ada field yang diupdate' }, { status: 400 })
+  if (visit_threshold !== undefined) {
+    const value = Number.parseInt(visit_threshold, 10)
+    if (!Number.isFinite(value) || value < 1 || value > 100) {
+      return NextResponse.json(
+        { error: 'Ambang kunjungan harus antara 1 dan 100.' },
+        { status: 400 }
+      )
+    }
+    updates.visit_threshold = value
   }
 
+  if (discount_percent !== undefined) {
+    const value = Number.parseInt(discount_percent, 10)
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      return NextResponse.json({ error: 'Diskon harus antara 0 dan 100 persen.' }, { status: 400 })
+    }
+    updates.discount_percent = value
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Tidak ada field yang diubah' }, { status: 400 })
+  }
+
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from('stores')
     .update(updates)
-    .eq('id', storeId)
+    .eq('id', store.id)
     .select('id, pelanggan_enabled, visit_threshold, discount_percent')
-    .single()
+    .maybeSingle()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('Gagal menyimpan setelan pelanggan', { code: error.code })
+    return NextResponse.json({ error: 'Gagal menyimpan setelan' }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true, store: data })
 }

@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# .env.example hanya memuat NAMA variabel, tanpa nilai -- aman dan memang
+# harus ikut ter-commit supaya orang lain tahu variabel apa yang dibutuhkan.
+!.env.example
 
 # vercel
 .vercel

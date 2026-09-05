@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { SUPABASE_COOKIE_OPTIONS } from './cookieOptions'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -7,6 +8,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -17,9 +19,9 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Dipanggil dari Server Component, yang tidak boleh menulis cookie.
+            // Aman diabaikan karena proxy.js di root sudah me-refresh sesi
+            // sebelum render (matcher-nya mencakup /dashboard, /login, /signup).
           }
         },
       },
