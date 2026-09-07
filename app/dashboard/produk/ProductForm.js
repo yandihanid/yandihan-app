@@ -1,48 +1,92 @@
 'use client'
 
-import { useState } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Alert from '@/components/ui/Alert'
+import Button from '@/components/ui/Button'
+import Field from '@/components/ui/Field'
+import Input from '@/components/ui/Input'
 import { addProduct } from './actions'
 
+/**
+ * Tambah produk baru.
+ *
+ * Perubahan dari versi sebelumnya:
+ *
+ * 1. `alert(res.error)` -> Alert di dalam form. Pesan seperti «Produk "Nasi
+ *    Goreng" sudah ada di toko ini» adalah koreksi terhadap isi form, jadi
+ *    tempatnya di sebelah form itu — bukan di kotak dialog yang harus ditutup
+ *    dulu sebelum nama produknya bisa diperbaiki.
+ * 2. Tiga useState untuk tiga input hilang. Nilainya tidak dipakai untuk apa pun
+ *    selain dikirim, jadi FormData sudah cukup; setelah sukses form.reset()
+ *    yang mengosongkannya.
+ * 3. Label lewat Field: sebelumnya <label> tanpa htmlFor, jadi mengklik "Harga
+ *    (Rp)" tidak memfokuskan inputnya dan pembaca layar membacakan tiga input
+ *    tanpa nama.
+ */
 export default function ProductForm({ storeId }) {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ name: '', price: '', stock: '' })
+  const formRef = useRef(null)
+  const [state, formAction, pending] = useActionState(
+    async (_prev, formData) => addProduct(formData),
+    null
+  )
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    const fd = new FormData()
-    fd.append('storeId', storeId)
-    Object.entries(form).forEach(([k, v]) => fd.append(k, v))
-    const res = await addProduct(fd)
-    setLoading(false)
-    if (res.error) alert(res.error)
-    else {
-      setForm({ name: '', price: '', stock: '' })
-      router.refresh()
-    }
-  }
+  useEffect(() => {
+    if (!state?.success) return
+    formRef.current?.reset()
+    // addProduct sudah revalidatePath('/dashboard/produk'), tapi revalidate itu
+    // berlaku untuk navigasi berikutnya; refresh() yang membuat daftar di bawah
+    // form ikut memuat produk barunya sekarang.
+    router.refresh()
+  }, [state, router])
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-      <div style={{ flex: 2, minWidth: 200 }}>
-        <label style={labelStyle}>Nama Produk</label>
-        <input className="input-field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nasi Goreng" required />
+    <form ref={formRef} action={formAction} className="produk-form">
+      {state?.error && <Alert variant="error">{state.error}</Alert>}
+      {state?.success && <Alert variant="success">Produk ditambahkan.</Alert>}
+
+      <input type="hidden" name="storeId" value={storeId} />
+
+      <div className="produk-form-row">
+        <Field id="product-name" label="Nama Produk" required>
+          {(props) => (
+            <Input {...props} name="name" maxLength={120} placeholder="Misal: Nasi Goreng" />
+          )}
+        </Field>
+
+        <Field id="product-price" label="Harga (Rp)" required>
+          {(props) => (
+            <Input
+              {...props}
+              name="price"
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              placeholder="25000"
+            />
+          )}
+        </Field>
+
+        <Field id="product-stock" label="Stok Awal" required>
+          {(props) => (
+            <Input
+              {...props}
+              name="stock"
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              placeholder="50"
+            />
+          )}
+        </Field>
+
+        <Button type="submit" disabled={pending}>
+          {pending ? 'Menyimpan…' : 'Tambah Produk'}
+        </Button>
       </div>
-      <div style={{ flex: 1, minWidth: 120 }}>
-        <label style={labelStyle}>Harga (Rp)</label>
-        <input type="number" className="input-field" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="25000" required min="0" />
-      </div>
-      <div style={{ flex: 1, minWidth: 100 }}>
-        <label style={labelStyle}>Stok Awal</label>
-        <input type="number" className="input-field" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="50" required min="0" />
-      </div>
-      <button type="submit" className="btn btn-primary" disabled={loading} style={{ height: 52, padding: '0 1.5rem' }}>
-        {loading ? '...' : '+ Tambah'}
-      </button>
     </form>
   )
 }
-
-const labelStyle = { display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }

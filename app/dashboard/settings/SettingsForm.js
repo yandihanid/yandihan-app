@@ -1,36 +1,67 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
+import { useActionState } from 'react'
+import Alert from '@/components/ui/Alert'
+import Button from '@/components/ui/Button'
+import Field from '@/components/ui/Field'
+import Input from '@/components/ui/Input'
+import { updateStore } from './actions'
 
-export default function SettingsForm({ store, userId }) {
-  const [name, setName] = useState(store?.name || '')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
-
-  const handleSave = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    if (store) {
-      await supabase.from('stores').update({ name }).eq('id', store.id)
-    } else {
-      await supabase.from('stores').insert({ name, user_id: userId })
-    }
-    setLoading(false)
-    router.refresh()
-  }
+/**
+ * Form nama toko.
+ *
+ * Sebelumnya komponen ini menulis tabel `stores` langsung dari browser:
+ *
+ *     await supabase.from('stores').update({ name }).eq('id', store.id)
+ *     setLoading(false); router.refresh()
+ *
+ * Hasilnya tidak pernah diperiksa, jadi setiap kegagalan — RLS menolak, baris
+ * tidak cocok, jaringan mati — terlihat identik dengan berhasil: spinner
+ * berhenti, halaman refresh, nama lama kembali muncul (temuan L2). Sekarang
+ * penulisannya lewat server action `updateStore` yang memeriksa kepemilikan dan
+ * memastikan ada baris yang benar-benar berubah.
+ *
+ * useActionState dipakai karena inilah yang membuat `{ error }` dari action
+ * benar-benar sampai ke layar. Signature action-nya (formData) saja, bukan
+ * (prevState, formData), karena action yang sama tidak hanya dipanggil dari
+ * sini — adapter satu baris di bawah yang menjembatani, bukan action-nya yang
+ * dipaksa mengikuti bentuk hook.
+ *
+ * `pending` dari hook, bukan useState sendiri: state yang dihitung React tidak
+ * bisa tertinggal kalau ada jalur keluar yang lupa mengembalikannya ke false.
+ */
+export default function SettingsForm({ store }) {
+  const [state, formAction, pending] = useActionState(
+    async (_prev, formData) => updateStore(formData),
+    null
+  )
 
   return (
-    <form onSubmit={handleSave} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-      <div style={{ flex: 1, minWidth: 200 }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>Nama Toko</label>
-        <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama Toko" required />
+    <form action={formAction} className="settings-form">
+      {state?.error && <Alert variant="error">{state.error}</Alert>}
+      {state?.success && <Alert variant="success">Nama toko tersimpan.</Alert>}
+
+      {/* storeId ikut dikirim sebagai hidden field, bukan lewat closure: kalau
+          kosong, action membacanya sebagai "buat toko baru". */}
+      <input type="hidden" name="storeId" value={store?.id ?? ''} />
+
+      <div className="settings-form-row">
+        <Field id="store-name" label="Nama Toko" required hint="Muncul di struk dan di layar kasir.">
+          {(props) => (
+            <Input
+              {...props}
+              name="name"
+              defaultValue={store?.name ?? ''}
+              maxLength={80}
+              placeholder="Misal: Warung Bu Ida"
+            />
+          )}
+        </Field>
+
+        <Button type="submit" disabled={pending}>
+          {pending ? 'Menyimpan…' : 'Simpan'}
+        </Button>
       </div>
-      <button type="submit" className="btn btn-primary" disabled={loading} style={{ height: 52, padding: '0 1.5rem' }}>
-        {loading ? '...' : 'Simpan'}
-      </button>
     </form>
   )
 }

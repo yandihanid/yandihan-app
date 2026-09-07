@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import { verifySession, getMyStore } from '@/lib/dal'
+import { verifySession, getMyStore, getOnboardingState } from '@/lib/dal'
 import { planTier } from '@/lib/plan'
 import { wibRangeFor } from '@/lib/time'
+import OnboardingChecklist from './OnboardingChecklist'
 import RealtimeTransactions from './RealtimeTransactions'
 import UpgradeBanner from './UpgradeBanner'
 
@@ -25,7 +25,20 @@ export default async function Dashboard({ searchParams }) {
   // sini membuat pemilik dengan lebih dari satu toko kena PGRST116 dan
   // terlempar bolak-balik ke /dashboard/settings (temuan C11).
   const store = await getMyStore()
-  if (!store) redirect('/dashboard/settings')
+
+  // Belum punya toko: dulu redirect('/dashboard/settings') tanpa penjelasan
+  // apa pun (temuan K5). Sekarang halaman ini tetap jadi tempat pertama yang
+  // dilihat pengguna baru, dan checklist-nya yang mengantar ke settings.
+  if (!store) {
+    return (
+      <div className="animate-fade-in flex flex-col gap-4">
+        <OnboardingChecklist store={null} />
+      </div>
+    )
+  }
+
+  const onboarding = await getOnboardingState(store.id)
+  const isOnboarding = onboarding.transactionCount === 0
 
   // Batas hari dihitung SEKALI di server menurut WIB, lalu diturunkan sebagai
   // prop ke komponen realtime. Dulu server memakai zona waktu mesinnya (UTC di
@@ -76,6 +89,11 @@ export default async function Dashboard({ searchParams }) {
           {tier}
         </span>
       </h2>
+
+      {/* Checklist bertahan sampai transaksi pertama masuk, bukan hanya sampai
+          toko dibuat: toko yang ada tapi tanpa produk/kasir sama saja belum
+          bisa dipakai. Begitu ada satu transaksi, blok ini hilang sendiri. */}
+      {isOnboarding && <OnboardingChecklist store={store} {...onboarding} />}
 
       {/* key: ganti filter = komponen baru, jadi state daftar ikut reset tanpa
           perlu useEffect yang menulis state saat render (aturan

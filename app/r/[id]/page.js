@@ -5,7 +5,7 @@
 // Sekarang token tidak pernah dibaca di sini; tombol "Kembali ke Kasir"
 // mengambil token dari localStorage perangkat kasir itu sendiri.
 import { createServiceClient } from '@/utils/supabase/service'
-import { formatDateTimeWib } from '@/lib/format'
+import { formatDateTimeWib, formatRupiah } from '@/lib/format'
 import PrintButton from './PrintButton'
 
 export const dynamic = 'force-dynamic'
@@ -73,22 +73,22 @@ export default async function ReceiptPage({ params }) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
           <span>{tx.product_name || 'Pembelian'}</span>
-          <span>Rp {Number(tx.amount).toLocaleString('id-ID')}</span>
+          <span>{formatRupiah(tx.amount)}</span>
         </div>
 
         {tx.payment_method === 'CASH' && tx.cash_received != null && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingTop: '0.5rem' }}>
               <span>Uang Diterima:</span>
-              <span>Rp {Number(tx.cash_received).toLocaleString('id-ID')}</span>
+              <span>{formatRupiah(tx.cash_received)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.125rem', borderTop: '1px dashed #eee', paddingTop: '0.5rem' }}>
               <span>Total Harga Barang Produk:</span>
-              <span>Rp {Number(tx.amount).toLocaleString('id-ID')}</span>
+              <span>{formatRupiah(tx.amount)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <span>Kembalian:</span>
-              <span>Rp {Number(tx.change_amount).toLocaleString('id-ID')}</span>
+              <span>{formatRupiah(tx.change_amount)}</span>
             </div>
           </>
         )}

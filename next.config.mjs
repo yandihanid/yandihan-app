@@ -44,8 +44,11 @@ const MIDTRANS_API = ['https://api.midtrans.com', 'https://api.sandbox.midtrans.
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' ${MIDTRANS.join(' ')}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  'font-src \'self\' data: https://fonts.gstatic.com',
+  // Tanpa fonts.googleapis.com dan fonts.gstatic.com: font Plus Jakarta Sans
+  // sekarang di-self-host oleh next/font (app/layout.js), jadi tidak ada lagi
+  // stylesheet maupun file font yang diambil dari domain pihak ketiga.
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   `img-src 'self' data: blob: ${supabase[0]} https://*.midtrans.com`,
   `connect-src 'self' ${supabase.join(' ')} ${MIDTRANS.join(' ')} ${MIDTRANS_API.join(' ')}`,
   `frame-src 'self' ${MIDTRANS.join(' ')}`,

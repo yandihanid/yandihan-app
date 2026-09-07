@@ -1,997 +1,386 @@
-"use client";
-
-import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowRight, BarChart3, Smartphone, Zap, ShieldCheck, CheckCircle2, Menu, X, ChevronDown, Star } from 'lucide-react'
+import {
+  ArrowRight,
+  BarChart3,
+  Receipt,
+  Send,
+  ShieldCheck,
+  Smartphone,
+  TrendingUp,
+  WifiOff,
+  Zap,
+} from 'lucide-react'
+import SiteHeader from '@/components/landing/SiteHeader'
+import SiteFooter from '@/components/landing/SiteFooter'
+import FaqAccordion from '@/components/landing/FaqAccordion'
+import PlanCards from '@/components/landing/PlanCards'
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from '@/lib/site'
+
+/**
+ * Landing page. SERVER COMPONENT -- dan itu perubahan terpenting di file ini.
+ *
+ * Versi sebelumnya diawali "use client". Alasannya hanya tiga, dan tidak satu
+ * pun soal data:
+ *
+ *   1. ~40 handler onMouseEnter/onMouseLeave inline yang menulis transform dan
+ *      boxShadow langsung ke elemen. Itu pekerjaan :hover; sekarang ada di
+ *      globals.css sebagai .lp-lift dan tetangganya.
+ *   2. dua pasang useState untuk menu mobile dan akordeon FAQ. Keduanya pindah
+ *      ke island kecil (components/landing/MobileNav.js dan FaqAccordion.js).
+ *   3. satu IntersectionObserver yang memanggil setVisibleSections pada setiap
+ *      perpotongan -- dan visibleSections TIDAK PERNAH DIBACA di mana pun.
+ *      Observer, ref, state, dan seluruh atribut data-animate hanya membuat
+ *      pohon 997 baris ini render ulang berkali-kali tanpa hasil. Semuanya
+ *      dihapus.
+ *
+ * Akibat dari "use client" itu: export const metadata MUSTAHIL (metadata hanya
+ * boleh diekspor Server Component), jadi landing page tidak punya OpenGraph,
+ * Twitter card, maupun canonical sama sekali. Untuk produk yang dibagikan lewat
+ * WhatsApp dan Telegram, itu berarti setiap tautan yang dibagikan tampil sebagai
+ * teks polos tanpa gambar maupun judul.
+ *
+ * KEJUJURAN ISI. Beberapa klaim di versi lama tidak cocok dengan kodenya:
+ *   * "#1" pada badge hero -- tidak ada dasarnya, dihapus.
+ *   * "notifikasi omzet harian ... langsung di Telegram" -- bot hanya MENERIMA
+ *     laporan; tidak ada pengirim notifikasi di repo ini. Diberi label "segera"
+ *     dan dipindahkan dari janji jadi rencana.
+ *   * "Ribuan UMKM sudah merasakan manfaat Yandihan" beserta tiga testimoni yang
+ *     ditandai sendiri "Dummy testimoni" -- lengkap dengan nama orang dan kota.
+ *     Testimoni karangan dengan nama orang bukan soal selera, itu risiko hukum.
+ *     Seluruh bagiannya dihapus, bukan diganti dengan testimoni lain.
+ *   * Tombol "Unduh APK Kasir" -- berkas .apk itu dikeluarkan dari repositori
+ *     (lihat Tahap 6), jadi tautannya akan 404 begitu di-deploy. Diganti tautan
+ *     ke /guide, dan cara memasang ke home screen dijelaskan di FAQ. Halaman
+ *     kasirnya memang PWA (public/manifest.json + sw.js), jadi itu bukan
+ *     pengganti seadanya.
+ */
+export const metadata = {
+  // absolute melewati template "%s | Yandihan Kasir" dari app/layout.js --
+  // untuk halaman utama, nama merek dua kali hanya memakan lebar di hasil
+  // pencarian.
+  title: { absolute: SITE_NAME + ' - ' + SITE_TAGLINE },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    'aplikasi kasir online',
+    'kasir UMKM',
+    'POS Indonesia',
+    'laporan keuangan warung',
+    'aplikasi kasir gratis',
+    'struk digital',
+    'kasir Telegram',
+  ],
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    locale: 'id_ID',
+    url: '/',
+    siteName: SITE_NAME,
+    title: SITE_NAME + ' - ' + SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_NAME + ' - ' + SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+  },
+}
+
+const STEPS = [
+  {
+    icon: Smartphone,
+    tone: 'lp-icon-blue',
+    step: 'Langkah 1',
+    title: 'Bagikan link kasir',
+    desc: 'Tambahkan kasir di dashboard, lalu kirim URL-nya lewat WhatsApp. Kasir membuka link itu di browser HP-nya: tanpa memasang aplikasi, tanpa membuat akun.',
+  },
+  {
+    icon: Receipt,
+    tone: 'lp-icon-green',
+    step: 'Langkah 2',
+    title: 'Kasir mencatat penjualan',
+    desc: 'Pilih produk, isi jumlah, pilih tunai atau QRIS. Harga dan total dihitung server dari daftar produk Anda, jadi tidak ada angka yang bisa diketik sembarangan.',
+  },
+  {
+    icon: BarChart3,
+    tone: 'lp-icon-purple',
+    step: 'Langkah 3',
+    title: 'Anda lihat hasilnya',
+    desc: 'Transaksi muncul di dashboard saat itu juga, stok berkurang otomatis, dan struk digitalnya siap dibagikan atau dicetak.',
+  },
+]
+
+const FEATURES = [
+  {
+    icon: Smartphone,
+    tone: 'lp-icon-blue',
+    title: 'Tanpa pasang aplikasi',
+    desc: 'Kasir hanya butuh satu tautan. Bisa dibuka dari HP apa pun, dan kalau mau, disimpan ke layar utama supaya membuka seperti aplikasi.',
+  },
+  {
+    icon: WifiOff,
+    tone: 'lp-icon-amber',
+    title: 'Tetap jalan saat internet mati',
+    desc: 'Transaksi yang gagal terkirim disimpan di HP kasir, termasuk foto bukti transfernya, lalu dikirim otomatis begitu sinyal kembali.',
+  },
+  {
+    icon: Zap,
+    tone: 'lp-icon-green',
+    title: 'Dashboard yang bergerak sendiri',
+    desc: 'Setiap penjualan yang masuk langsung muncul di dashboard Anda tanpa perlu memuat ulang halaman. Tidak perlu menunggu toko tutup untuk tahu omzet hari ini.',
+  },
+  {
+    icon: Receipt,
+    tone: 'lp-icon-purple',
+    title: 'Struk digital siap cetak',
+    desc: 'Setiap transaksi menghasilkan satu tautan struk berisi rincian item, diskon, dan kembalian. Rapi di layar, rapi juga di printer thermal 58 mm dan 80 mm.',
+  },
+  {
+    icon: ShieldCheck,
+    tone: 'lp-icon-blue',
+    title: 'Link kasir terikat satu perangkat',
+    desc: 'Begitu link dibuka di HP kasir, perangkat lain yang memakai link yang sama ditolak. Tautan yang tersebar di grup chat tidak otomatis jadi pintu masuk.',
+  },
+  {
+    icon: Send,
+    tone: 'lp-icon-green',
+    title: 'Bisa lapor dari Telegram',
+    desc: 'Kasir yang lebih nyaman dengan chat bisa mengirim laporan ke bot. Harga tetap diambil dari daftar produk dan stok tetap berkurang: aturannya sama dengan jalur web.',
+  },
+]
+
+/**
+ * FAQ. Setiap jawaban di bawah ini saya cocokkan dulu ke kode yang
+ * menegakkannya -- daftar sebelumnya menjanjikan APK Android (berkasnya keluar
+ * dari repo) dan menjual Device Binding sebagai fitur PRO (sebenarnya aktif di
+ * semua paket, app/api/cashier/route.js:55-75, tanpa pemeriksaan tier).
+ *
+ * Yang SENGAJA belum disebut: memutar/mencabut token kasir. Fungsinya sudah ada
+ * (app/dashboard/settings/actions.js rotateCashierToken) tapi belum ada tombol
+ * yang memanggilnya, jadi menyebutnya sekarang berarti menyuruh pemilik toko
+ * mencari menu yang belum ada. Masuk FAQ setelah Tahap 4.
+ */
+const FAQ_ITEMS = [
+  {
+    q: 'Apakah paket gratisnya benar-benar gratis?',
+    a: 'Ya, dan berlaku selamanya. Tidak ada masa percobaan yang habis dan tidak perlu kartu kredit. Jumlah transaksinya tidak dibatasi; batasnya hanya satu kasir. Kalau nanti butuh lebih dari satu kasir, program loyalitas pelanggan, atau laporan lanjutan, baru pindah ke PRO.',
+  },
+  {
+    q: 'Bagaimana cara mendapatkan link kasir?',
+    a: 'Setelah mendaftar, buat toko Anda, lalu tambahkan kasir di menu Pengaturan. Setiap kasir mendapat satu URL sendiri yang bisa Anda kirim lewat WhatsApp atau Telegram. Kasir cukup membuka link itu: tidak ada aplikasi yang perlu dipasang dan tidak ada akun yang perlu ia buat.',
+  },
+  {
+    q: 'Kasir saya harus memasang aplikasi?',
+    a: 'Tidak. Halaman kasir berjalan di browser HP apa pun. Kalau kasir ingin tampilannya seperti aplikasi, buka link kasirnya lalu pilih "Tambahkan ke layar utama" di menu browser. Halamannya akan punya ikon sendiri dan terbuka tanpa bilah alamat.',
+  },
+  {
+    q: 'Bagaimana kalau internet mati saat sedang jualan?',
+    a: 'Transaksinya tidak hilang. Yang gagal terkirim disimpan dulu di HP kasir, termasuk foto bukti transfernya, dan dikirim otomatis begitu sinyal kembali. Kasir bisa terus melayani pembeli sementara itu.',
+  },
+  {
+    q: 'Bisa mencatat penjualan lewat Telegram?',
+    a: 'Bisa. Hubungkan bot ke toko Anda dengan mengirim /start diikuti kode toko, lalu laporkan penjualan dengan mengetik jumlah dan nama produknya. Harganya diambil dari daftar produk Anda, stok tetap berkurang, dan struknya tetap dibuat: persis seperti jalur web. Satu catatan jujur, saat ini botnya menerima laporan dan belum mengirim ringkasan omzet.',
+  },
+  {
+    q: 'Seaman apa data penjualan saya?',
+    a: 'Data setiap toko dipisahkan di tingkat database, bukan hanya disembunyikan di tampilan, jadi akun lain tidak bisa membaca transaksi Anda meski menebak-nebak alamatnya. Setiap link kasir juga terikat ke satu perangkat, sehingga tautan yang tersebar tidak otomatis bisa dipakai orang lain.',
+  },
+]
 
 export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [activeFaq, setActiveFaq] = useState(null)
-  const [visibleSections, setVisibleSections] = useState({})
-
-  const observerRef = useRef(null)
-
-  useEffect(() => {
-    // Intersection Observer untuk animasi muncul saat scroll
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setVisibleSections((prev) => ({ ...prev, [entry.target.id]: true }))
-          }
-        })
-      },
-      { threshold: 0.2 }
-    )
-
-    const elements = document.querySelectorAll('[data-animate]')
-    elements.forEach((el) => observerRef.current.observe(el))
-
-    return () => {
-      if (observerRef.current) observerRef.current.disconnect()
-    }
-  }, [])
-
-  const toggleFaq = (index) => {
-    setActiveFaq(activeFaq === index ? null : index)
-  }
-
-  // Dummy testimoni
-  const testimonials = [
-    {
-      name: 'Rina Wijaya',
-      role: 'Pemilik Warung Kopi Semarang',
-      text: 'Dulu pusing catat penjualan manual, sekarang tinggal klik link kasir. Laporan langsung masuk Telegram. Mantap!',
-      rating: 5,
-    },
-    {
-      name: 'Andi Pratama',
-      role: 'Owner Toserba Makmur',
-      text: 'Fitur device binding bikin tenang, link kasir nggak bisa disalahgunakan. Harganya juga terjangkau banget.',
-      rating: 5,
-    },
-    {
-      name: 'Siti Nurhaliza',
-      role: 'Pemilik Butik Online',
-      text: 'Dashboard realtime bantu aku pantau omset harian tanpa harus nunggu tutup toko. Recommended!',
-      rating: 5,
-    },
-  ]
-
   return (
-    <div className="flex flex-col min-h-screen" style={{ overflowX: 'hidden', backgroundColor: 'var(--bg-color)' }}>
+    <div className="lp-page">
+      <SiteHeader />
 
-      {/* ── Navbar ── */}
-      <header
-        style={{
-          backgroundColor: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(8px)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          borderBottom: '1px solid var(--border-color)',
-          transition: 'all 0.3s ease',
-        }}
-      >
-        <div className="container flex justify-between items-center" style={{ padding: '0.875rem 1.5rem' }}>
-          {/* Logo */}
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <div
-              style={{
-                fontSize: '1.5rem',
-                fontWeight: '800',
-                color: 'var(--primary-color)',
-                letterSpacing: '-0.5px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-            >
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, var(--primary-color) 0%, #3B82F6 100%)',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.2rem',
-                  fontWeight: '900',
-                }}
-              >
-                Y
-              </div>
-              Yandihan.
-            </div>
-          </Link>
+      <main className="lp-main">
+        {/* ── Hero ───────────────────────────────────────────────────────── */}
+        <section className="lp-hero">
+          {/* Dua bulatan blur dekoratif. aria-hidden karena tidak membawa
+              informasi, dan pointer-events:none di CSS supaya tidak pernah
+              menutupi tombol di atasnya. */}
+          <div className="lp-blob lp-blob-a" aria-hidden="true" />
+          <div className="lp-blob lp-blob-b" aria-hidden="true" />
 
-          {/* Nav link desktop */}
-          <div className="flex gap-6 items-center hidden sm:flex">
-            <Link href="#fitur" style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.95rem' }}>
-              Fitur
-            </Link>
-            <Link href="#testimoni" style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.95rem' }}>
-              Testimoni
-            </Link>
-            <Link href="#harga" style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.95rem' }}>
-              Harga
-            </Link>
-            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)' }} className="hidden sm:block"></div>
-            <Link href="/login" style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '0.95rem' }}>
-              Masuk
-            </Link>
-            <Link href="/signup" className="btn btn-primary" style={{ padding: '0.5rem 1.25rem', fontSize: '0.95rem', borderRadius: '8px' }}>
-              Daftar Gratis
-            </Link>
-          </div>
+          <div className="lp-hero-inner">
+            {/* Badge lama berbunyi "SaaS Kasir & Laporan Keuangan UMKM #1".
+                Klaim peringkat tanpa sumber diganti janji yang bisa dibuktikan
+                dari kodenya sendiri: PLAN_LIMITS.FREE tidak punya batas
+                transaksi dan maxCashiers-nya 1. */}
+            <span className="lp-badge">
+              <span className="lp-badge-dot" aria-hidden="true" />
+              Gratis selamanya untuk 1 kasir
+            </span>
 
-          {/* Mobile menu toggle */}
-          <div className="flex items-center sm:hidden">
-            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2" aria-label="Toggle menu">
-              {menuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile nav overlay */}
-        {menuOpen && (
-          <div style={{ backgroundColor: 'white', borderBottom: '1px solid var(--border-color)', padding: '1rem' }} className="sm:hidden">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <Link href="#fitur" onClick={() => setMenuOpen(false)} style={{ color: 'var(--text-main)', fontWeight: '600' }}>
-                Fitur
-              </Link>
-              <Link href="#testimoni" onClick={() => setMenuOpen(false)} style={{ color: 'var(--text-main)', fontWeight: '600' }}>
-                Testimoni
-              </Link>
-              <Link href="#harga" onClick={() => setMenuOpen(false)} style={{ color: 'var(--text-main)', fontWeight: '600' }}>
-                Harga
-              </Link>
-              <hr style={{ border: '0.5px solid var(--border-color)' }} />
-              <Link href="/login" onClick={() => setMenuOpen(false)} style={{ color: 'var(--text-main)', fontWeight: '700' }}>
-                Masuk
-              </Link>
-              <Link href="/signup" onClick={() => setMenuOpen(false)} className="btn btn-primary" style={{ textAlign: 'center', padding: '0.5rem 0', borderRadius: '8px', fontWeight: '700' }}>
-                Daftar Gratis
-              </Link>
-            </div>
-          </div>
-        )}
-      </header>
-
-      <main className="flex-col" style={{ flex: 1 }}>
-        {/* ── Hero Section ── */}
-        <section
-          className="hero-section bg-gradient-primary"
-          style={{
-            padding: '8rem 1rem 6rem 1rem',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            className="container flex flex-col items-center animate-fade-in"
-            style={{ position: 'relative', zIndex: 10 }}
-            data-animate
-          >
-            {/* Badge */}
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: 'var(--secondary-color)',
-                padding: '0.35rem 1rem',
-                borderRadius: '99px',
-                fontSize: '0.875rem',
-                fontWeight: '700',
-                marginBottom: '2rem',
-                color: 'var(--primary-color)',
-                border: '1px solid var(--primary-light, #DBEAFE)',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--success-color)',
-                }}
-              ></span>
-              SaaS Kasir &amp; Laporan Keuangan UMKM #1
-            </div>
-
-            {/* Judul utama */}
-            <h1
-              style={{
-                fontSize: 'clamp(2.8rem, 6vw, 4.5rem)',
-                fontWeight: '800',
-                lineHeight: 1.1,
-                marginBottom: '1.5rem',
-                maxWidth: '860px',
-                letterSpacing: '-1.5px',
-                color: 'var(--text-main)',
-              }}
-            >
-              Lepas dari Catatan Manual, Masuk ke Era Laporan{' '}
-              <span
-                style={{
-                  color: 'transparent',
-                  backgroundImage: 'linear-gradient(90deg, var(--primary-color), #3B82F6)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                }}
-              >
-                Realtime.
-              </span>
+            <h1 className="lp-hero-title">
+              Lepas dari catatan manual,
+              <br />
+              <span className="lp-hero-accent">masuk ke laporan realtime.</span>
             </h1>
 
-            {/* Sub-heading */}
-            <p
-              style={{
-                fontSize: 'clamp(1.1rem, 2.2vw, 1.3rem)',
-                color: 'var(--text-muted)',
-                maxWidth: '720px',
-                marginBottom: '2.5rem',
-                lineHeight: 1.8,
-                fontWeight: '500',
-              }}
-            >
-              Catat penjualan hanya dengan satu link web – tidak perlu install aplikasi. Dapatkan notifikasi omset harian, bulanan, dan analisis
-              cash flow langsung di Telegram atau dashboard web Anda.
+            <p className="lp-hero-sub">
+              Kasir Anda mencatat penjualan dari HP lewat satu tautan, tanpa memasang aplikasi.
+              Anda melihat omzet, stok, dan struknya berubah di dashboard saat itu juga.
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex gap-4 flex-wrap justify-center">
-              <Link
-                href="/signup"
-                className="btn btn-primary"
-                style={{ padding: '0.95rem 2.5rem', fontSize: '1.1rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', transition: 'transform 0.2s' }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-              >
-                Mulai Gratis Sekarang <ArrowRight size={20} />
+            <div className="lp-hero-cta">
+              <Link href="/signup" className="btn btn-primary btn-lg">
+                Mulai Gratis Sekarang
+                <ArrowRight size={20} aria-hidden="true" />
               </Link>
-              <a
-                href="/yandihan-kasir.apk"
-                download
-                className="btn btn-secondary"
-                style={{
-                  padding: '0.95rem 2.5rem',
-                  fontSize: '1.1rem',
-                  borderRadius: '8px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  transition: 'transform 0.2s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-              >
-                📲 Unduh APK Kasir
-              </a>
+              {/* Dulu di sini ada <a href="/yandihan-kasir.apk" download>.
+                  Berkas APK-nya keluar dari repositori, jadi tautan itu akan
+                  404 setelah deploy berikutnya. Panduan adalah tujuan yang
+                  benar-benar ada, dan memang itu yang dibutuhkan pemilik toko
+                  yang baru datang. */}
+              <Link href="/guide" className="btn btn-secondary btn-lg">
+                Lihat Cara Kerjanya
+              </Link>
             </div>
-          </div>
 
-          {/* Hiasan lingkaran blur */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '18%',
-              left: '8%',
-              width: '280px',
-              height: '280px',
-              backgroundColor: 'rgba(37, 99, 235, 0.04)',
-              borderRadius: '50%',
-              filter: 'blur(70px)',
-              zIndex: 0,
-            }}
-          ></div>
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '12%',
-              right: '10%',
-              width: '360px',
-              height: '360px',
-              backgroundColor: 'rgba(59, 130, 246, 0.04)',
-              borderRadius: '50%',
-              filter: 'blur(90px)',
-              zIndex: 0,
-            }}
-          ></div>
+            <p className="lp-hero-note">
+              Tanpa kartu kredit. Tanpa masa percobaan yang habis.
+            </p>
+          </div>
         </section>
 
-        {/* ── Feature Dashboard Preview ── */}
-        <section
-          style={{
-            marginTop: '-3rem',
-            padding: '0 1rem',
-            position: 'relative',
-            zIndex: 20,
-            paddingBottom: '4rem',
-          }}
-          data-animate
-          id="preview"
-        >
-          <div className="container flex justify-center">
-            <div
-              className="glass-card floating"
-              style={{
-                width: '100%',
-                maxWidth: '850px',
-                padding: '0.6rem',
-                borderRadius: '20px',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
-                transition: 'transform 0.3s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-6px)')}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-            >
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '14px',
-                  border: '1px solid var(--border-color)',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    padding: '0.875rem 1.25rem',
-                    borderBottom: '1px solid var(--border-color)',
-                    display: 'flex',
-                    gap: '0.5rem',
-                    backgroundColor: '#F8FAFC',
-                  }}
-                >
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#eab308' }}></div>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#22c55e' }}></div>
-                </div>
-                <div
-                  style={{
-                    padding: '3.5rem 2rem',
-                    textAlign: 'center',
-                    background: 'linear-gradient(180deg, #ffffff 0%, #F8FAFC 100%)',
-                  }}
-                >
-                  <h3
-                    style={{
-                      fontSize: '1.1rem',
-                      fontWeight: '700',
-                      color: 'var(--text-muted)',
-                      marginBottom: '0.5rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                    }}
-                  >
-                    Total Pemasukan (Bulan Ini)
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: 'clamp(2.25rem, 5vw, 3.25rem)',
-                      fontWeight: '800',
-                      color: 'var(--text-main)',
-                      margin: '0.5rem 0',
-                      letterSpacing: '-1px',
-                    }}
-                  >
-                    Rp 24.500.000
-                  </p>
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      backgroundColor: '#dcfce7',
-                      color: '#16a34a',
-                      padding: '0.4rem 0.875rem',
-                      borderRadius: '99px',
-                      fontWeight: '700',
-                      fontSize: '0.85rem',
-                      marginTop: '0.75rem',
-                    }}
-                  >
-                    <TrendingUpIcon /> Naik 15% dari bulan lalu
-                  </div>
-                </div>
+        {/* ── Pratinjau dashboard ────────────────────────────────────────── */}
+        <section className="lp-preview" aria-labelledby="lp-preview-title">
+          <h2 id="lp-preview-title" className="sr-only">
+            Contoh tampilan dashboard
+          </h2>
+          <div className="lp-preview-shell">
+            <div className="lp-preview-frame">
+              <div className="lp-window-bar" aria-hidden="true">
+                <span className="lp-window-dot lp-window-dot-red" />
+                <span className="lp-window-dot lp-window-dot-yellow" />
+                <span className="lp-window-dot lp-window-dot-green" />
+              </div>
+              <div className="lp-preview-body">
+                <p className="lp-preview-label">Total Pemasukan Bulan Ini</p>
+                <p className="lp-preview-value">Rp 24.500.000</p>
+                <p className="lp-preview-delta">
+                  <TrendingUp size={16} aria-hidden="true" />
+                  Naik 15% dari bulan lalu
+                </p>
+                {/* Angka di atas adalah contoh. Menyebutnya terang-terangan
+                    lebih baik daripada membiarkan pengunjung membacanya
+                    sebagai omzet toko sungguhan. */}
+                <p className="lp-preview-note">Angka pada contoh ini hanya ilustrasi.</p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── How It Works Section ── */}
-        <section style={{ padding: '6rem 1rem', backgroundColor: 'var(--card-bg)' }} id="cara-kerja" data-animate>
-          <div className="container">
-            <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-              <h2
-                style={{
-                  fontSize: '2.25rem',
-                  fontWeight: '800',
-                  color: 'var(--text-main)',
-                  marginBottom: '1rem',
-                  letterSpacing: '-1px',
-                }}
-              >
-                Cara Kerja Yandihan dalam 3 Langkah
+        {/* ── Cara kerja ─────────────────────────────────────────────────── */}
+        <section id="cara-kerja" className="lp-section" aria-labelledby="lp-steps-title">
+          <div className="lp-inner">
+            <div className="lp-section-head">
+              <h2 id="lp-steps-title" className="lp-section-title">
+                Tiga langkah, selesai hari ini
               </h2>
-              <p
-                style={{
-                  color: 'var(--text-muted)',
-                  fontSize: '1.05rem',
-                  maxWidth: '600px',
-                  margin: '0 auto',
-                }}
-              >
-                Tidak ada instalasi yang rumit. Mulai kasir dan lapor penjualan dalam hitungan menit.
+              <p className="lp-section-sub">
+                Tidak ada pemasangan, tidak ada pelatihan. Kasir Anda cukup bisa membuka tautan.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  icon: <Smartphone size={28} />,
-                  bg: 'var(--secondary-color)',
-                  color: 'var(--primary-color)',
-                  title: 'Dapatkan Link Kasir',
-                  desc: 'Setelah signup, Anda akan menerima URL unik yang bisa dibuka di browser apa saja.',
-                },
-                {
-                  icon: <BarChart3 size={28} />,
-                  bg: '#dcfce7',
-                  color: '#16a34a',
-                  title: 'Catat Penjualan',
-                  desc: 'Kasir hanya perlu menambahkan produk, qty, dan pilih pembayaran. Data langsung terkirim ke server.',
-                },
-                {
-                  icon: <Zap size={28} />,
-                  bg: '#f3e8ff',
-                  color: '#9333ea',
-                  title: 'Lihat Laporan Realtime',
-                  desc: 'Dashboard dan Telegram bot akan memperbarui omset, laba, dan stok secara otomatis.',
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-col items-center text-center p-4 bg-white rounded-xl shadow-sm border border-gray-200"
-                  style={{ transition: 'transform 0.3s', cursor: 'default' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-6px)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-                >
-                  <div
-                    style={{
-                      width: '56px',
-                      height: '56px',
-                      borderRadius: '14px',
-                      backgroundColor: item.bg,
-                      color: item.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem',
-                    }}
-                  >
-                    {item.icon}
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>{item.title}</h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6 }}>{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Features Section ── */}
-        <section id="fitur" style={{ padding: '6rem 1rem', backgroundColor: 'var(--card-bg)' }} data-animate>
-          <div className="container">
-            <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
-              <h2
-                style={{
-                  fontSize: '2.25rem',
-                  fontWeight: '800',
-                  color: 'var(--text-main)',
-                  marginBottom: '1rem',
-                  letterSpacing: '-1px',
-                }}
-              >
-                Kenapa Memilih Yandihan?
-              </h2>
-              <p
-                style={{
-                  color: 'var(--text-muted)',
-                  fontSize: '1.1rem',
-                  maxWidth: '600px',
-                  margin: '0 auto',
-                }}
-              >
-                Didesain khusus untuk mempermudah operasional UMKM tanpa bikin pusing kasir dan pemilik.
-              </p>
-            </div>
-
-            <div className="feature-grid">
-              {[
-                {
-                  icon: <Smartphone size={24} />,
-                  bg: 'var(--secondary-color)',
-                  color: 'var(--primary-color)',
-                  title: 'Tanpa Download Aplikasi',
-                  desc: 'Kasir Anda hanya butuh satu link web. Bisa langsung lapor penjualan dari HP apa saja dalam hitungan detik.',
-                },
-                {
-                  icon: <BarChart3 size={24} />,
-                  bg: '#dcfce7',
-                  color: '#16a34a',
-                  title: 'Laporan Analitik Cerdas',
-                  desc: 'Pantau rincian omset per bulan dan per hari. Dilengkapi filter spesifik untuk pembayaran Cash vs QRIS/Transfer.',
-                },
-                {
-                  icon: <Zap size={24} />,
-                  bg: '#fef3c7',
-                  color: '#d97706',
-                  title: 'Pembaruan Realtime',
-                  desc: 'Setiap kali kasir menginput data penjualan, dashboard Anda akan langsung terupdate otomatis secara real-time.',
-                },
-                {
-                  icon: <ShieldCheck size={24} />,
-                  bg: '#f3e8ff',
-                  color: '#9333ea',
-                  title: 'Struk Digital Siap Cetak',
-                  desc: 'Setiap transaksi akan menghasilkan link Struk Digital (format thermal 58mm/80mm) yang rapi dan siap cetak.',
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="card"
-                  style={{
-                    borderRadius: '12px',
-                    backgroundColor: 'white',
-                    padding: '1.5rem',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                    border: '1px solid var(--border-color)',
-                    transition: 'transform 0.3s, box-shadow 0.3s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)'
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.08)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.04)'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '12px',
-                      backgroundColor: item.bg,
-                      color: item.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1.25rem',
-                    }}
-                  >
-                    {item.icon}
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.75rem', letterSpacing: '-0.5px' }}>{item.title}</h3>
-                  <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, fontSize: '0.95rem' }}>{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Testimonial Section ── */}
-        <section id="testimoni" style={{ padding: '6rem 1rem', backgroundColor: 'var(--bg-color)' }} data-animate>
-          <div className="container">
-            <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-              <h2 style={{ fontSize: '2.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '1rem', letterSpacing: '-1px' }}>
-                Apa Kata Mereka?
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: '600px', margin: '0 auto' }}>
-                Ribuan UMKM sudah merasakan manfaat Yandihan. Berikut beberapa cerita mereka.
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: '2rem',
-                maxWidth: '1000px',
-                margin: '0 auto',
-              }}
-            >
-              {testimonials.map((t, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    backgroundColor: 'white',
-                    borderRadius: '12px',
-                    padding: '2rem',
-                    border: '1px solid var(--border-color)',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                    transition: 'transform 0.3s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-4px)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-                >
-                  <div style={{ display: 'flex', gap: '0.15rem', marginBottom: '1rem' }}>
-                    {Array.from({ length: t.rating }).map((_, i) => (
-                      <Star key={i} size={18} fill="#facc15" color="#facc15" />
-                    ))}
-                  </div>
-                  <p style={{ color: 'var(--text-main)', lineHeight: 1.7, marginBottom: '1.25rem', fontStyle: 'italic' }}>
-                    {'\u201C'}{t.text}{'\u201D'}
-                  </p>
-                  <div>
-                    <p style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text-main)' }}>{t.name}</p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.role}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── FAQ Section ── */}
-        <section id="faq" style={{ padding: '6rem 1rem', backgroundColor: 'var(--card-bg)' }} data-animate>
-          <div className="container">
-            <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-              <h2 style={{ fontSize: '2.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '1rem', letterSpacing: '-1px' }}>
-                Pertanyaan Umum
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: '600px', margin: '0 auto' }}>
-                Masih ragu? Mungkin jawabannya ada di sini.
-              </p>
-            </div>
-
-            <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-              {[
-                {
-                  q: 'Apakah benar-benar gratis?',
-                  a: 'Ya, paket GRATIS berlaku selamanya tanpa batas transaksi. Cocok untuk UMKM yang baru mulai.',
-                },
-                {
-                  q: 'Bagaimana cara mendapatkan link kasir?',
-                  a: 'Setelah mendaftar, Anda akan langsung mendapatkan URL unik untuk masing-masing kasir. Bisa dibagikan ke karyawan melalui WhatsApp atau Telegram.',
-                },
-                {
-                  q: 'Apakah ada aplikasi mobile?',
-                  a: 'Saat ini Yandihan berbasis web dan bisa diakses dari browser apa pun. Kami juga menyediakan APK Android untuk kemudahan akses.',
-                },
-                {
-                  q: 'Bagaimana keamanan data saya?',
-                  a: 'Semua transaksi tersimpan di server terenkripsi. Fitur Device Binding memastikan hanya perangkat yang terdaftar yang bisa mengakses link kasir.',
-                },
-              ].map((faq, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    borderBottom: '1px solid var(--border-color)',
-                    padding: '1rem 0',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => toggleFaq(idx)}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontWeight: '700',
-                      color: 'var(--text-main)',
-                      fontSize: '1.05rem',
-                    }}
-                  >
-                    <span>{faq.q}</span>
-                    <ChevronDown
-                      size={20}
-                      style={{
-                        transform: activeFaq === idx ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.3s',
-                      }}
-                    />
-                  </div>
-                  {activeFaq === idx && (
-                    <p
-                      style={{
-                        color: 'var(--text-muted)',
-                        marginTop: '0.75rem',
-                        lineHeight: 1.7,
-                        fontSize: '0.95rem',
-                      }}
-                    >
-                      {faq.a}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Pricing Section ── */}
-        <section id="harga" style={{ padding: '7rem 1rem', backgroundColor: 'var(--bg-color)' }} data-animate>
-          <div className="container">
-            <div style={{ textAlign: 'center', marginBottom: '4.5rem' }}>
-              <h2 style={{ fontSize: '2.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '1rem', letterSpacing: '-1px' }}>
-                Harga Transparan, Tanpa Kejutan
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                Pilih paket yang sesuai dengan ukuran bisnis Anda. Mulai dari gratis, upgrade kapan saja.
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: '2rem',
-                maxWidth: '900px',
-                margin: '0 auto',
-              }}
-            >
-              {/* Free Plan */}
-              <div
-                className="card"
-                style={{
-                  padding: '2.5rem 2rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRadius: '12px',
-                  backgroundColor: 'white',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                  border: '1px solid var(--border-color)',
-                  transition: 'transform 0.3s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-4px)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-              >
-                <div style={{ marginBottom: '1.75rem' }}>
-                  <span
-                    style={{
-                      backgroundColor: 'var(--border-color)',
-                      color: 'var(--text-main)',
-                      padding: '0.25rem 0.875rem',
-                      borderRadius: '99px',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                    }}
-                  >
-                    GRATIS
+            <div className="lp-grid">
+              {STEPS.map(({ icon: Icon, tone, step, title, desc }) => (
+                <article key={title} className="lp-tile lp-tile-center lp-lift">
+                  <span className={`lp-icon lp-icon-lg ${tone}`} aria-hidden="true">
+                    <Icon size={28} />
                   </span>
-                  <h3 style={{ fontSize: '1.85rem', fontWeight: '800', marginTop: '0.875rem' }}>
-                    Rp 0 <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: '500' }}>/ selamanya</span>
-                  </h3>
-                  <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                    Cocok untuk UMKM pemula yang baru merintis bisnis.
-                  </p>
-                </div>
-
-                <ul
-                  style={{
-                    listStyle: 'none',
-                    padding: 0,
-                    margin: '0 0 2rem 0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.875rem',
-                    flex: 1,
-                  }}
-                >
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>Transaksi tanpa batas</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>1 Web Kasir &amp; 1 Akun Telegram Bot</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>Laporan Omset Standar</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--success-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>Manajemen Gudang Produk</span>
-                  </li>
-                </ul>
-
-                <Link
-                  href="/signup"
-                  className="btn btn-secondary"
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', textDecoration: 'none', fontSize: '0.95rem', textAlign: 'center', transition: 'background-color 0.3s' }}
-                >
-                  Mulai Gratis
-                </Link>
-              </div>
-
-              {/* Pro Plan */}
-              <div
-                className="card"
-                style={{
-                  padding: '2.5rem 2rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRadius: '12px',
-                  backgroundColor: 'white',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                  border: '2px solid var(--primary-color)',
-                  position: 'relative',
-                  transition: 'transform 0.3s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-4px)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '-12px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: 'var(--primary-color)',
-                    color: 'white',
-                    padding: '0.2rem 1.25rem',
-                    borderRadius: '99px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    letterSpacing: '1px',
-                  }}
-                >
-                  PALING POPULER
-                </div>
-
-                <div style={{ marginBottom: '1.75rem' }}>
-                  <span
-                    style={{
-                      backgroundColor: 'var(--secondary-color)',
-                      color: 'var(--primary-color)',
-                      padding: '0.25rem 0.875rem',
-                      borderRadius: '99px',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                    }}
-                  >
-                    PRO
-                  </span>
-                  <h3 style={{ fontSize: '1.85rem', fontWeight: '800', marginTop: '0.875rem' }}>
-                    Rp 78.000 <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: '500' }}>/ bln</span>
-                  </h3>
-                  <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                    Untuk bisnis yang sedang berkembang dengan cabang/kasir banyak.
-                  </p>
-                </div>
-
-                <ul
-                  style={{
-                    listStyle: 'none',
-                    padding: 0,
-                    margin: '0 0 2rem 0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.875rem',
-                    flex: 1,
-                  }}
-                >
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{ fontWeight: '700' }}>Transaksi Tanpa Batas</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{ fontWeight: '700' }}>Unlimited</span> Web Kasir &amp; Telegram
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Fitur Device Binding (Anti-Copas Link)
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.92rem' }}>
-                    <CheckCircle2 size={18} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Analitik Lanjutan &amp; Prioritas Support
-                  </li>
-                </ul>
-
-                <Link
-                  href="/login"
-                  className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', textDecoration: 'none', fontSize: '0.95rem', textAlign: 'center', transition: 'background-color 0.3s' }}
-                >
-                  Berlangganan PRO
-                </Link>
-              </div>
+                  <p className="lp-tile-step">{step}</p>
+                  <h3 className="lp-tile-title">{title}</h3>
+                  <p className="lp-tile-desc">{desc}</p>
+                </article>
+              ))}
             </div>
+          </div>
+        </section>
+
+        {/* ── Fitur ──────────────────────────────────────────────────────── */}
+        <section id="fitur" className="lp-section lp-section-alt" aria-labelledby="lp-features-title">
+          <div className="lp-inner">
+            <div className="lp-section-head">
+              <h2 id="lp-features-title" className="lp-section-title">
+                Dibuat untuk warung, bukan untuk kantor
+              </h2>
+              <p className="lp-section-sub">
+                Setiap fitur di bawah ini sudah jalan sekarang, bukan rencana.
+              </p>
+            </div>
+
+            <div className="lp-grid lp-grid-wide">
+              {FEATURES.map(({ icon: Icon, tone, title, desc }) => (
+                <article key={title} className="lp-tile lp-lift">
+                  <span className={`lp-icon ${tone}`} aria-hidden="true">
+                    <Icon size={22} />
+                  </span>
+                  <h3 className="lp-tile-title">{title}</h3>
+                  <p className="lp-tile-desc">{desc}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Harga ──────────────────────────────────────────────────────── */}
+        {/* Kartunya datang dari components/landing/PlanCards.js dan isinya dari
+            lib/plans.content.js -- daftar yang sama dipakai /pricing. Sebelum
+            ini landing page memegang daftar fiturnya sendiri, dan begitu
+            /pricing ada akan jadi dua daftar yang pasti berpisah. */}
+        <section id="harga" className="lp-section" aria-labelledby="lp-pricing-title">
+          <div className="lp-inner">
+            <div className="lp-section-head">
+              <h2 id="lp-pricing-title" className="lp-section-title">
+                Harga yang bisa dihitung
+              </h2>
+              <p className="lp-section-sub">
+                Mulai gratis tanpa batas transaksi. Bayar hanya kalau butuh lebih dari satu kasir.
+              </p>
+            </div>
+
+            <PlanCards />
+          </div>
+        </section>
+
+        {/* ── FAQ ────────────────────────────────────────────────────────── */}
+        <section id="faq" className="lp-section lp-section-alt" aria-labelledby="lp-faq-title">
+          <div className="lp-inner">
+            <div className="lp-section-head">
+              <h2 id="lp-faq-title" className="lp-section-title">
+                Pertanyaan yang sering masuk
+              </h2>
+            </div>
+
+            {/* Island kecil: hanya bagian buka-tutupnya yang butuh JavaScript.
+                Teks jawabannya tetap ikut ke HTML awal, jadi tetap terbaca
+                mesin pencari walau panelnya tertutup. */}
+            <FaqAccordion items={FAQ_ITEMS} />
+          </div>
+        </section>
+
+        {/* ── Penutup ────────────────────────────────────────────────────── */}
+        {/* Bagian baru. Halaman sebelumnya berakhir di kartu harga lalu langsung
+            footer, jadi pengunjung yang membaca sampai bawah tidak diberi satu
+            pun jalan untuk mulai. */}
+        <section className="lp-cta-band" aria-labelledby="lp-cta-title">
+          <div className="lp-inner">
+            <h2 id="lp-cta-title" className="lp-cta-title">
+              Coba dengan penjualan Anda hari ini
+            </h2>
+            <p className="lp-cta-sub">
+              Buat akun, tambahkan satu produk, lalu kirim link kasirnya ke HP Anda sendiri.
+              Lima menit cukup untuk tahu apakah ini cocok.
+            </p>
+            <Link href="/signup" className="btn btn-primary btn-lg">
+              Buat Akun Gratis
+              <ArrowRight size={20} aria-hidden="true" />
+            </Link>
           </div>
         </section>
       </main>
 
-      {/* ── Footer ── */}
-      <footer
-        style={{
-          padding: '3.5rem 1rem',
-          borderTop: '1px solid var(--border-color)',
-          backgroundColor: 'var(--card-bg)',
-        }}
-      >
-        <div
-          className="container"
-          style={{ margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
-        >
-          <div
-            style={{
-              fontSize: '1.6rem',
-              fontWeight: '800',
-              color: 'var(--text-main)',
-              marginBottom: '0.75rem',
-              letterSpacing: '-0.5px',
-            }}
-          >
-            Yandihan.
-          </div>
-          <p
-            style={{
-              color: 'var(--text-muted)',
-              marginBottom: '2rem',
-              maxWidth: '400px',
-              lineHeight: 1.6,
-              fontSize: '0.92rem',
-            }}
-          >
-            Memberdayakan UMKM Indonesia dengan teknologi pencatatan keuangan yang modern, cepat, dan aman.
-          </p>
-          <div
-            style={{
-              display: 'flex',
-              gap: '1.5rem',
-              marginBottom: '2.5rem',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-            }}
-          >
-            <Link href="/guide" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.92rem' }}>
-              Panduan
-            </Link>
-            <Link href="/login" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.92rem' }}>
-              Login Owner
-            </Link>
-            <a href="mailto:support@yandihan.my.id" style={{ color: 'var(--text-main)', fontWeight: '600', fontSize: '0.92rem' }}>
-              Hubungi Kami
-            </a>
-          </div>
-
-          {/* Social Media Icons */}
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-            <a href="https://instagram.com/yandihan" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 5.806 1.762 5.806 3.937 0 2.174-1.762 3.936-5.806 3.936-3.204 0-5.806-1.762-5.806-3.936 0-2.175 1.762-3.937 5.806-3.937zm0 1.441a2.886 2.886 0 100 5.772 2.886 2.886 0 000-5.772zM12 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7zm6.432-4.803a4.75 4.75 0 00-6.432 0 4.75 4.75 0 000 6.432 4.75 4.75 0 006.432 0 4.75 4.75 0 000-6.432z" />
-              </svg>
-            </a>
-            <a href="https://wa.me/6281234567890" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20.1 3.9C17.9 1.7 15 .5 12 .5 5.8.5.7 5.6.7 11.9c0 2 .5 3.9 1.5 5.6L.6 23.4l6-1.6c1.6.9 3.5 1.3 5.4 1.3 6.3 0 11.5-5.1 11.5-11.5-.1-2.8-1.2-5.7-3.3-7.8zM16.7 12c-1.8 0-3.2-.9-3.8-2.2l1.1-3.1c.3-.4.7-.6 1.2-.6h1.2c.7 0 1.2.5 1.2 1.2 0 .6-.3 1.1-.8 1.5l-2.1 3.4z" />
-              </svg>
-            </a>
-          </div>
-
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: '500' }}>
-            © {new Date().getFullYear()} Yandihan SaaS. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
-  )
-}
-
-function TrendingUpIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-      <polyline points="17 6 23 6 23 12"></polyline>
-    </svg>
   )
 }

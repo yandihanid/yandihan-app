@@ -1,9 +1,15 @@
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, Smartphone, Download, Wifi, WifiOff, Send } from 'lucide-react';
 
+// Judul TANPA nama merek: app/layout.js memakai template `%s | Yandihan Kasir`,
+// jadi "Panduan Penggunaan - Yandihan" akan tampil sebagai
+// "Panduan Penggunaan - Yandihan | Yandihan Kasir" di tab dan hasil pencarian.
 export const metadata = {
-  title: 'Panduan Penggunaan - Yandihan',
-  description: 'Panduan lengkap cara menggunakan aplikasi Yandihan untuk pemilik usaha dan kasir.',
+  title: 'Panduan Penggunaan',
+  description:
+    'Panduan lengkap cara memakai Yandihan Kasir: menyiapkan toko, membagikan ' +
+    'link kasir, mencatat penjualan, sampai membaca laporan.',
+  alternates: { canonical: '/guide' },
 };
 
 export default function GuidePage() {

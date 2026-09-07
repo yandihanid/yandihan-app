@@ -8,8 +8,73 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
-import { requireStoreOwnership, requireCashierOwnership } from '@/lib/dal'
+import { requireStoreOwnership, requireCashierOwnership, requireUser } from '@/lib/dal'
 import { maxCashiers, planTier } from '@/lib/plan'
+
+/**
+ * Simpan nama toko — buat kalau belum ada, ubah kalau sudah.
+ *
+ * Kenapa jadi server action: SettingsForm.js dulu menulis tabel `stores`
+ * langsung dari browser lewat supabase client, lalu **membuang hasilnya**:
+ *
+ *     await supabase.from('stores').update({ name }).eq('id', store.id)
+ *     setLoading(false); router.refresh()
+ *
+ * Tanpa memeriksa `error`, tolakan RLS terlihat persis sama dengan berhasil —
+ * spinner berhenti, halaman refresh, nama lama muncul kembali, dan tidak ada
+ * penjelasan apa pun (temuan L2). Ditambah: `.eq('id', store.id)` tanpa filter
+ * `user_id` menyerahkan seluruh perlindungan ke RLS. Di sini kepemilikan
+ * diperiksa lewat DAL sebelum menulis, seperti action lain di file ini.
+ *
+ * `storeId` kosong berarti "buat toko baru", jadi ia sengaja tidak lewat
+ * requireStoreOwnership() — toko yang belum ada tidak punya pemilik untuk
+ * dicocokkan. user_id diambil dari sesi, bukan dari formData, supaya tidak ada
+ * jalur membuat toko atas nama orang lain.
+ */
+export async function updateStore(formData) {
+  const name = String(formData.get('name') || '').trim()
+  const storeId = formData.get('storeId')
+
+  if (!name) return { error: 'Nama toko wajib diisi' }
+  if (name.length > 80) return { error: 'Nama toko terlalu panjang (maks 80 karakter)' }
+
+  const supabase = await createClient()
+
+  if (storeId) {
+    const { store, error: ownErr } = await requireStoreOwnership(storeId)
+    if (ownErr) return { error: ownErr }
+
+    // .select('id') + maybeSingle(): UPDATE yang tidak mengenai satu baris pun
+    // dijawab sukses oleh PostgREST. Tanpa ini, tulisan yang ditolak RLS
+    // terbaca sebagai tersimpan.
+    const { data, error } = await supabase
+      .from('stores')
+      .update({ name })
+      .eq('id', store.id)
+      .eq('user_id', store.user_id)
+      .select('id')
+      .maybeSingle()
+
+    if (error) return { error: 'Gagal menyimpan nama toko' }
+    if (!data) return { error: 'Perubahan tidak tersimpan. Coba muat ulang halaman.' }
+
+    revalidatePath('/dashboard/settings')
+    return { success: true }
+  }
+
+  const { user, error: authErr } = await requireUser()
+  if (authErr) return { error: authErr }
+
+  const { error } = await supabase.from('stores').insert({ name, user_id: user.id })
+
+  if (error) return { error: 'Gagal membuat toko' }
+
+  // Checklist onboarding di /dashboard ikut berubah begitu toko pertama ada,
+  // jadi dua path yang perlu di-revalidate, bukan satu.
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
+  return { success: true }
+}
 
 // Token kasir dibuat di sini, bukan diserahkan ke DEFAULT kolom DB.
 // Sebelumnya `insert({ store_id, name })` tidak pernah mengirim `token`, jadi

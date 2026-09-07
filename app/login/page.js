@@ -1,111 +1,64 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
-import { LogIn } from 'lucide-react'
 import Link from 'next/link'
+import { SITE_NAME } from '@/lib/site'
+import { safeNextPath } from '@/lib/safeNext'
+import LoginForm from './LoginForm'
 
-export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const router = useRouter()
-  const supabase = createClient()
+/**
+ * Halaman login. Server Component tipis: yang butuh state hanyalah formnya,
+ * jadi hanya form itu yang jadi island ('use client' di LoginForm.js).
+ *
+ * Efek `getSession()` yang dulu ada di sini sudah dihapus. Pengalihan pengguna
+ * yang sudah masuk dikerjakan proxy.js (matcher-nya mencakup /login), dan
+ * getSession() di browser tidak diverifikasi ke Auth server -- jadi efek itu
+ * bukan hanya redundan, ia juga sumber kebenaran yang lebih lemah.
+ *
+ * `next` dan `error` dibaca di sini lewat prop `searchParams`, bukan dengan
+ * useSearchParams() di dalam form. Alasannya ada di dokumen Next:
+ * useSearchParams() memaksa seluruh subtree client sampai batas <Suspense>
+ * terdekat dirender di browser (use-search-params.md:82-86), padahal nilai ini
+ * sudah tersedia di server. Konsekuensinya halaman ini dirender per-permintaan,
+ * dan itu memang benar untuk halaman login.
+ */
+export const metadata = {
+  title: 'Masuk',
+  description: `Masuk ke dashboard ${SITE_NAME} untuk memantau penjualan dan laporan keuangan toko Anda.`,
+  // Halaman auth tidak punya isi yang berguna di hasil pencarian, dan
+  // /login?next=... bisa menghasilkan URL tak terhingga banyaknya.
+  robots: { index: false, follow: false },
+}
 
-  // Redirect if already logged in
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace('/dashboard')
-      }
-    })
-  }, [router, supabase])
+export default async function LoginPage({ searchParams }) {
+  const params = (await searchParams) || {}
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+  // Divalidasi DI SINI, bukan di dalam form: dengan begitu tidak ada jalur di
+  // mana nilai mentah dari URL sempat sampai ke router.
+  const next = safeNextPath(params.next)
 
-      if (error) {
-        setError(error.message)
-        setLoading(false)
-      } else {
-        router.replace('/dashboard') // Use replace to prevent going back to login
-        router.refresh()
-      }
-    } catch (err) {
-      console.error('Login error:', err)
-      setError('Gagal terhubung ke server Supabase (Failed to fetch). Periksa koneksi internet atau NEXT_PUBLIC_SUPABASE_URL.')
-      setLoading(false)
-    }
-  }
+  // Pesan dari /auth/callback (link email kedaluwarsa, dsb). Dirender sebagai
+  // teks biasa oleh React, jadi isinya tidak bisa jadi markup.
+  const notice = typeof params.error === 'string' ? params.error.slice(0, 300) : null
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-color)', padding: '1rem' }}>
-      <div style={{ marginBottom: '2rem' }}>
-        <Link href="/" style={{ color: 'var(--primary-color)', fontWeight: 'bold', fontSize: '1.5rem', textDecoration: 'none' }}>
-          Yandihan
-        </Link>
-      </div>
+    <main className="auth-page">
+      <Link href="/" className="auth-brand">
+        {SITE_NAME}
+      </Link>
 
-      <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ color: 'var(--text-main)', fontSize: '1.75rem', marginBottom: '0.5rem', fontWeight: '700' }}>Masuk Dashboard</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Pantau laporan keuangan UMKM Anda</p>
+      <div className="card auth-card animate-fade-in">
+        <div className="auth-head">
+          <h1>Masuk Dashboard</h1>
+          <p>Pantau penjualan dan laporan keuangan toko Anda</p>
         </div>
-        
-        <form onSubmit={handleLogin} className="flex flex-col">
-          <div className="input-group">
-            <label htmlFor="email">Email</label>
-            <input 
-              id="email"
-              type="email" 
-              className="input-field" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="bos@toko.com"
-            />
-          </div>
-          <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-            <label htmlFor="password">Password</label>
-            <input 
-              id="password"
-              type="password" 
-              className="input-field" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-            />
-          </div>
-          
-          {error && <div style={{ color: '#dc3545', fontSize: '0.875rem', marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#f8d7da', borderRadius: '4px' }}>{error}</div>}
-          
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-            {loading ? 'Memproses...' : (
-              <>
-                <LogIn size={18} style={{ marginRight: '8px' }} />
-                Masuk
-              </>
-            )}
-          </button>
-        </form>
 
-        <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+        <LoginForm next={next} notice={notice} />
+
+        <p className="auth-foot">
           Belum punya akun?{' '}
-          <Link href="/signup" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>
+          <Link href="/signup" className="auth-link">
             Daftar sekarang
           </Link>
-        </div>
+        </p>
       </div>
-    </div>
+    </main>
   )
 }

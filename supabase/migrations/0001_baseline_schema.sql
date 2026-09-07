@@ -80,6 +80,37 @@ create table if not exists public.cashiers (
 
 alter table public.cashiers add column if not exists device_id text;
 alter table public.cashiers add column if not exists telegram_chat_id text;
+
+-- Di sebagian project kolom ini bertipe uuid dengan default gen_random_uuid().
+-- Percobaan pertama migrasi ini gagal di situ:
+--   42804: column "token" is of type uuid but default expression is of type text
+-- Aplikasi sekarang membuat token 24 byte acak yang BUKAN bentuk UUID, dan RPC
+-- submit_transaction() menerima p_token sebagai text, jadi kolomnya perlu text.
+-- Kalau dibiarkan uuid: addCashier gagal (22P02 invalid input syntax for type
+-- uuid) dan perbandingan token di RPC gagal (operator does not exist: uuid = text).
+--
+-- Konversi ini AMAN untuk link kasir yang sudah dibagikan: uuid::text
+-- menghasilkan bentuk kanonik 36 karakter huruf kecil bertanda hubung, persis
+-- nilai yang sudah ada di /c/<token>.
+--
+-- `drop default` harus SEBELUM `type text`, kalau tidak PostgreSQL ikut
+-- mencoba mengonversi ekspresi default lamanya dan gagal lagi.
+-- Index unik cashiers_token_key dibangun ulang otomatis oleh ALTER TYPE.
+do $tok$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'cashiers'
+      and column_name = 'token'
+      and data_type = 'uuid'
+  ) then
+    alter table public.cashiers alter column token drop default;
+    alter table public.cashiers alter column token type text using token::text;
+  end if;
+end
+$tok$;
+
 alter table public.cashiers alter column token set default public.generate_cashier_token();
 
 create unique index if not exists cashiers_token_key on public.cashiers (token);

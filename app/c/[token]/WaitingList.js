@@ -34,13 +34,22 @@ export default function WaitingList({ token }) {
   }, [token])
 
   useEffect(() => {
-    load()
+    // Pemuatan pertama dijadwalkan lewat timer 0 ms, bukan dipanggil langsung di
+    // badan efek. Alasannya bukan sekadar menyenangkan linter: `load()` di sini
+    // memanggil setTickets dalam fase yang sama, sehingga React langsung
+    // menjadwalkan render kedua di atas render pertama (cascading render) --
+    // itulah yang ditandai react-hooks/set-state-in-effect sebagai error.
+    // Dengan setTimeout, daftar kosong tergambar dulu lalu diisi pada tugas
+    // berikutnya, dan timernya ikut dibersihkan saat unmount supaya komponen
+    // yang langsung dilepas tidak menyisakan fetch menggantung.
+    const first = setTimeout(load, 0)
     const timer = setInterval(load, POLL_MS)
     const onVisible = () => {
       if (document.visibilityState === 'visible') load()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => {
+      clearTimeout(first)
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
     }

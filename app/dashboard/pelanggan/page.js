@@ -1,374 +1,53 @@
-'use client'
+import { verifySession, getMyStore } from '@/lib/dal'
+import { planTier } from '@/lib/plan'
+import OnboardingChecklist from '../OnboardingChecklist'
+import PelangganClient from './PelangganClient'
 
-import { useState, useEffect } from 'react'
+export const dynamic = 'force-dynamic'
 
-export default function PelangganPage() {
-  const [store, setStore] = useState(null)
-  const [storeLoading, setStoreLoading] = useState(true)
-  const [customers, setCustomers] = useState([])
-  const [customersLoading, setCustomersLoading] = useState(false)
-  const [pelangganEnabled, setPelangganEnabled] = useState(false)
-  const [visitThreshold, setVisitThreshold] = useState(5)
-  const [discountPercent, setDiscountPercent] = useState(10)
-  const [savingToggle, setSavingToggle] = useState(false)
-  const [savingSettings, setSavingSettings] = useState(false)
-  const [error, setError] = useState('')
+/**
+ * Menu Pelanggan (loyalitas).
+ *
+ * Dulu seluruh halaman ini 'use client' dan memulai hidupnya dengan
+ * fetch('/api/store/my') di useEffect. Kalau pengguna belum punya toko, route
+ * itu menjawab 404 dan halaman menerjemahkannya jadi layar merah "Gagal memuat
+ * data toko" — padahal belum punya toko bukan kegagalan, itu keadaan awal
+ * setiap akun baru (temuan K5). Sekarang toko dibaca di server, dan keadaan
+ * "belum punya toko" memakai OnboardingChecklist yang sama dengan /dashboard.
+ *
+ * Bentuk `store` yang diturunkan ke client sengaja dipertahankan sama dengan
+ * response /api/store/my (termasuk `plan` huruf kecil dari planTier) supaya
+ * PelangganClient tidak perlu tahu dari mana datanya datang.
+ */
+export const metadata = {
+  title: 'Menu Pelanggan',
+}
 
-  useEffect(() => {
-    async function loadStore() {
-      try {
-        const res = await fetch('/api/store/my')
-        if (!res.ok) throw new Error('Gagal memuat data toko')
-        const data = await res.json()
-        setStore(data)
-        setPelangganEnabled(!!data.pelanggan_enabled)
-        setVisitThreshold(data.visit_threshold ?? 5)
-        setDiscountPercent(data.discount_percent ?? 10)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setStoreLoading(false)
-      }
-    }
-    loadStore()
-  }, [])
+export default async function PelangganPage() {
+  await verifySession('/dashboard/pelanggan')
 
-  useEffect(() => {
-    if (!store) return
-    if (store.plan !== 'pro') return
-    async function loadCustomers() {
-      setCustomersLoading(true)
-      try {
-        const res = await fetch(`/api/pelanggan?storeId=${store.id}`)
-        if (!res.ok) throw new Error('Gagal memuat daftar pelanggan')
-        const list = await res.json()
-        setCustomers(list)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setCustomersLoading(false)
-      }
-    }
-    loadCustomers()
-  }, [store])
+  const store = await getMyStore()
 
-  const handleToggleEnabled = async () => {
-    if (!store) return
-    setSavingToggle(true)
-    try {
-      const newValue = !pelangganEnabled
-      const res = await fetch('/api/pelanggan/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storeId: store.id,
-          pelanggan_enabled: newValue,
-        }),
-      })
-      if (!res.ok) throw new Error('Gagal mengubah pengaturan')
-      setPelangganEnabled(newValue)
-      setStore(prev => prev ? { ...prev, pelanggan_enabled: newValue } : null)
-    } catch (err) {
-      alert('Gagal: ' + err.message)
-    } finally {
-      setSavingToggle(false)
-    }
-  }
-
-  const handleSaveSettings = async () => {
-    if (!store) return
-    setSavingSettings(true)
-    try {
-      const res = await fetch('/api/pelanggan/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storeId: store.id,
-          visit_threshold: Number(visitThreshold),
-          discount_percent: Number(discountPercent),
-        }),
-      })
-      if (!res.ok) throw new Error('Gagal menyimpan pengaturan')
-      setStore(prev => prev ? { 
-        ...prev, 
-        visit_threshold: Number(visitThreshold), 
-        discount_percent: Number(discountPercent) 
-      } : null)
-      alert('Pengaturan diskon tersimpan')
-    } catch (err) {
-      alert('Gagal: ' + err.message)
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
-  if (storeLoading) {
+  if (!store) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Memuat data toko...
-      </div>
-    )
-  }
-
-  if (error && !store) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
-        <p>{error}</p>
-      </div>
-    )
-  }
-
-  if (store && store.plan !== 'pro') {
-    return (
-      <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-        <h2 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-          Menu Pelanggan
-        </h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          Fitur ini hanya tersedia untuk <strong>Paket Pro</strong>. Silakan upgrade untuk mengakses loyalty customer.
-        </p>
-        <button
-          onClick={() => { window.location.href = '/pricing' }}
-          style={{
-            padding: '0.75rem 2rem',
-            backgroundColor: 'var(--primary-color)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-          }}
-        >
-          Lihat Paket
-        </button>
+      <div className="animate-fade-in flex flex-col gap-4">
+        <OnboardingChecklist store={null} />
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h2
-        style={{
-          fontWeight: 'bold',
-          fontSize: '1.5rem',
-          color: 'var(--primary-color)',
-          marginBottom: '1.5rem',
-        }}
-      >
-        Menu Pelanggan
-      </h2>
-
-      {/* Toggle feature */}
-      <div
-        className="card"
-        style={{
-          marginBottom: '1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '1rem',
-        }}
-      >
-        <span style={{ fontWeight: '600', fontSize: '1rem' }}>
-          Aktifkan Fitur Pelanggan
-        </span>
-        <button
-          onClick={handleToggleEnabled}
-          disabled={savingToggle}
-          style={{
-            padding: '0.4rem 1rem',
-            borderRadius: '999px',
-            border: 'none',
-            backgroundColor: pelangganEnabled ? '#22c55e' : '#d1d5db',
-            color: '#fff',
-            fontWeight: 'bold',
-            cursor: savingToggle ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s',
-          }}
-        >
-          {pelangganEnabled ? 'ON' : 'OFF'}
-        </button>
-      </div>
-
-      {/* Loyalty settings */}
-      {pelangganEnabled && (
-        <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
-          <h3 style={{ fontWeight: '600', marginBottom: '1rem' }}>
-            Aturan Diskon Loyalitas
-          </h3>
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              flexWrap: 'wrap',
-              marginBottom: '1rem',
-            }}
-          >
-            <div style={{ flex: '1 1 200px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '0.25rem',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                Jumlah Kunjungan
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={visitThreshold}
-                onChange={(e) => setVisitThreshold(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                }}
-              />
-              <small style={{ color: 'var(--text-muted)' }}>
-                Berapa kali kunjungan untuk mendapat diskon
-              </small>
-            </div>
-            <div style={{ flex: '1 1 200px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '0.25rem',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                Potongan Diskon (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={discountPercent}
-                onChange={(e) => setDiscountPercent(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                }}
-              />
-              <small style={{ color: 'var(--text-muted)' }}>
-                Persentase potongan setelah memenuhi kunjungan
-              </small>
-            </div>
-          </div>
-          <button
-            onClick={handleSaveSettings}
-            disabled={savingSettings}
-            style={{
-              padding: '0.5rem 1.5rem',
-              backgroundColor: savingSettings
-                ? 'var(--border-color)'
-                : 'var(--primary-color)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: 'bold',
-              cursor: savingSettings ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {savingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
-          </button>
-        </div>
-      )}
-
-      {/* Customer list */}
-      {pelangganEnabled && (
-        <div className="card" style={{ padding: '1rem' }}>
-          <h3 style={{ fontWeight: '600', marginBottom: '1rem' }}>
-            Daftar Pelanggan
-          </h3>
-          {customersLoading && (
-            <p style={{ color: 'var(--text-muted)' }}>
-              Memuat daftar pelanggan...
-            </p>
-          )}
-          {!customersLoading && customers.length === 0 && (
-            <p style={{ color: 'var(--text-muted)' }}>
-              Belum ada pelanggan tercatat.
-            </p>
-          )}
-          {!customersLoading && customers.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--border-color)', backgroundColor: '#f8fafc' }}>
-                    <th style={{ textAlign: 'left', padding: '0.625rem 0.75rem' }}>Nama</th>
-                    <th style={{ textAlign: 'left', padding: '0.625rem 0.75rem' }}>Nomor WA</th>
-                    <th style={{ textAlign: 'center', padding: '0.625rem 0.75rem' }}>Kunjungan</th>
-                    <th style={{ textAlign: 'right', padding: '0.625rem 0.75rem' }}>Total Belanja</th>
-                    <th style={{ textAlign: 'center', padding: '0.625rem 0.75rem' }}>Diskon Aktif</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((cust) => {
-                    const getsDiscount = cust.visit_count >= visitThreshold
-                    return (
-                      <tr
-                        key={cust.id}
-                        style={{ borderBottom: '1px solid var(--border-color)' }}
-                      >
-                        <td style={{ padding: '0.625rem 0.75rem', fontWeight: '500' }}>{cust.name}</td>
-                        <td style={{ padding: '0.625rem 0.75rem' }}>
-                          <a
-                            href={`https://wa.me/62${cust.phone.replace(/^0/, '').replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#16a34a', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                          >
-                            💬 {cust.phone}
-                          </a>
-                        </td>
-                        <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center' }}>
-                          <span style={{
-                            display: 'inline-block',
-                            minWidth: '2rem',
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '999px',
-                            backgroundColor: '#eff6ff',
-                            color: '#1d4ed8',
-                            fontWeight: '700',
-                            fontSize: '0.85rem'
-                          }}>
-                            {cust.visit_count ?? 0}x
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.625rem 0.75rem', textAlign: 'right', fontWeight: '500' }}>
-                          Rp {(cust.total_spent ?? 0).toLocaleString('id-ID')}
-                        </td>
-                        <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center' }}>
-                          {pelangganEnabled && getsDiscount ? (
-                            <span style={{
-                              display: 'inline-block',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '999px',
-                              backgroundColor: '#f0fdf4',
-                              color: '#16a34a',
-                              fontWeight: '700',
-                              fontSize: '0.8rem',
-                              border: '1px solid #86efac'
-                            }}>
-                              🏷️ {discountPercent}% OFF
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                              {pelangganEnabled ? `${visitThreshold - (cust.visit_count ?? 0)} lagi` : '—'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-          )}
-        </div>
-      )}
-    </div>
+    <PelangganClient
+      store={{
+        id: store.id,
+        name: store.name,
+        // planTier(), bukan subscription_tier mentah: PRO yang masa aktifnya
+        // sudah lewat dihitung GRATIS di seluruh aplikasi (temuan C9).
+        plan: planTier(store).toLowerCase(),
+        pelanggan_enabled: store.pelanggan_enabled ?? false,
+        visit_threshold: store.visit_threshold ?? 5,
+        discount_percent: store.discount_percent ?? 10,
+      }}
+    />
   )
 }

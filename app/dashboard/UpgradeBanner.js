@@ -1,11 +1,95 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { PRO_PRICE_IDR } from '@/lib/plan'
+import { formatRupiah } from '@/lib/format'
+
+// Harga dibaca dari PRO_PRICE_IDR, tidak lagi ditulis ulang di sini. Sebelumnya
+// banner ini menjanjikan "Rp 189.000 / bulan" sementara app/api/payment/route.js
+// menagih PRO_PRICE_IDR -- dua angka berbeda untuk satu produk, di layar yang
+// justru dipakai orang untuk memutuskan membeli. Daftar fiturnya juga diperbaiki:
+// "Device Binding" bukan pembeda PRO (pengikatan perangkat aktif di semua paket,
+// app/api/cashier/route.js:59-70), dan "transaksi tanpa batas" sekarang berlaku
+// di paket GRATIS juga.
+
+// --- Order tertunda --------------------------------------------------------
+// localStorage dijadikan SATU-SATUNYA sumber kebenaran untuk "ada pembayaran
+// yang belum selesai", lalu dibaca lewat useSyncExternalStore -- pola yang sama
+// dengan app/r/[id]/PrintButton.js.
+//
+// Sebelumnya nilainya dibaca di dalam useEffect lalu disalin ke useState. Itu
+// menghasilkan dua sumber kebenaran untuk satu fakta, dan render kedua yang
+// langsung menyusul render pertama (cascading render) yang ditandai
+// react-hooks/set-state-in-effect sebagai error.
+//
+// Karena komponen ini juga MENULIS nilai itu, setiap penulisan memanggil emit()
+// supaya pembacanya ikut diperbarui. Event `storage` ikut didengarkan agar tab
+// lain yang menyelesaikan pembayaran (dan menghapus kuncinya) juga membuat
+// banner di tab ini hilang.
+const ORDER_KEY = 'yandihan_pending_order'
+const STORE_KEY = 'yandihan_pending_store'
+
+const listeners = new Set()
+
+function emitPendingOrderChange() {
+  for (const notify of listeners) notify()
+}
+
+function subscribePendingOrder(onStoreChange) {
+  listeners.add(onStoreChange)
+  window.addEventListener('storage', onStoreChange)
+  return () => {
+    listeners.delete(onStoreChange)
+    window.removeEventListener('storage', onStoreChange)
+  }
+}
+
+function savePendingOrder(orderId, storeId) {
+  try {
+    localStorage.setItem(ORDER_KEY, orderId)
+    localStorage.setItem(STORE_KEY, storeId)
+  } catch {
+    // localStorage bisa diblokir (mode privat). Pembayarannya tetap jalan;
+    // yang hilang hanya tombol "Cek Status" setelah halaman dimuat ulang.
+  }
+  emitPendingOrderChange()
+}
+
+function clearPendingOrder() {
+  try {
+    localStorage.removeItem(ORDER_KEY)
+    localStorage.removeItem(STORE_KEY)
+  } catch {
+    // Tidak ada yang bisa dilakukan, dan tidak ada yang perlu dilaporkan.
+  }
+  emitPendingOrderChange()
+}
+
+/** Snapshot di server selalu null: localStorage tidak ada di sana, dan
+ *  mengembalikan null membuat markup server cocok dengan render pertama di
+ *  browser sebelum store terbaca. */
+const pendingOrderServerSnapshot = () => null
 
 export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionEndDate }) {
   const [loading, setLoading] = useState(false)
-  const [pendingOrderId, setPendingOrderId] = useState(null)
   const [statusMsg, setStatusMsg] = useState(null)
+
+  // Order tertunda hanya dianggap milik toko yang sedang dibuka -- pemilik
+  // dengan beberapa toko tidak boleh melihat tombol "Cek Status" toko lain.
+  const readPendingOrder = useCallback(() => {
+    try {
+      if (localStorage.getItem(STORE_KEY) !== storeId) return null
+      return localStorage.getItem(ORDER_KEY)
+    } catch {
+      return null
+    }
+  }, [storeId])
+
+  const pendingOrderId = useSyncExternalStore(
+    subscribePendingOrder,
+    readPendingOrder,
+    pendingOrderServerSnapshot
+  )
 
   // Load Midtrans Snap Script
   useEffect(() => {
@@ -25,15 +109,6 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
     }
   }, [])
 
-  // Check if there's a pending order stored in localStorage
-  useEffect(() => {
-    const storedOrderId = localStorage.getItem('yandihan_pending_order')
-    const storedStoreId = localStorage.getItem('yandihan_pending_store')
-    if (storedOrderId && storedStoreId === storeId) {
-      setPendingOrderId(storedOrderId)
-    }
-  }, [storeId])
-
   // Verify payment status from Midtrans directly
   const verifyPayment = async (orderId) => {
     setLoading(true)
@@ -47,8 +122,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
       const data = await res.json()
 
       if (data.paid) {
-        localStorage.removeItem('yandihan_pending_order')
-        localStorage.removeItem('yandihan_pending_store')
+        clearPendingOrder()
         setStatusMsg({ type: 'success', text: '✅ Pembayaran terkonfirmasi! Halaman akan diperbarui...' })
         setTimeout(() => window.location.reload(), 1500)
       } else {
@@ -84,9 +158,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
 
       // Store orderId for fallback verify
       if (data.orderId) {
-        localStorage.setItem('yandihan_pending_order', data.orderId)
-        localStorage.setItem('yandihan_pending_store', storeId)
-        setPendingOrderId(data.orderId)
+        savePendingOrder(data.orderId, storeId)
       }
 
       window.snap.pay(data.token, {
@@ -206,7 +278,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
               ⏳ Ada pembayaran yang belum selesai
             </p>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#b45309' }}>
-              Jika Anda sudah membayar, klik tombol "Cek Status" untuk mengaktifkan PRO.
+              Jika Anda sudah membayar, klik tombol &quot;Cek Status&quot; untuk mengaktifkan PRO.
             </p>
           </div>
           <button
@@ -247,7 +319,8 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
           Upgrade ke Yandihan PRO ✨
         </h3>
         <p style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9, position: 'relative', zIndex: 10, maxWidth: '600px', lineHeight: 1.6 }}>
-          Transaksi tanpa batas, jumlah kasir tak terbatas, dan fitur Device Binding. Hanya <strong>Rp 189.000 / bulan</strong>.
+          Kasir tanpa batas, program loyalitas pelanggan, dan laporan lanjutan. Hanya{' '}
+          <strong>{formatRupiah(PRO_PRICE_IDR)} / bulan</strong>, tanpa penagihan otomatis.
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button

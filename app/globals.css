@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Font di-self-host lewat next/font di app/layout.js (variabel --font-sans).
+   Dulu @import ke fonts.googleapis.com: satu request pihak ketiga di jalur
+   render, plus dua origin yang harus diizinkan CSP. Keduanya sekarang hilang. */
 
 /* ──────────────────────────────────────────────────────────
    Design Tokens
@@ -15,15 +17,45 @@
   --bg-color: #F8FAFC;
   --card-bg: #FFFFFF;
 
-  /* Typography */
+  /* Typography.
+     --font-jakarta di-set oleh next/font di app/layout.js dan berisi nama
+     keluarga font yang di-generate (mis. __Plus_Jakarta_Sans_abc123) plus font
+     fallback yang sudah disesuaikan metriknya supaya tidak ada layout shift.
+     Nilai cadangan 'Plus Jakarta Sans' di dalam var() dipakai kalau variabelnya
+     tidak ada -- mis. kalau <html> kehilangan class-nya. Tanpa cadangan itu,
+     satu variabel yang hilang membuat SELURUH deklarasi font-family batal. */
+  --font-sans: var(--font-jakarta, 'Plus Jakarta Sans'), -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --text-main: #0F172A;
-  --text-muted: #64748B;
+  /* Dinaikkan dari #64748B. Dipakai untuk <th> 0.75rem di atas --secondary-color,
+     dan di sana rasio kontrasnya hanya 4,38:1 -- di bawah ambang AA 4.5:1.
+     #475569 memberi 6,96:1 di latar itu dan 7,57:1 di atas putih. */
+  --text-muted: #475569;
+  /* Placeholder saja: tidak membawa informasi, jadi boleh lebih redup -- tapi
+     dengan opacity 1 supaya nilainya benar-benar bisa diprediksi. */
+  --text-placeholder: #64748B;
 
   /* Borders */
   --border-color: #E2E8F0;
 
-  /* Status */
+  /* Status -- dipakai .alert-*, .pos-status-*, dan komponen di components/ui/ */
   --success-color: #10B981;
+  --success-light: #D1FAE5;
+  --success-border: #6EE7B7;
+  --success-dark: #065F46;
+  --danger-color: #DC2626;
+  --danger-hover: #B91C1C;
+  --danger-light: #FEE2E2;
+  --danger-border: #FCA5A5;
+  --danger-dark: #7F1D1D;
+  --warning-color: #B45309;
+  --warning-light: #FEF3C7;
+  --warning-border: #FCD34D;
+  --warning-dark: #78350F;
+  --info-dark: #1E3A8A;
+
+  /* Target sentuh minimum (WCAG 2.5.8). Dipakai layar kasir dan menu mobile. */
+  --tap-target: 44px;
 
   /* Elevation */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
@@ -57,8 +89,7 @@ html {
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-color);
   color: var(--text-main);
   line-height: 1.6;
@@ -74,6 +105,15 @@ a {
 
 a:hover {
   color: var(--primary-hover);
+}
+
+/* Fokus keyboard yang terlihat DI SELURUH aplikasi. Sebelumnya hanya di dalam
+   .pos dan .alert, jadi menavigasi dashboard dengan Tab berarti menebak posisi.
+   :focus-visible (bukan :focus) tidak memunculkan cincin pada klik mouse. */
+:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 
@@ -140,41 +180,64 @@ a:hover {
    Inputs
    ────────────────────────────────────────────────────────── */
 
-.input-group {
+/* `.input-group` dan `.input-field` dihapus di tahap 4. Keduanya tidak dipakai
+   satu file JS pun: form dashboard memakai `.form-group`/`.label`/`.input`
+   (lewat komponen Field dan Input), begitu juga layar kasir. Menyimpan dua
+   definisi input dengan padding berbeda (0.875rem/1.25rem vs 0.625rem/0.875rem)
+   hanya menunggu salah satunya dipakai lagi lalu tingginya tidak cocok dengan
+   input di sebelahnya. */
+
+/* Tiga alias di bawah ini dipakai layar kasir (app/c/[token]/CashierForm.js:
+   .form-group 5x, .label 8x, .input 4x) tapi tidak pernah didefinisikan, jadi
+   seluruh input di layar yang paling sering dipakai merender dengan default
+   browser: tanpa radius, tanpa padding, dan tingginya di bawah target sentuh.
+   Dibuat sebagai alias, bukan aturan baru, supaya tidak ada bahasa visual kedua. */
+.form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
 }
 
-.input-group label {
+.label {
+  display: block;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-main);
 }
 
-.input-field {
+.input {
   width: 100%;
-  padding: 0.875rem 1.25rem;
+  min-height: var(--tap-target);
+  padding: 0.625rem 0.875rem;
   border: 1.5px solid var(--border-color);
   border-radius: var(--border-radius-sm);
   font-size: 1rem;
   font-family: inherit;
-  transition: all 0.2s var(--ease-out);
   background-color: var(--card-bg);
   color: var(--text-main);
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 
-.input-field::placeholder {
-  color: var(--text-muted);
-  opacity: 0.65;
+.input::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
 }
 
-.input-field:focus {
+.input:focus {
   outline: none;
   border-color: var(--primary-color);
-  background-color: var(--card-bg);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.input:disabled {
+  background-color: var(--bg-color);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger-color);
 }
 
 
@@ -218,6 +281,54 @@ a:hover {
 .gap-6         { gap: 1.5rem; }
 .min-h-screen  { min-height: 100vh; }
 .hidden        { display: none; }
+
+/* Atribut `hidden` HARUS menang atas display apa pun yang ditulis di sini.
+   Aturan [hidden] milik browser berasal dari UA stylesheet, jadi satu class
+   author seperti `.lp-mobile-nav { display: flex }` mengalahkannya dan elemen
+   yang di-`hidden` tetap terlihat. Ini bukan teori: menu mobile landing page
+   memakai `hidden={!open}`. */
+[hidden] { display: none !important; }
+
+/* Terbaca pembaca layar, tak terlihat di layar. Dipakai untuk judul section
+   yang secara visual sudah jelas dari gambarnya tapi tetap dibutuhkan supaya
+   urutan heading tidak melompat (h1 -> h3) saat dinavigasi dengan pembaca
+   layar. `clip-path` + ukuran 1px, BUKAN `display:none` -- yang terakhir
+   menghilangkan elemennya dari accessibility tree juga. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Utility di bawah ini SUDAH dipakai di JSX sejak lama tapi belum pernah punya
+   aturan CSS -- proyek ini tidak memasang Tailwind, jadi nama bergaya Tailwind
+   tidak berarti apa pun sampai didefinisikan. Akibat nyata sebelum ini:
+   grid fitur landing menumpuk jadi satu kolom, kartunya tanpa padding/latar,
+   ikon footer merender pada ukuran default SVG (~300x150), dan tombol
+   hamburger tampil di desktop.
+   Nilainya diambil dari token, bukan dari palet Tailwind, supaya satu
+   perubahan token tetap mengubah seluruh aplikasi. */
+.grid          { display: grid; }
+.grid-cols-1   { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.items-start   { align-items: flex-start; }
+.items-end     { align-items: flex-end; }
+.text-center   { text-align: center; }
+.p-2           { padding: 0.5rem; }
+.p-4           { padding: 1rem; }
+.bg-white      { background-color: var(--card-bg); }
+.border        { border-width: 1px; border-style: solid; }
+.border-gray-200 { border-color: var(--border-color); }
+.rounded-xl    { border-radius: var(--border-radius); }
+.shadow-sm     { box-shadow: var(--shadow-sm); }
+.h-5           { height: 20px; }
+.w-5           { width: 20px; }
+.min-h-\[50vh\] { min-height: 50vh; }
 
 
 /* ──────────────────────────────────────────────────────────
@@ -397,6 +508,16 @@ tr:hover td {
 @media (min-width: 640px) {
   .sm\:inline { display: inline; }
   .sm\:block  { display: block; }
+  /* .sm\:flex dan .sm\:hidden inilah yang hilang: tanpa keduanya
+     `class="flex ... hidden sm:flex"` selalu kalah ke .hidden, jadi nav desktop
+     landing page tidak pernah tampil di lebar mana pun. */
+  .sm\:flex   { display: flex; }
+  .sm\:hidden { display: none; }
+  .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 
@@ -490,27 +611,115 @@ tr:hover td {
 
 
 /* ──────────────────────────────────────────────────────────
-   Dashboard & Sidebar Responsiveness
+   Dashboard: header, kerangka, navigasi
+
+   Blok ini dulu berisi .dashboard-sidebar/.sidebar-link yang TIDAK dipakai satu
+   pun JSX -- layout menulis stylenya sendiri secara inline. Akibatnya blok
+   @media di bawah, termasuk perilaku mobile-nya, tidak pernah berlaku. Sekarang
+   layout memakai nama-nama ini dan tidak ada style inline lagi, jadi `!important`
+   yang dulu dipakai untuk mengalahkan style inline itu ikut hilang.
    ────────────────────────────────────────────────────────── */
+
+/* Tautan lompat-ke-konten. Terlihat hanya saat menerima fokus keyboard:
+   pengguna mouse tidak pernah melihatnya, pengguna Tab tidak harus melewati
+   lima tautan menu di setiap halaman. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.625rem 1rem;
+  background-color: var(--card-bg);
+  color: var(--primary-color);
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--shadow-md);
+  transition: top 0.15s var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  top: 1rem;
+}
+
+.dashboard-header {
+  background-color: var(--primary-color);
+  color: #fff;
+  padding: 0.875rem 0;
+}
+
+.dashboard-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+}
+
+.dashboard-brand:hover {
+  color: #fff;
+  opacity: 0.9;
+}
+
+/* Tombol keluar. Sebelumnya `.btn` dengan warna dan latar dicabut inline, dan
+   isinya hanya ikon tanpa nama yang bisa dibacakan. Labelnya sekarang selalu
+   ada di DOM; di layar sempit ia disembunyikan secara visual lewat .sr-only
+   (lihat @media di bawah), bukan dihapus. */
+.dashboard-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--tap-target);
+  padding: 0.5rem 0.875rem;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease-out);
+}
+
+.dashboard-signout:hover {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.dashboard-container {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2rem;
+  flex: 1;
+}
+
+/* min-width: 0, bukan 300px. Sebagai flex item, `min-width: auto` membuat main
+   menolak menyusut di bawah lebar isinya -- satu tabel lebar cukup untuk
+   mendorong seluruh halaman melebar dan memunculkan scroll horizontal pada
+   <body>. Dengan 0, yang menggulir adalah pembungkus tabelnya sendiri. */
+.dashboard-main {
+  flex: 1;
+  min-width: 0;
+}
 
 .dashboard-sidebar {
   width: 100%;
   max-width: 250px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 0.75rem;
+  min-height: var(--tap-target);
   padding: 0.75rem 1rem;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-main);
   border-radius: var(--border-radius-sm);
-  transition: all 0.2s var(--ease-out);
+  transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out);
   text-decoration: none;
 }
 
@@ -519,37 +728,109 @@ tr:hover td {
   color: var(--primary-color);
 }
 
+/* Halaman yang sedang dibuka. Selectornya `[aria-current='page']` dan bukan
+   class terpisah supaya penanda visual dan penanda untuk pembaca layar tidak
+   bisa lepas satu dari yang lain -- kalau atributnya lupa dipasang, warnanya
+   juga tidak muncul, jadi kesalahannya kelihatan.
+   Warna saja tidak cukup (WCAG 1.4.1), karena itu ada garis tebal di kiri. */
+.sidebar-link[aria-current='page'] {
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
 .sidebar-link svg {
-  margin-right: 0.75rem;
   flex-shrink: 0;
 }
 
+/* Di bawah 768px navigasi jadi bilah bawah, bukan lima tombol yang menumpuk di
+   atas konten. Bilah bawah dipilih karena aplikasi ini dipakai satu tangan
+   sambil melayani pembeli: jempol sampai ke tepi bawah layar, tidak ke atas.
+
+   position: fixed berarti bilahnya keluar dari alur dokumen, jadi .dashboard-main
+   perlu ruang bawah tambahan supaya baris terakhir tabel tidak tertutup.
+   env(safe-area-inset-bottom) untuk iPhone dengan indikator home. */
 @media (max-width: 768px) {
   .dashboard-container {
-    flex-direction: column !important;
-    margin-top: 1rem !important;
-    gap: 1.5rem !important;
+    flex-direction: column;
+    margin-top: 1rem;
+    gap: 1rem;
   }
 
-  .dashboard-sidebar {
-    max-width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .sidebar-link {
-    padding: 0.5rem 0.875rem;
-    font-size: 0.875rem;
+  .dashboard-signout-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 
+  .dashboard-signout {
+    min-width: var(--tap-target);
+    justify-content: center;
+    padding: 0.5rem;
+  }
+
+  .dashboard-main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dashboard-sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-width: 100%;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 0;
+    padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+  }
+
+  .sidebar-link {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.125rem;
+    min-width: var(--tap-target);
+    min-height: var(--tap-target);
+    padding: 0.375rem 0.25rem;
+    font-size: 0.6875rem;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  /* Garis penanda pindah ke atas: di bilah bawah, indikator di tepi kiri item
+     tidak terbaca sebagai "yang aktif", ia terbaca sebagai pemisah kolom. */
+  .sidebar-link[aria-current='page'] {
+    box-shadow: inset 0 3px 0 var(--primary-color);
+  }
+
   .sidebar-link svg {
-    margin-right: 0.5rem;
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Toast muncul dari tepi bawah, tempat yang sekarang ditempati bilah navigasi.
+     Tanpa ini, notifikasi "Tersimpan" menutupi menu — dan yang lebih buruk,
+     toast error yang tidak hilang sendiri menutupinya selamanya. */
+  .toast-stack {
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .sidebar-link,
+  .dashboard-signout {
+    transition: none;
   }
 }
 
@@ -565,19 +846,9 @@ tr:hover td {
    oleh komponen di components/ui/ pada P4.
    ────────────────────────────────────────────────────────── */
 
-:root {
-  --danger-color: #DC2626;
-  --danger-light: #FEE2E2;
-  --warning-color: #B45309;
-  --tap-target: 44px;
-}
-
-/* Fokus keyboard yang terlihat di seluruh layar kasir. */
-.pos :focus-visible,
-.alert :focus-visible {
-  outline: 2px solid var(--primary-color);
-  outline-offset: 2px;
-}
+/* Token yang dulu dideklarasikan lagi di sini (blok :root kedua) sudah dilebur
+   ke :root paling atas. Dua blok :root berarti dua tempat untuk mengubah satu
+   warna, dan itu sumber selisih yang tidak perlu. */
 
 /* --- Pesan / alert ------------------------------------------------------ */
 .alert {
@@ -593,26 +864,26 @@ tr:hover td {
 
 .alert-error {
   background-color: var(--danger-light);
-  border-color: #FCA5A5;
-  color: #7F1D1D;
+  border-color: var(--danger-border);
+  color: var(--danger-dark);
 }
 
 .alert-success {
-  background-color: #D1FAE5;
-  border-color: #6EE7B7;
-  color: #065F46;
+  background-color: var(--success-light);
+  border-color: var(--success-border);
+  color: var(--success-dark);
 }
 
 .alert-info {
   background-color: var(--secondary-color);
   border-color: var(--primary-light);
-  color: #1E3A8A;
+  color: var(--info-dark);
 }
 
 .alert-warning {
-  background-color: #FEF3C7;
-  border-color: #FCD34D;
-  color: #78350F;
+  background-color: var(--warning-light);
+  border-color: var(--warning-border);
+  color: var(--warning-dark);
 }
 
 /* --- Grid produk yang bisa ditap --------------------------------------- */
@@ -972,13 +1243,13 @@ tr:hover td {
 }
 
 .pos-status-online {
-  background-color: #D1FAE5;
-  color: #065F46;
+  background-color: var(--success-light);
+  color: var(--success-dark);
 }
 
 .pos-status-offline {
-  background-color: #FEF3C7;
-  color: #78350F;
+  background-color: var(--warning-light);
+  color: var(--warning-dark);
 }
 
 .pos-dot {
@@ -1008,4 +1279,1696 @@ tr:hover td {
   .pos-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   Design system: komponen bersama (components/ui/)
+   ──────────────────────────────────────────────────────────
+   Semua kelas di bawah ini mendukung satu komponen React di components/ui/.
+   Tujuannya menghapus inline style yang tersebar: sebelumnya .btn yang sudah
+   berbentuk pill ditimpa `borderRadius: '8px'` di beberapa tempat, dan baris
+   filter yang sama ditulis dua kali dengan style inline di dashboard dan
+   laporan. Satu definisi di sini, satu pembungkus React di sana.
+   ────────────────────────────────────────────────────────── */
+
+/* --- Varian tombol yang belum ada --------------------------------------- */
+.btn-danger {
+  background-color: var(--danger-color);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px 0 rgba(220, 38, 38, 0.28);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--danger-hover);
+  transform: translateY(-2px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Tombol tanpa bentuk: dipakai untuk aksi tersier (mis. "Batal" di dialog)
+   supaya tidak bersaing secara visual dengan aksi utama. */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--secondary-color);
+  color: var(--text-main);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* min-height: pemakaian di layar sentuh. .btn-sm memang lebih kecil, tapi
+   target sentuhnya tetap harus 44px (WCAG 2.5.8) -- padding vertikalnya yang
+   mengecil, bukan area tapnya. */
+.btn-sm,
+.btn {
+  min-height: var(--tap-target);
+}
+
+.btn-lg {
+  padding: 0.9375rem 2.25rem;
+  font-size: 1.0625rem;
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+
+/* --- Badge -------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.1875rem 0.5625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge-neutral { background-color: var(--secondary-color); color: var(--text-muted); border-color: var(--border-color); }
+.badge-success { background-color: var(--success-light); color: var(--success-dark); border-color: var(--success-border); }
+.badge-danger  { background-color: var(--danger-light);  color: var(--danger-dark);  border-color: var(--danger-border); }
+.badge-warning { background-color: var(--warning-light); color: var(--warning-dark); border-color: var(--warning-border); }
+.badge-info    { background-color: var(--primary-light); color: var(--info-dark);    border-color: var(--primary-light); }
+
+/* --- Switch (toggle) ----------------------------------------------------
+   Menggantikan dua <button> tanpa peran di ToggleReceiptRequired.js dan
+   ToggleStoreSettings.js. Bentuknya sama, tapi sekarang state-nya diumumkan
+   lewat aria-checked pada role="switch", bukan hanya lewat warna. */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background-color: #CBD5E1;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease-out);
+}
+
+.switch[aria-checked='true'] {
+  background-color: var(--primary-color);
+}
+
+.switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  transition: transform 0.2s var(--ease-out);
+}
+
+.switch[aria-checked='true']::after {
+  transform: translateX(20px);
+}
+
+/* Baris setelan: label + deskripsi di kiri, switch di kanan. Seluruh baris
+   jadi target klik lewat <label> di komponennya. */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.switch-row:last-child {
+  border-bottom: none;
+}
+
+.switch-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 0;
+}
+
+.switch-row-text strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.switch-row-text span {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   Halaman Pengaturan
+
+   Kelas-kelas di bawah menggantikan style inline yang sebelumnya ditulis
+   ulang di SettingsForm, AddCashierForm, dan CashierRow — termasuk
+   `height: 52px` pada tombol simpan, yang membuatnya berbeda tinggi dari
+   tombol lain di aplikasi.
+   ────────────────────────────────────────────────────────── */
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* align-items: flex-end supaya tombol sejajar dengan dasar input, bukan dengan
+   dasar hint di bawahnya. Field membawa label + input + hint sebagai satu
+   kolom, jadi tanpa ini tombolnya melayang. */
+.settings-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.settings-form-row .form-group {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.settings-block {
+  margin-bottom: 1.5rem;
+}
+
+.settings-toggles {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-hint {
+  margin-top: 1.5rem;
+}
+
+/* Pembungkus tabel yang menggulir sendiri. Tanpa ini, tabel kasir (empat kolom,
+   salah satunya berisi link panjang) melebarkan seluruh halaman di HP dan
+   memunculkan scroll horizontal pada <body>. */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cashier-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Kotak link dibuat readOnly, bukan disabled: nilainya harus tetap bisa
+   difokus dan diseleksi (onFocus -> select()) supaya bisa disalin manual kalau
+   clipboard API ditolak. Input disabled tidak bisa difokus sama sekali. */
+.cashier-link input {
+  width: 190px;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8125rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted);
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.cashier-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   Halaman Gudang Produk
+   ────────────────────────────────────────────────────────── */
+
+.produk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.produk-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+/* Nama produk dua kali lebih lebar dari harga dan stok: nama bisa panjang
+   ("Nasi Goreng Spesial Telur Dobel"), harga dan stok tidak pernah lebih dari
+   enam digit. */
+.produk-form-row .form-group {
+  flex: 1 1 130px;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.produk-form-row .form-group:first-of-type {
+  flex: 2 1 200px;
+}
+
+.produk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.produk-stock-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.produk-stock-input {
+  width: 72px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+/* --- Segmented filter --------------------------------------------------
+   Bentuk yang sama dengan baris filter yang sebelumnya ditulis dua kali
+   dengan style inline (dashboard/RealtimeTransactions.js dan
+   dashboard/laporan/page.js). */
+.filter-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out);
+}
+
+.filter-pill:hover {
+  color: var(--text-main);
+}
+
+.filter-pill[aria-current='true'],
+.filter-pill[aria-pressed='true'] {
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+/* --- Modal / ConfirmDialog ---------------------------------------------
+   Dipasang di atas <dialog> native, jadi focus trap, Esc, dan inert pada
+   latar belakang datang dari browser -- bukan dari kode yang harus kita jaga
+   sendiri. Ini yang menggantikan confirm() bawaan browser: teksnya bisa
+   berbahasa Indonesia dan bisa menyebutkan akibat tindakannya. */
+.modal {
+  width: min(440px, calc(100vw - 2rem));
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
+}
+
+.modal::backdrop {
+  background-color: rgba(15, 23, 42, 0.45);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.modal-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+/* --- Toast -------------------------------------------------------------
+   Pengganti alert(): tidak memblokir, tidak menghentikan render, dan bisa
+   menampung dua baris teks. Diletakkan di bawah supaya tidak menutupi header
+   di ponsel; aria-live ada di container-nya (lihat ToastProvider). */
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(420px, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-md);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  pointer-events: auto;
+  animation: toast-in 0.22s var(--ease-out);
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.toast-close:hover { opacity: 1; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+/* --- Empty state (versi umum, di luar layar kasir) --------------------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-state svg {
+  color: var(--text-placeholder);
+}
+
+.empty-state strong {
+  font-size: 1.0625rem;
+  color: var(--text-main);
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+/* --- Kelengkapan yang dipakai komponen ui ------------------------------ */
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.field-error {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--danger-color);
+  line-height: 1.45;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Skeleton (dipakai loading.js per sub-route) -----------------------
+   Kotak abu-abu berdenyut yang meniru bentuk konten yang sedang dimuat.
+   Lebih baik daripada spinner di tengah layar untuk halaman dashboard: posisi
+   dan tinggi elemennya sudah benar sejak awal, jadi tidak ada lompatan tata
+   letak ketika data akhirnya datang. */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--secondary-color) 25%,
+    #E8EEF9 37%,
+    var(--secondary-color) 63%
+  );
+  background-size: 400% 100%;
+  border-radius: var(--border-radius-sm);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-text {
+  height: 0.875rem;
+  border-radius: 4px;
+}
+
+.skeleton-title {
+  height: 1.5rem;
+  width: 40%;
+  border-radius: 6px;
+}
+
+.skeleton-card {
+  height: 104px;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   Halaman publik: landing, /pricing, /terms, /privacy
+   ──────────────────────────────────────────────────────────
+   Kenapa semua ini pindah ke CSS: app/page.js dulu memegang ~40 handler
+   onMouseEnter/onMouseLeave inline hanya untuk efek hover. Satu-satunya
+   akibatnya adalah `'use client'` di baris pertama file, dan itu membuat
+   `export const metadata` MUSTAHIL -- landing page tidak punya OpenGraph,
+   Twitter card, maupun canonical. Hover memang pekerjaan CSS; memindahkannya
+   ke sini membuat halamannya jadi Server Component dan SEO-nya mungkin.
+   ══════════════════════════════════════════════════════════ */
+
+.lp-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--bg-color);
+}
+
+.lp-main { flex: 1; }
+
+/* ── Header ── */
+
+.lp-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.lp-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.875rem 1.5rem;
+}
+
+/* Pembungkus isi section. Sengaja BUKAN .container: .container sudah membawa
+   padding samping 1.5rem sendiri, dan .lp-section juga -- dipakai bersama,
+   sisi kiri/kanan jadi 3rem di ponsel dan isinya kehimpit. */
+.lp-inner {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.lp-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.lp-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--border-radius-sm);
+  background: linear-gradient(135deg, var(--primary-color) 0%, #3B82F6 100%);
+  color: #FFFFFF;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+/* Nav desktop. `display: none` di sini menggantikan pasangan class
+   `hidden sm:flex` yang dulu dipakai -- lebih jelas dan tidak bergantung pada
+   urutan sumber antar-utility. */
+.lp-nav {
+  display: none;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.lp-nav-link {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: color 0.2s var(--ease-out);
+}
+
+.lp-nav-link:hover { color: var(--primary-color); }
+
+.lp-nav-link-strong {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.lp-nav-divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--border-color);
+}
+
+/* Tombol hamburger. min-height/width dari --tap-target: ikonnya 24px, tapi
+   area sentuhnya tidak boleh ikut 24px (WCAG 2.5.8). */
+.lp-nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  padding: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  background: none;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.lp-nav-toggle:hover { background-color: var(--secondary-color); }
+
+/* Panel absolut, bukan aliran normal: tombol pemicunya berada di dalam
+   .lp-header-inner yang flex-row, jadi panel dalam aliran akan ikut menjadi
+   kolom di baris itu. .lp-header sudah position:sticky (= positioned), jadi
+   inilah acuan koordinatnya. */
+.lp-mobile-nav {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1.5rem 1.25rem;
+  background-color: var(--card-bg);
+  border-top: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-mobile-nav-link {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  color: var(--text-main);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lp-mobile-nav-divider {
+  height: 1px;
+  margin: 0.5rem 0;
+  border: 0;
+  background-color: var(--border-color);
+}
+
+@media (min-width: 640px) {
+  .lp-nav { display: flex; }
+  .lp-nav-toggle,
+  .lp-mobile-nav { display: none; }
+}
+
+/* ── Hero ── */
+
+.lp-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 6rem 1.5rem 5rem;
+  text-align: center;
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #FFFFFF 100%);
+}
+
+.lp-hero-inner {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  padding: 0.35rem 1rem;
+  border: 1px solid var(--primary-light);
+  border-radius: 99px;
+  background-color: var(--secondary-color);
+  box-shadow: var(--shadow-sm);
+  color: var(--primary-color);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.lp-badge-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: var(--success-color);
+}
+
+.lp-hero-title {
+  max-width: 860px;
+  margin: 0 0 1.5rem;
+  font-size: clamp(2.25rem, 6vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  color: var(--text-main);
+}
+
+/* Teks bergradien. -webkit-text-fill-color dipakai bersama color:transparent
+   supaya browser yang tidak mendukung background-clip:text tetap menampilkan
+   teksnya (bukan celah kosong). */
+.lp-hero-accent {
+  background-image: linear-gradient(90deg, var(--primary-color), #3B82F6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.lp-hero-sub {
+  max-width: 720px;
+  margin: 0 0 2.5rem;
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  font-weight: 500;
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+
+.lp-hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.lp-hero-cta .btn {
+  padding: 0.95rem 2.25rem;
+  font-size: 1.05rem;
+}
+
+.lp-hero-note {
+  margin: 1.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Hiasan blur. aria-hidden di JSX; pointer-events none supaya tidak pernah
+   menghalangi klik tombol di atasnya. */
+.lp-blob {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.lp-blob-a {
+  top: 18%;
+  left: 8%;
+  width: 280px;
+  height: 280px;
+  background-color: rgba(37, 99, 235, 0.04);
+  filter: blur(70px);
+}
+
+.lp-blob-b {
+  right: 10%;
+  bottom: 12%;
+  width: 360px;
+  height: 360px;
+  background-color: rgba(59, 130, 246, 0.04);
+  filter: blur(90px);
+}
+
+/* ── Pratinjau dashboard ── */
+
+.lp-preview {
+  position: relative;
+  z-index: 20;
+  margin-top: -3rem;
+  padding: 0 1.5rem 4rem;
+}
+
+/* Bingkai kaca di sekeliling pratinjau. Nilainya diambil dari .glass-card yang
+   lama supaya tampilannya tidak berubah, tapi ditulis di sini karena
+   .glass-card hanya pernah dipakai app/page.js -- dengan ini ia bisa dihapus
+   tanpa membuat pratinjau kehilangan latarnya. Padding-nya 0.6rem, bukan
+   2.5rem seperti aslinya: ini bingkai, bukan kartu berisi teks. */
+.lp-preview-shell {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+}
+
+.lp-preview-frame {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background-color: var(--card-bg);
+}
+
+.lp-window-bar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: #F8FAFC;
+}
+
+.lp-window-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.lp-window-dot-red    { background-color: #EF4444; }
+.lp-window-dot-yellow { background-color: #EAB308; }
+.lp-window-dot-green  { background-color: #22C55E; }
+
+.lp-preview-body {
+  padding: 3.5rem 2rem;
+  text-align: center;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+.lp-preview-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lp-preview-value {
+  margin: 0.5rem 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--text-main);
+}
+
+.lp-preview-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.4rem 0.875rem;
+  border-radius: 99px;
+  background-color: var(--success-light);
+  color: #047857;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Keterangan bahwa angka di pratinjau adalah contoh, bukan data seseorang.
+   Pratinjau tanpa keterangan mudah dibaca sebagai omzet nyata sebuah toko. */
+.lp-preview-note {
+  margin: 1.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Kerangka section ── */
+
+.lp-section {
+  padding: 6rem 1.5rem;
+  background-color: var(--bg-color);
+}
+
+.lp-section-alt { background-color: var(--card-bg); }
+
+.lp-section-head {
+  max-width: 640px;
+  margin: 0 auto 3.5rem;
+  text-align: center;
+}
+
+.lp-section-title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--text-main);
+}
+
+.lp-section-sub {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+/* ── Kartu: efek angkat & ikon berwarna ──
+   .lp-lift menggantikan ~10 pasang onMouseEnter/onMouseLeave yang dulu menulis
+   transform dan boxShadow langsung ke style elemen. */
+
+.lp-lift {
+  transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+}
+
+.lp-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-lift:hover { transform: none; }
+  .floating { animation: none; }
+}
+
+.lp-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  margin-bottom: 1.25rem;
+  border-radius: 12px;
+}
+
+.lp-icon-lg {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  margin-bottom: 1rem;
+}
+
+.lp-icon-blue   { background-color: var(--secondary-color); color: var(--primary-color); }
+.lp-icon-green  { background-color: var(--success-light);   color: #047857; }
+.lp-icon-amber  { background-color: var(--warning-light);   color: var(--warning-color); }
+.lp-icon-purple { background-color: #F3E8FF;                color: #7E22CE; }
+
+/* ── Grid langkah & fitur ── */
+
+.lp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.lp-grid-wide {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.lp-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.lp-tile-center {
+  align-items: center;
+  text-align: center;
+}
+
+.lp-tile-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--text-main);
+}
+
+.lp-tile-desc {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.lp-tile-step {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary-color);
+}
+
+/* ── FAQ ──
+   Dulu `<div onClick>`: tidak bisa di-Tab, tidak bisa ditekan Enter/Space, dan
+   pembaca layar tidak diberi tahu bahwa isinya bisa dibuka. Sekarang <button>
+   dengan aria-expanded, jadi semua itu didapat dari elemennya sendiri. */
+
+.lp-faq {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.lp-faq-item { border-bottom: 1px solid var(--border-color); }
+
+.lp-faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 1.15rem 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.lp-faq-q:hover { color: var(--primary-color); }
+
+.lp-faq-chevron {
+  flex-shrink: 0;
+  transition: transform 0.25s var(--ease-out);
+}
+
+.lp-faq-q[aria-expanded='true'] .lp-faq-chevron { transform: rotate(180deg); }
+
+.lp-faq-a {
+  margin: 0;
+  padding: 0 0 1.15rem;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+
+/* ── Kartu paket ── */
+
+.lp-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  /* Kartu PRO punya pita yang menonjol 12px ke atas. Tanpa padding-top di
+     induknya, pita itu terpotong section di atasnya. */
+  padding-top: 12px;
+}
+
+.lp-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 2.5rem 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.lp-plan-featured {
+  border: 2px solid var(--primary-color);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-plan-ribbon {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25rem 1.25rem;
+  border-radius: 99px;
+  background-color: var(--primary-color);
+  color: #FFFFFF;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.lp-plan-tag {
+  align-self: flex-start;
+  padding: 0.25rem 0.875rem;
+  border-radius: 99px;
+  background-color: var(--border-color);
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.lp-plan-featured .lp-plan-tag {
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+}
+
+.lp-plan-price {
+  margin: 0.875rem 0 0;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  color: var(--text-main);
+}
+
+.lp-plan-period {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.lp-plan-desc {
+  margin: 0.5rem 0 1.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.lp-plan-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.875rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-plan-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+.lp-plan-item svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Fitur yang belum ada tetap boleh disebut, tapi harus terlihat berbeda dari
+   fitur yang sudah jalan -- itu bedanya antara roadmap dan janji palsu. */
+.lp-plan-item-soon { color: var(--text-muted); }
+
+.lp-plan-soon-tag {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  background-color: var(--warning-light);
+  color: var(--warning-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lp-plan-cta { width: 100%; }
+
+.lp-plan-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ── CTA penutup ── */
+
+.lp-cta-band {
+  padding: 5rem 1.5rem;
+  text-align: center;
+  background: linear-gradient(135deg, var(--primary-color) 0%, #3B82F6 100%);
+  color: #FFFFFF;
+}
+
+.lp-cta-title {
+  max-width: 640px;
+  margin: 0 auto 1rem;
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+
+.lp-cta-sub {
+  max-width: 560px;
+  margin: 0 auto 2rem;
+  font-size: 1.02rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Tombol putih di atas latar biru. Warna teksnya ikut --primary-color supaya
+   satu perubahan token tetap konsisten. */
+.lp-cta-band .btn-primary {
+  background: #FFFFFF;
+  color: var(--primary-color);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-cta-band .btn-primary:hover {
+  background: var(--secondary-color);
+  color: var(--primary-hover);
+}
+
+/* ── Footer ── */
+
+.lp-footer {
+  padding: 3.5rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--card-bg);
+}
+
+.lp-footer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.lp-footer-brand {
+  margin-bottom: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text-main);
+}
+
+.lp-footer-text {
+  max-width: 420px;
+  margin: 0 0 2rem;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.lp-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.lp-footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  color: var(--text-main);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lp-footer-link:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+.lp-social {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.lp-social-link {
+  display: grid;
+  place-items: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: 50%;
+  color: var(--text-muted);
+  transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out);
+}
+
+.lp-social-link:hover {
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+}
+
+.lp-footer-legal {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* ── Halaman teks panjang: /terms, /privacy ── */
+
+.lp-prose {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 5rem;
+}
+
+.lp-prose h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--text-main);
+}
+
+.lp-prose h2 {
+  margin: 2.5rem 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.lp-prose p,
+.lp-prose li {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+
+.lp-prose ul {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.lp-prose li { margin-bottom: 0.4rem; }
+
+.lp-prose a {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.lp-prose-updated {
+  margin: 0 0 2rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-placeholder);
+}
+
+/* Ringkasan di atas halaman hukum: yang paling sering ingin diketahui orang,
+   dalam bahasa biasa, sebelum pasal-pasalnya. */
+.lp-prose-summary {
+  margin: 0 0 2.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--secondary-color);
+}
+
+.lp-prose-summary p:last-child { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .lp-hero { padding: 4rem 1.25rem 4rem; }
+  .lp-section { padding: 4rem 1.25rem; }
+  .lp-cta-band { padding: 3.5rem 1.25rem; }
+  .lp-plans { gap: 1.5rem; }
+  .lp-plan { padding: 2rem 1.5rem; }
+  .lp-hero-cta .btn { width: 100%; }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   Halaman auth: /login, /signup, /forgot-password, /reset-password
+   ──────────────────────────────────────────────────────────
+   Keempatnya dulu membawa ~25 inline style yang sama, disalin per file, dan
+   sudah mulai menyimpang satu dari yang lain (radius kotak error berbeda,
+   ukuran judul berbeda). Di sini jadi satu tempat, dan shell halamannya bisa
+   tetap Server Component -- yang penting karena export const metadata baru
+   mungkin setelah 'use client' hilang dari page.js.
+   ══════════════════════════════════════════════════════════ */
+
+.auth-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  background-color: var(--bg-color);
+}
+
+.auth-brand {
+  margin-bottom: 1.75rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--primary-color);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-head {
+  margin-bottom: 1.75rem;
+  text-align: center;
+}
+
+.auth-head h1 {
+  margin-bottom: 0.35rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-main);
+}
+
+.auth-head p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* gap, bukan margin-bottom per field: dengan begitu menambah atau membuang
+   satu field tidak pernah meninggalkan jarak ganda di ujung form. */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* Baris "Lupa password?" -- rapat ke field password di atasnya supaya
+   terbaca sebagai bagian dari field itu, bukan item form tersendiri. */
+.auth-aside {
+  margin-top: -0.5rem;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.auth-link {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.auth-link:hover { text-decoration: underline; }
+
+.auth-foot {
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Layar "cek email Anda" setelah daftar atau minta reset. */
+.auth-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.auth-sent svg {
+  color: var(--success-color);
+}
+
+.auth-sent h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.auth-sent p {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.auth-sent strong {
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+/* Selektor turunan, bukan !important: `.auth-sent p` di atas punya spesifisitas
+   (0,1,1) jadi `.auth-sent-hint` sendiri (0,1,0) akan kalah. */
+.auth-sent p.auth-sent-hint {
+  font-size: 0.82rem;
+  color: var(--text-placeholder);
+}
+
+@media (max-width: 480px) {
+  .auth-page { padding: 1.5rem 1rem; }
+  .auth-card { padding: 1.5rem; }
+  .auth-head h1 { font-size: 1.4rem; }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   Onboarding checklist (/dashboard, /dashboard/pelanggan)
+   ──────────────────────────────────────────────────────────
+   Tiga keadaan per langkah dibedakan lewat [data-state] di <li>, bukan lewat
+   tiga class terpisah: statusnya memang saling meniadakan, jadi atribut tunggal
+   membuat mustahil satu baris kebetulan "done" dan "locked" sekaligus.
+   ══════════════════════════════════════════════════════════ */
+
+.onb {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.onb-head h2 {
+  margin-bottom: 0.3rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.onb-head p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Lebar terisi dikirim dari komponen sebagai --onb-progress supaya nilainya
+   ikut data, bukan dihitung ulang di CSS. */
+.onb-progress {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background-color: var(--border-color);
+}
+
+.onb-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--onb-progress, 0%);
+  border-radius: 99px;
+  background-color: var(--success-color);
+  transition: width 0.35s var(--ease-out);
+}
+
+.onb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  list-style: none;
+}
+
+.onb-item {
+  display: flex;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.onb-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.onb-mark {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 0.1rem;
+}
+
+.onb-item[data-state='done'] .onb-mark    { color: var(--success-color); }
+.onb-item[data-state='active'] .onb-mark  { color: var(--primary-color); }
+.onb-item[data-state='locked'] .onb-mark  { color: var(--text-placeholder); }
+
+.onb-body {
+  min-width: 0;
+}
+
+.onb-item-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.onb-item-title svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* Langkah selesai dicoret supaya bisa dipindai sekali lihat, dan langkah
+   terkunci diredupkan -- tapi keduanya tetap di atas ambang kontras AA karena
+   isinya informasi, bukan hiasan. */
+.onb-item[data-state='done'] .onb-item-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.onb-item[data-state='locked'] .onb-item-title {
+  color: var(--text-muted);
+}
+
+.onb-item-desc {
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.onb-item[data-state='done'] .onb-item-desc,
+.onb-item[data-state='locked'] .onb-item-desc {
+  color: var(--text-placeholder);
+}
+
+.onb-cta {
+  margin-top: 0.65rem;
+}
+
+.onb-foot {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.onb-foot code {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onb-progress::after { transition: none; }
 }

@@ -1,44 +1,70 @@
-import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Settings, LogOut, BarChart3, Package, Users } from 'lucide-react'
+import { LogOut } from 'lucide-react'
+import { verifySession } from '@/lib/dal'
+import { SITE_NAME } from '@/lib/site'
+import { ToastProvider } from '@/components/ui/Toast'
+import DashboardNav from './DashboardNav'
 
-const menu = [
-  { href: '/dashboard', label: 'Ringkasan', icon: LayoutDashboard },
-  { href: '/dashboard/laporan', label: 'Laporan', icon: BarChart3 },
-  { href: '/dashboard/produk', label: 'Gudang Produk', icon: Package },
-  { href: '/dashboard/pelanggan', label: 'Pelanggan', icon: Users },
-  { href: '/dashboard/settings', label: 'Pengaturan', icon: Settings },
-]
-
+/**
+ * Kerangka dashboard.
+ *
+ * Tiga hal berubah dari versi sebelumnya:
+ *
+ * 1. `supabase.auth.getUser()` mentah -> `verifySession()` dari DAL. Bukan
+ *    karena lebih singkat, tapi karena layout TIDAK ikut re-render saat
+ *    navigasi antar rute di bawahnya (Partial Rendering), jadi cek di sini
+ *    saja tidak pernah cukup — setiap page dan action punya cek sendiri lewat
+ *    DAL yang sama. Cek di layout tetap ada sebagai pagar pertama supaya
+ *    pengunjung tanpa sesi tidak melihat kerangka halaman sama sekali.
+ *
+ * 2. Menu pindah ke <DashboardNav>, island kecil yang memakai usePathname()
+ *    untuk state aktif. Sebelumnya kelima tautan sama sekali tidak menunjukkan
+ *    halaman mana yang sedang dibuka.
+ *
+ * 3. Class `.dashboard-container`/`.dashboard-sidebar`/`.sidebar-link` akhirnya
+ *    dipakai. CSS-nya sudah ada di globals.css sejak lama termasuk blok
+ *    @media (max-width: 768px)-nya, tapi tidak satu pun JSX memakai nama-nama
+ *    itu — jadi di HP kelima tombol menumpuk di atas konten. Inline style lama
+ *    juga memakai `.btn btn-secondary` lalu mencabut border, background, dan
+ *    shadow-nya satu per satu; sekarang tidak ada yang perlu dicabut.
+ *
+ * ToastProvider dipasang di sini, bukan di root layout: yang memakai toast
+ * hanya layar-layar dashboard, dan halaman publik (landing, harga, struk) tidak
+ * perlu ikut memuat provider-nya.
+ */
 export default async function DashboardLayout({ children }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  await verifySession('/dashboard')
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header style={{ backgroundColor: 'var(--primary-color)', color: 'white', padding: '1rem 0' }}>
-        <div className="container flex justify-between items-center">
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Yandihan</h1>
-          <form action="/auth/signout" method="post">
-            <button className="btn" style={{ color: 'white', backgroundColor: 'transparent', padding: '0.5rem' }}>
-              <LogOut size={20} />
-            </button>
-          </form>
-        </div>
-      </header>
-      <div className="container flex" style={{ marginTop: '2rem', flex: 1, gap: '2rem', flexWrap: 'wrap' }}>
-        <aside style={{ width: '100%', maxWidth: '250px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {menu.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="btn btn-secondary" style={{ justifyContent: 'flex-start', border: 'none', backgroundColor: 'transparent', boxShadow: 'none' }}>
-              <Icon size={18} style={{ marginRight: '10px' }} />
-              {label}
+    <ToastProvider>
+      <div className="flex flex-col min-h-screen">
+        {/* Lompat ke konten: pengguna keyboard tidak harus melewati lima
+            tautan menu di setiap halaman sebelum sampai ke isinya. */}
+        <a href="#konten" className="skip-link">
+          Lompat ke konten
+        </a>
+
+        <header className="dashboard-header">
+          <div className="container flex justify-between items-center">
+            <Link href="/dashboard" className="dashboard-brand">
+              {SITE_NAME}
             </Link>
-          ))}
-        </aside>
-        <main style={{ flex: 1, minWidth: '300px' }}>{children}</main>
+            <form action="/auth/signout" method="post">
+              <button type="submit" className="dashboard-signout">
+                <LogOut size={20} aria-hidden="true" />
+                <span className="dashboard-signout-label">Keluar</span>
+              </button>
+            </form>
+          </div>
+        </header>
+
+        <div className="container dashboard-container">
+          <DashboardNav />
+          <main id="konten" className="dashboard-main">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   )
 }

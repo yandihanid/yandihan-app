@@ -1,6 +1,8 @@
 'use client'
+
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { formatRupiah } from '@/lib/format'
 
 export default function ReportAccordion({ month, total, dailyData }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -17,7 +19,7 @@ export default function ReportAccordion({ month, total, dailyData }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ fontSize: '1.125rem', fontWeight: 'bold', color: 'var(--success-color)' }}>
-            Rp {total.toLocaleString('id-ID')}
+            {formatRupiah(total)}
           </span>
           {isOpen ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
         </div>
@@ -30,7 +32,7 @@ export default function ReportAccordion({ month, total, dailyData }) {
               {dailyData.map((day, idx) => (
                 <tr key={idx} style={{ borderBottom: idx === dailyData.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem 0', color: 'var(--text-main)', fontWeight: '500' }}>{day.date}</td>
-                  <td style={{ padding: '0.75rem 0', textAlign: 'right', fontWeight: '600', color: 'var(--text-main)' }}>Rp {day.total.toLocaleString('id-ID')}</td>
+                  <td style={{ padding: '0.75rem 0', textAlign: 'right', fontWeight: '600', color: 'var(--text-main)' }}>{formatRupiah(day.total)}</td>
                 </tr>
               ))}
             </tbody>

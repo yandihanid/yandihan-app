@@ -1,58 +1,65 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useActionState, useEffect, useRef } from 'react'
+import Alert from '@/components/ui/Alert'
+import Button from '@/components/ui/Button'
+import Field from '@/components/ui/Field'
+import Input from '@/components/ui/Input'
 import { addCashier } from './actions'
 
+/**
+ * Tambah kasir baru.
+ *
+ * Perubahan dari versi sebelumnya:
+ *
+ * 1. `router.refresh()` tidak lagi dipanggil di sini. `addCashier` sudah
+ *    memanggil revalidatePath('/dashboard/settings'), jadi refresh manual berarti
+ *    dua pengambilan data untuk satu perubahan — dan versi lama menjalankannya
+ *    bahkan setelah gagal, jadi setiap penolakan kuota memicu refresh yang tidak
+ *    mengubah apa pun.
+ * 2. Pesan error tidak lagi berupa <div> dengan warna hardcode; Alert
+ *    membawa role="alert" supaya penolakan kuota benar-benar dibacakan.
+ * 3. Input dikosongkan lewat form.reset() setelah sukses, bukan dengan state
+ *    terkontrol — satu state kurang untuk hal yang sudah dilakukan browser.
+ */
 export default function AddCashierForm({ storeId }) {
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const router = useRouter()
+  const formRef = useRef(null)
+  const [state, formAction, pending] = useActionState(
+    async (_prev, formData) => addCashier(formData),
+    null
+  )
 
-  const handleAdd = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const formData = new FormData()
-    formData.append('storeId', storeId)
-    formData.append('name', name)
-
-    const result = await addCashier(formData)
-
-    if (result.error) {
-      setError(result.error)
-    } else {
-      setName('')
-    }
-    
-    setLoading(false)
-    router.refresh()
-  }
+  // Reset setelah action berhasil. Dilakukan di efek dan bukan di dalam action
+  // karena hasil action baru diketahui setelah render berikutnya; `state`
+  // adalah satu-satunya sinyal bahwa penambahan itu benar-benar terjadi.
+  useEffect(() => {
+    if (state?.success) formRef.current?.reset()
+  }, [state])
 
   return (
-    <div style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
-      {error && (
-        <div style={{ padding: '0.75rem', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.875rem' }}>
-          {error}
+    <div className="settings-block">
+      {state?.error && <Alert variant="error">{state.error}</Alert>}
+      {state?.success && <Alert variant="success">Kasir ditambahkan.</Alert>}
+
+      <form ref={formRef} action={formAction} className="settings-form">
+        <input type="hidden" name="storeId" value={storeId} />
+
+        <div className="settings-form-row">
+          <Field
+            id="cashier-name"
+            label="Tambah Kasir"
+            required
+            hint="Setiap kasir dapat link sendiri untuk dibuka di HP."
+          >
+            {(props) => (
+              <Input {...props} name="name" maxLength={80} placeholder="Misal: Budi Shift Pagi" />
+            )}
+          </Field>
+
+          <Button type="submit" disabled={pending}>
+            {pending ? 'Memproses…' : 'Tambah Kasir'}
+          </Button>
         </div>
-      )}
-      <form onSubmit={handleAdd} className="flex gap-2 items-end">
-        <div className="input-group" style={{ margin: 0, flex: 1 }}>
-          <label style={{ fontSize: '0.85rem' }}>Tambah Kasir Manual (Untuk Link Web)</label>
-          <input 
-            type="text" 
-            className="input-field" 
-            value={name} 
-            onChange={e => setName(e.target.value)} 
-            required 
-            placeholder="Misal: Budi Shift Pagi"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? 'Memproses...' : 'Tambah Kasir'}
-        </button>
       </form>
     </div>
   )
