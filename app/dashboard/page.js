@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { verifySession, getMyStore, getOnboardingState } from '@/lib/dal'
 import { planTier } from '@/lib/plan'
+import { isMidtransProduction } from '@/lib/midtrans'
 import { wibRangeFor } from '@/lib/time'
 import OnboardingChecklist from './OnboardingChecklist'
 import RealtimeTransactions from './RealtimeTransactions'
@@ -70,6 +71,7 @@ export default async function Dashboard({ searchParams }) {
         storeId={store.id}
         subscriptionTier={tier}
         subscriptionEndDate={store.subscription_end_date}
+        midtransProduction={isMidtransProduction()}
       />
 
       <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginTop: tier === 'FREE' ? '1rem' : '0' }}>

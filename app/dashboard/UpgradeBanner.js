@@ -28,6 +28,7 @@ import { formatRupiah } from '@/lib/format'
 // banner di tab ini hilang.
 const ORDER_KEY = 'yandihan_pending_order'
 const STORE_KEY = 'yandihan_pending_store'
+const SNAP_CLIENT_KEY = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''
 
 const listeners = new Set()
 
@@ -70,9 +71,12 @@ function clearPendingOrder() {
  *  browser sebelum store terbaca. */
 const pendingOrderServerSnapshot = () => null
 
-export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionEndDate }) {
+export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionEndDate, midtransProduction = false }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState(null)
+  const snapScriptUrl = midtransProduction
+    ? 'https://app.midtrans.com/snap/snap.js'
+    : 'https://app.sandbox.midtrans.com/snap/snap.js'
 
   // Order tertunda hanya dianggap milik toko yang sedang dibuka -- pemilik
   // dengan beberapa toko tidak boleh melihat tombol "Cek Status" toko lain.
@@ -91,23 +95,28 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
     pendingOrderServerSnapshot
   )
 
-  // Load Midtrans Snap Script
+  // Snap browser harus memakai lingkungan yang sama dengan API server. URL
+  // diturunkan dari MIDTRANS_IS_PRODUCTION di Server Component, sedangkan
+  // client key memang variabel publik karena dibaca Snap.js di browser.
   useEffect(() => {
-    const scriptUrl = 'https://app.sandbox.midtrans.com/snap/snap.js'
-    const clientKey = 'SB-Mid-client-5CqF-xis4qMicQ-m'
-    
-    if (document.querySelector(`script[src="${scriptUrl}"]`)) return
+    if (!SNAP_CLIENT_KEY) return
+
+    const existing = document.querySelector(`script[src="${snapScriptUrl}"]`)
+    if (existing) return
 
     const script = document.createElement('script')
-    script.src = scriptUrl
-    script.setAttribute('data-client-key', clientKey)
+    script.src = snapScriptUrl
+    script.setAttribute('data-client-key', SNAP_CLIENT_KEY)
     script.async = true
+    script.onerror = () => {
+      setStatusMsg({ type: 'error', text: 'Sistem pembayaran gagal dimuat. Muat ulang halaman lalu coba lagi.' })
+    }
     document.body.appendChild(script)
 
     return () => {
-      if (document.body.contains(script)) document.body.removeChild(script)
+      script.onerror = null
     }
-  }, [])
+  }, [snapScriptUrl])
 
   // Verify payment status from Midtrans directly
   const verifyPayment = async (orderId) => {
@@ -117,7 +126,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
       const res = await fetch('/api/payment/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, storeId })
+        body: JSON.stringify({ orderId })
       })
       const data = await res.json()
 
@@ -131,7 +140,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
           text: `⏳ Pembayaran belum terkonfirmasi (status: ${data.status || 'unknown'}). Jika sudah bayar, tunggu beberapa saat lalu coba lagi.`
         })
       }
-    } catch (err) {
+    } catch {
       setStatusMsg({ type: 'error', text: 'Gagal memverifikasi. Coba lagi.' })
     } finally {
       setLoading(false)
@@ -139,6 +148,15 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
   }
 
   const handleUpgrade = async () => {
+    if (!SNAP_CLIENT_KEY) {
+      setStatusMsg({ type: 'error', text: 'Pembayaran belum dikonfigurasi. Hubungi pengelola aplikasi.' })
+      return
+    }
+    if (!window.snap?.pay) {
+      setStatusMsg({ type: 'warn', text: 'Sistem pembayaran masih dimuat. Tunggu sebentar lalu coba lagi.' })
+      return
+    }
+
     setLoading(true)
     setStatusMsg(null)
     try {
@@ -150,9 +168,8 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
 
       const data = await res.json()
 
-      if (!data.token) {
-        setStatusMsg({ type: 'error', text: 'Gagal membuat transaksi: ' + (data.error || 'Unknown error') })
-        setLoading(false)
+      if (!res.ok || !data.token) {
+        setStatusMsg({ type: 'error', text: data.error || 'Gagal membuat transaksi. Coba lagi.' })
         return
       }
 
@@ -162,7 +179,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
       }
 
       window.snap.pay(data.token, {
-        onSuccess: async function(result) {
+        onSuccess: async function() {
           setStatusMsg({ type: 'success', text: '✅ Pembayaran berhasil! Memverifikasi status...' })
           // Directly verify and upgrade
           if (data.orderId) {
@@ -171,19 +188,19 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
             setTimeout(() => window.location.reload(), 1500)
           }
         },
-        onPending: function(result) {
+        onPending: function() {
           setStatusMsg({ type: 'warn', text: '⏳ Pembayaran Anda masih dalam proses. Selesaikan pembayaran dan klik "Cek Status Pembayaran" di bawah.' })
         },
-        onError: function(result) {
+        onError: function() {
           setStatusMsg({ type: 'error', text: '❌ Pembayaran gagal. Silakan coba lagi.' })
         },
         onClose: function() {
           setStatusMsg({ type: 'warn', text: '💡 Popup pembayaran ditutup. Jika sudah bayar, klik "Cek Status Pembayaran" di bawah.' })
         }
       })
-    } catch (err) {
-      console.error(err)
-      setStatusMsg({ type: 'error', text: 'Terjadi kesalahan: ' + err.message })
+    } catch (error) {
+      console.error('Gagal membuka pembayaran', { message: error?.message })
+      setStatusMsg({ type: 'error', text: 'Terjadi kesalahan saat membuka pembayaran. Coba lagi.' })
     } finally {
       setLoading(false)
     }

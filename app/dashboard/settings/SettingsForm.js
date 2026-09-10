@@ -39,7 +39,7 @@ export default function SettingsForm({ store }) {
   return (
     <form action={formAction} className="settings-form">
       {state?.error && <Alert variant="error">{state.error}</Alert>}
-      {state?.success && <Alert variant="success">Nama toko tersimpan.</Alert>}
+      {state?.success && <Alert variant="success">Profil toko tersimpan.</Alert>}
 
       {/* storeId ikut dikirim sebagai hidden field, bukan lewat closure: kalau
           kosong, action membacanya sebagai "buat toko baru". */}
@@ -54,6 +54,34 @@ export default function SettingsForm({ store }) {
               defaultValue={store?.name ?? ''}
               maxLength={80}
               placeholder="Misal: Warung Bu Ida"
+            />
+          )}
+        </Field>
+
+        <Field id="store-phone" label="Nomor Telepon" hint="Opsional. Ditampilkan di struk.">
+          {(props) => (
+            <Input
+              {...props}
+              type="tel"
+              inputMode="tel"
+              name="phone"
+              defaultValue={store?.phone ?? ''}
+              maxLength={20}
+              placeholder="Misal: 0812 3456 7890"
+            />
+          )}
+        </Field>
+      </div>
+
+      <div className="settings-form-row">
+        <Field id="store-address" label="Alamat Toko" hint="Opsional. Ditampilkan di struk.">
+          {(props) => (
+            <Input
+              {...props}
+              name="address"
+              defaultValue={store?.address ?? ''}
+              maxLength={200}
+              placeholder="Misal: Jl. Melati No. 10"
             />
           )}
         </Field>

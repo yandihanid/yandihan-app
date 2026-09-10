@@ -9,6 +9,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
 import { requireStoreOwnership, requireCashierOwnership, requireUser } from '@/lib/dal'
+import { normalizePhone } from '@/lib/format'
 import { maxCashiers, planTier } from '@/lib/plan'
 
 /**
@@ -33,11 +34,18 @@ import { maxCashiers, planTier } from '@/lib/plan'
  */
 export async function updateStore(formData) {
   const name = String(formData.get('name') || '').trim()
+  const address = String(formData.get('address') || '').trim()
+  const rawPhone = String(formData.get('phone') || '').trim()
+  const phone = rawPhone ? normalizePhone(rawPhone) : null
   const storeId = formData.get('storeId')
 
   if (!name) return { error: 'Nama toko wajib diisi' }
   if (name.length > 80) return { error: 'Nama toko terlalu panjang (maks 80 karakter)' }
+  if (address.length > 200) return { error: 'Alamat toko terlalu panjang (maks 200 karakter)' }
+  if (rawPhone.length > 20) return { error: 'Nomor telepon terlalu panjang (maks 20 karakter)' }
+  if (rawPhone && !phone) return { error: 'Nomor telepon tidak valid' }
 
+  const profile = { name, address: address || null, phone }
   const supabase = await createClient()
 
   if (storeId) {
@@ -49,13 +57,13 @@ export async function updateStore(formData) {
     // terbaca sebagai tersimpan.
     const { data, error } = await supabase
       .from('stores')
-      .update({ name })
+      .update(profile)
       .eq('id', store.id)
       .eq('user_id', store.user_id)
       .select('id')
       .maybeSingle()
 
-    if (error) return { error: 'Gagal menyimpan nama toko' }
+    if (error) return { error: 'Gagal menyimpan profil toko' }
     if (!data) return { error: 'Perubahan tidak tersimpan. Coba muat ulang halaman.' }
 
     revalidatePath('/dashboard/settings')
@@ -65,7 +73,10 @@ export async function updateStore(formData) {
   const { user, error: authErr } = await requireUser()
   if (authErr) return { error: authErr }
 
-  const { error } = await supabase.from('stores').insert({ name, user_id: user.id })
+  const { error } = await supabase.from('stores').insert({
+    ...profile,
+    user_id: user.id,
+  })
 
   if (error) return { error: 'Gagal membuat toko' }
 

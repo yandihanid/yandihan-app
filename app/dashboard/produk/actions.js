@@ -27,8 +27,8 @@ export async function addProduct(formData) {
   const priceNum = parseInt(price, 10)
   const stockNum = parseInt(stock, 10)
 
-  if (isNaN(priceNum) || priceNum < 0) return { error: 'Harga harus angka positif' }
-  if (isNaN(stockNum) || stockNum < 0) return { error: 'Stok harus angka positif' }
+  if (isNaN(priceNum) || priceNum < 0) return { error: 'Harga harus angka nol atau lebih' }
+  if (isNaN(stockNum) || stockNum < 0) return { error: 'Stok harus angka nol atau lebih' }
 
   const supabase = await createClient()
   const { error } = await supabase.from('products').insert({
