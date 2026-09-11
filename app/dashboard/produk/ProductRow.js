@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
+import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Money from '@/components/ui/Money'
 import { useToast } from '@/components/ui/Toast'
-import { deleteProduct, updateStock } from './actions'
+import { deleteProduct, updateProductType, updateStock } from './actions'
 
 /**
  * Satu baris produk: ubah stok, hapus.
@@ -44,6 +45,7 @@ export default function ProductRow({ product }) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     formData.append('productId', product.id)
+    formData.append('currentStock', String(product.stock ?? 0))
 
     setBusy(true)
     const res = await updateStock(formData)
@@ -54,6 +56,25 @@ export default function ProductRow({ product }) {
       return
     }
     toast.success(`Stok "${product.name}" diperbarui.`)
+    router.refresh()
+  }
+
+  const handleType = async (event) => {
+    const nextType = event.target.value
+    const formData = new FormData()
+    formData.append('productId', product.id)
+    formData.append('productType', nextType)
+
+    setBusy(true)
+    const res = await updateProductType(formData)
+    setBusy(false)
+
+    if (res.error) {
+      toast.error(res.error)
+      event.target.value = product.is_sub_product ? 'sub' : 'main'
+      return
+    }
+    toast.success(`Jenis "${product.name}" diperbarui.`)
     router.refresh()
   }
 
@@ -77,6 +98,26 @@ export default function ProductRow({ product }) {
   return (
     <tr>
       <td style={{ fontWeight: 500 }}>{product.name}</td>
+      <td>
+        <div className="product-type-cell">
+          <Badge variant={product.is_sub_product ? 'warning' : 'info'}>
+            {product.is_sub_product ? 'Sub-produk' : 'Utama'}
+          </Badge>
+          <label className="sr-only" htmlFor={`type-${product.id}`}>
+            Jenis produk {product.name}
+          </label>
+          <select
+            id={`type-${product.id}`}
+            className="input product-type-select"
+            defaultValue={product.is_sub_product ? 'sub' : 'main'}
+            onChange={handleType}
+            disabled={busy}
+          >
+            <option value="main">Produk utama</option>
+            <option value="sub">Sub-produk / tambahan</option>
+          </select>
+        </div>
+      </td>
       <td>
         <Money value={product.price} />
       </td>

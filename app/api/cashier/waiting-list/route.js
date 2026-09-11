@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { readCashierToken, resolveCashier, tokenBucket } from '@/lib/cashierAuth'
+import { authorizeCashier, readCashierToken, tokenBucket } from '@/lib/cashierAuth'
+import { normalizeQueueStatus } from '@/lib/queue'
 import { checkRateLimit, tooManyRequests } from '@/lib/rateLimit'
 import { wibDayRange } from '@/lib/time'
 
@@ -20,7 +21,7 @@ import { wibDayRange } from '@/lib/time'
 // penjualan selamanya.
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
-const CASHIER_COLUMNS = 'id, store_id, stores!inner(waiting_list_enabled)'
+const CASHIER_COLUMNS = 'id, store_id, device_id, stores!inner(waiting_list_enabled)'
 
 async function authorize(req, { limit, windowSeconds }) {
   const token = readCashierToken(req)
@@ -31,10 +32,16 @@ async function authorize(req, { limit, windowSeconds }) {
   const rate = await checkRateLimit(tokenBucket('cashier:waiting', token), { limit, windowSeconds })
   if (!rate.allowed) return { response: tooManyRequests(rate.retryAfter) }
 
-  const { cashier, supabase } = await resolveCashier(token, CASHIER_COLUMNS)
-  if (!cashier) {
-    return { response: NextResponse.json({ error: 'Link kasir tidak valid' }, { status: 404, headers: NO_STORE }) }
+  const auth = await authorizeCashier(req, CASHIER_COLUMNS)
+  if (auth.error) {
+    return {
+      response: NextResponse.json(
+        { error: auth.error },
+        { status: auth.status, headers: NO_STORE }
+      ),
+    }
   }
+  const { cashier, supabase } = auth
 
   // Fitur dimatikan pemilik toko: tiap handler memutuskan sendiri jawabannya.
   if (!cashier.stores?.waiting_list_enabled) return { disabled: true }
@@ -47,16 +54,20 @@ export async function GET(req) {
   if (response) return response
   if (disabled) return NextResponse.json({ tickets: [], enabled: false }, { headers: NO_STORE })
 
-  const { start, end } = wibDayRange()
+  const status = normalizeQueueStatus(new URL(req.url).searchParams.get('status') || 'pending')
+  if (!status) {
+    return NextResponse.json({ error: 'Status antrean tidak valid' }, { status: 400, headers: NO_STORE })
+  }
+
+  const { day } = wibDayRange()
 
   const { data, error } = await supabase
     .from('transactions')
-    .select('id, buyer_name, customer_name, product_name, amount, created_at')
+    .select('id, queue_number, buyer_name, customer_name, product_name, amount, created_at')
     .eq('store_id', cashier.store_id)
-    .eq('status', 'pending')
-    .gte('created_at', start)
-    .lt('created_at', end)
-    .order('created_at', { ascending: true })
+    .eq('queue_date', day)
+    .eq('status', status)
+    .order('queue_number', { ascending: true })
     .limit(100)
 
   if (error) {
@@ -86,14 +97,18 @@ export async function PATCH(req) {
     return NextResponse.json({ error: 'id transaksi diperlukan' }, { status: 400, headers: NO_STORE })
   }
 
-  // store_id ikut difilter: token toko A tidak bisa menyelesaikan tiket toko B.
+  const { day } = wibDayRange()
+
+  // store_id, hari WIB, dan status asal ikut difilter: token toko A tidak bisa
+  // menyelesaikan tiket toko B atau mengubah riwayat yang sudah selesai.
   const { data, error } = await supabase
     .from('transactions')
     .update({ status: 'done' })
     .eq('id', id)
     .eq('store_id', cashier.store_id)
+    .eq('queue_date', day)
     .eq('status', 'pending')
-    .select('id')
+    .select('id, queue_number')
     .maybeSingle()
 
   if (error) {
@@ -105,5 +120,8 @@ export async function PATCH(req) {
     return NextResponse.json({ error: 'Tiket tidak ditemukan' }, { status: 404, headers: NO_STORE })
   }
 
-  return NextResponse.json({ ok: true, id: data.id }, { headers: NO_STORE })
+  return NextResponse.json(
+    { ok: true, id: data.id, queue_number: data.queue_number },
+    { headers: NO_STORE }
+  )
 }

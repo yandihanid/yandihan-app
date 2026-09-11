@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-import {
-  readCashierToken,
-  readDeviceId,
-  resolveCashier,
-  tokenBucket,
-} from '@/lib/cashierAuth'
+import { authorizeCashier, readCashierToken, tokenBucket } from '@/lib/cashierAuth'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 // Perubahan dari versi sebelumnya:
@@ -44,34 +39,19 @@ export async function GET(req) {
   })
   if (!perIp.allowed) return tooManyRequests(perIp.retryAfter)
 
-  const { cashier, supabase } = await resolveCashier(
-    token,
+  const auth = await authorizeCashier(
+    req,
     `id, name, store_id, device_id, stores!inner(${STORE_FIELDS})`
   )
-
-  if (!cashier) {
-    return NextResponse.json({ error: 'Link kasir tidak valid' }, { status: 404, headers: NO_STORE })
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE })
   }
 
-  const deviceId = readDeviceId(req)
-
-  // Perangkat sudah terikat: apa pun yang tidak cocok ditolak -- termasuk
-  // request yang sama sekali tidak mengirim deviceId. Dulu `if (deviceId)`
-  // membuat binding bisa dilewati hanya dengan menghapus parameternya.
-  if (cashier.device_id && cashier.device_id !== deviceId) {
-    return NextResponse.json(
-      { error: 'Link kasir ini sudah dipakai di perangkat lain. Minta pemilik toko mereset token.' },
-      { status: 403, headers: NO_STORE }
-    )
-  }
-
-  if (!cashier.device_id && deviceId) {
-    await supabase.from('cashiers').update({ device_id: deviceId }).eq('id', cashier.id)
-  }
+  const { cashier, supabase } = auth
 
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, price, stock')
+    .select('id, name, price, stock, is_sub_product')
     .eq('store_id', cashier.store_id)
     .order('name', { ascending: true })
 

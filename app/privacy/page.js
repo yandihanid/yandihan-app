@@ -12,7 +12,7 @@ import { SITE_NAME, SUPPORT_EMAIL, supportMailto } from '@/lib/site'
  * memang begitu keadaannya:
  *
  *   * Berkas bukti pembayaran diunggah ke bucket Storage publik dan URL-nya
- *     dibagikan lewat getPublicUrl() (app/c/[token]/actions.js:112). Siapa pun
+ *     dibagikan lewat getPublicUrl() di route transaksi kasir. Siapa pun
  *     yang punya URL-nya bisa membukanya tanpa login. Itu harus disebut.
  *   * Alamat IP memang disimpan sementara, sebagai bagian dari kunci kuota
  *     permintaan di tabel rate_limits, dan dihapus otomatis setelah satu jam

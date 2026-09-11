@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { readCashierToken, resolveCashier, tokenBucket } from '@/lib/cashierAuth'
+import { authorizeCashier, readCashierToken, tokenBucket } from '@/lib/cashierAuth'
 import { checkRateLimit, tooManyRequests } from '@/lib/rateLimit'
 import { normalizePhone } from '@/lib/format'
 import { loyaltyState } from '@/lib/loyalty'
@@ -18,7 +18,7 @@ import { loyaltyState } from '@/lib/loyalty'
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
 const CASHIER_COLUMNS =
-  'id, store_id, stores!inner(subscription_tier, subscription_end_date, ' +
+  'id, store_id, device_id, stores!inner(subscription_tier, subscription_end_date, ' +
   'pelanggan_enabled, visit_threshold, discount_percent)'
 
 export async function GET(req) {
@@ -38,10 +38,11 @@ export async function GET(req) {
     return NextResponse.json({ error: 'Nomor tidak valid' }, { status: 400, headers: NO_STORE })
   }
 
-  const { cashier, supabase } = await resolveCashier(token, CASHIER_COLUMNS)
-  if (!cashier) {
-    return NextResponse.json({ error: 'Link kasir tidak valid' }, { status: 404, headers: NO_STORE })
+  const auth = await authorizeCashier(req, CASHIER_COLUMNS)
+  if (auth.error) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE })
   }
+  const { cashier, supabase } = auth
 
   const store = cashier.stores || {}
   if (!loyaltyState(store, null).enabled) {

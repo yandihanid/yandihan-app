@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_LINES, MAX_QTY, normalizeItems } from '@/lib/transactionValidation'
+import {
+  MAX_FLAT_ITEMS,
+  MAX_LINES,
+  MAX_QTY,
+  normalizeItems,
+} from '@/lib/transactionValidation'
 
 const PRODUCT_ID = '123e4567-e89b-12d3-a456-426614174000'
 const SUB_ID = '123e4567-e89b-12d3-a456-426614174001'
@@ -28,6 +33,23 @@ describe('transaction item validation', () => {
     const item = { product_id: PRODUCT_ID, qty: 1 }
     expect(normalizeItems(Array.from({ length: MAX_LINES + 1 }, () => item)).error).toMatch(/maksimal/i)
     expect(normalizeItems([{ ...item, subs: Array.from({ length: MAX_LINES + 1 }, () => ({ product_id: SUB_ID, qty: 1 })) }]).error).toMatch(/sub-produk/i)
+  })
+
+  it('rejects payloads above the flattened item cap', () => {
+    const subsPerLine = MAX_FLAT_ITEMS / MAX_LINES - 1
+    const item = {
+      product_id: PRODUCT_ID,
+      qty: 1,
+      subs: Array.from({ length: subsPerLine }, () => ({ product_id: SUB_ID, qty: 1 })),
+    }
+    expect(normalizeItems(Array.from({ length: MAX_LINES }, () => item))).toHaveProperty('items')
+
+    const overLimit = Array.from({ length: MAX_LINES }, () => item)
+    overLimit[0] = {
+      ...item,
+      subs: [...item.subs, { product_id: SUB_ID, qty: 1 }],
+    }
+    expect(normalizeItems(overLimit).error).toMatch(/maksimal/i)
   })
 
   it('rejects malformed sub-items', () => {

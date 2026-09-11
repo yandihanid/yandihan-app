@@ -1,47 +1,84 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-
-// Dulu komponen ini memakai anon client langsung dari browser untuk membaca dan
-// menulis tabel transactions, padahal halaman kasir tidak punya sesi Supabase.
-// Setelah RLS aktif (0002_rls_policies.sql) query itu akan mengembalikan nol
-// baris tanpa error. Sekarang semuanya lewat route handler ber-token, dan
-// pembaruan memakai polling -- Realtime butuh JWT yang kasir memang tidak punya.
+import { formatRupiah } from '@/lib/format'
+import { wibTimeLabel } from '@/lib/time'
+import { cashierDeviceHeaders } from './device'
 
 const POLL_MS = 15000
+const TABS = [
+  { status: 'pending', label: 'Belum selesai' },
+  { status: 'done', label: 'Selesai' },
+]
 
-export default function WaitingList({ token }) {
-  const [tickets, setTickets] = useState([])
+export default function WaitingList({ token, active = true }) {
+  const [status, setStatus] = useState('pending')
+  const [snapshot, setSnapshot] = useState({
+    status: 'pending',
+    tickets: [],
+    loaded: false,
+  })
+  const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
-  const inFlight = useRef(false)
+  const activeStatus = useRef(status)
+  const requestSequence = useRef(0)
+  const requestController = useRef(null)
+
+  const cancelActiveLoad = useCallback(() => {
+    requestSequence.current += 1
+    requestController.current?.abort()
+    requestController.current = null
+  }, [])
 
   const load = useCallback(async () => {
-    if (!token || inFlight.current) return
-    inFlight.current = true
+    if (!active || !token || document.visibilityState !== 'visible') return
+
+    const requestedStatus = activeStatus.current
+    const sequence = requestSequence.current + 1
+    const controller = new AbortController()
+    requestSequence.current = sequence
+    requestController.current?.abort()
+    requestController.current = controller
+
     try {
-      const res = await fetch('/api/cashier/waiting-list', {
-        headers: { 'x-cashier-token': token },
+      const res = await fetch(`/api/cashier/waiting-list?status=${requestedStatus}`, {
+        headers: {
+          'x-cashier-token': token,
+          ...cashierDeviceHeaders(),
+        },
         cache: 'no-store',
+        signal: controller.signal,
       })
-      if (!res.ok) return
-      const data = await res.json()
-      setTickets(Array.isArray(data.tickets) ? data.tickets : [])
-    } catch {
-      // Offline: biarkan daftar terakhir tetap tampil.
+      const data = await res.json().catch(() => null)
+      if (sequence !== requestSequence.current || requestedStatus !== activeStatus.current) return
+      if (!res.ok) {
+        setError(data?.error || 'Gagal memuat antrean.')
+        return
+      }
+      setSnapshot({
+        status: requestedStatus,
+        tickets: Array.isArray(data?.tickets) ? data.tickets : [],
+        loaded: true,
+      })
+      setError('')
+    } catch (loadError) {
+      if (
+        loadError?.name !== 'AbortError'
+        && sequence === requestSequence.current
+        && requestedStatus === activeStatus.current
+      ) {
+        setError('Tidak ada koneksi. Daftar terakhir tetap ditampilkan.')
+      }
     } finally {
-      inFlight.current = false
+      if (sequence === requestSequence.current) requestController.current = null
     }
-  }, [token])
+  }, [active, token])
 
   useEffect(() => {
-    // Pemuatan pertama dijadwalkan lewat timer 0 ms, bukan dipanggil langsung di
-    // badan efek. Alasannya bukan sekadar menyenangkan linter: `load()` di sini
-    // memanggil setTickets dalam fase yang sama, sehingga React langsung
-    // menjadwalkan render kedua di atas render pertama (cascading render) --
-    // itulah yang ditandai react-hooks/set-state-in-effect sebagai error.
-    // Dengan setTimeout, daftar kosong tergambar dulu lalu diisi pada tugas
-    // berikutnya, dan timernya ikut dibersihkan saat unmount supaya komponen
-    // yang langsung dilepas tidak menyisakan fetch menggantung.
+    if (!active) {
+      cancelActiveLoad()
+      return
+    }
     const first = setTimeout(load, 0)
     const timer = setInterval(load, POLL_MS)
     const onVisible = () => {
@@ -52,70 +89,116 @@ export default function WaitingList({ token }) {
       clearTimeout(first)
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
+      cancelActiveLoad()
     }
-  }, [load])
+  }, [active, cancelActiveLoad, load, status])
+
+  const selectStatus = (nextStatus) => {
+    if (nextStatus === activeStatus.current) return
+    activeStatus.current = nextStatus
+    cancelActiveLoad()
+    setStatus(nextStatus)
+    setSnapshot({ status: nextStatus, tickets: [], loaded: false })
+    setError('')
+  }
 
   const markDone = async (id) => {
+    if (!navigator.onLine) {
+      setError('Perubahan status membutuhkan koneksi internet.')
+      return
+    }
     setBusyId(id)
     try {
       const res = await fetch('/api/cashier/waiting-list', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-cashier-token': token },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cashier-token': token,
+          ...cashierDeviceHeaders(),
+        },
         body: JSON.stringify({ id }),
       })
-      if (res.ok) setTickets((prev) => prev.filter((t) => t.id !== id))
-      else load()
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || 'Gagal memperbarui antrean.')
+        return
+      }
+      setError('')
+      await load()
     } catch {
-      // Gagal kirim: biarkan tiket tetap di daftar supaya bisa dicoba lagi.
+      setError('Koneksi terputus. Status antrean belum diubah.')
     } finally {
       setBusyId(null)
     }
   }
 
-  if (!tickets.length) return null
+  const current = snapshot.status === status ? snapshot.tickets : []
+  const currentLoaded = snapshot.status === status && snapshot.loaded
 
   return (
-    <section
-      className="card"
-      style={{ maxWidth: 500, margin: '1rem auto' }}
-      aria-live="polite"
-    >
-      <h3 style={{ fontWeight: 700, marginBottom: '0.75rem' }}>
-        Waiting List <span style={{ color: 'var(--text-muted)' }}>({tickets.length})</span>
-      </h3>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {tickets.map((t) => (
-          <li
-            key={t.id}
-            style={{
-              border: '1px solid var(--border-color, #e2e8f0)',
-              borderRadius: 8,
-              padding: '0.75rem',
-              marginBottom: '0.5rem',
-            }}
-          >
-            <div style={{ fontWeight: 700 }}>{t.buyer_name || t.customer_name || 'Tanpa Nama'}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.product_name}</div>
+    <main className="queue-screen" aria-live="polite">
+      <section className="card">
+        <div className="queue-heading">
+          <div>
+            <h2>Antrean hari ini</h2>
+            <p>Nomor antrean mengikuti hari operasional WIB.</p>
+          </div>
+          <button type="button" className="pos-text-btn" onClick={load}>
+            Muat ulang
+          </button>
+        </div>
+
+        <div className="queue-tabs" role="tablist" aria-label="Status antrean">
+          {TABS.map((tab) => (
             <button
+              key={tab.status}
               type="button"
-              onClick={() => markDone(t.id)}
-              disabled={busyId === t.id}
-              style={{
-                marginTop: '0.5rem',
-                minHeight: 44,
-                padding: '0.5rem 1rem',
-                background: busyId === t.id ? '#94a3b8' : '#22c55e',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                fontWeight: 600,
-              }}
+              role="tab"
+              aria-selected={status === tab.status}
+              className={status === tab.status ? 'active' : ''}
+              onClick={() => selectStatus(tab.status)}
             >
-              {busyId === t.id ? 'Menyimpan...' : 'Selesai / Panggil'}
+              {tab.label}
             </button>
-          </li>
-        ))}
-      </ul>
-    </section>
+          ))}
+        </div>
+
+        {error && <div className="alert alert-warning">{error}</div>}
+
+        {!currentLoaded && current.length === 0 ? (
+          <div className="queue-empty">Memuat antrean...</div>
+        ) : current.length === 0 ? (
+          <div className="queue-empty">
+            {status === 'pending' ? 'Tidak ada antrean yang belum selesai.' : 'Belum ada antrean selesai hari ini.'}
+          </div>
+        ) : (
+          <ol className="queue-list">
+            {current.map((ticket) => (
+              <li key={ticket.id} className="queue-card">
+                <div className="queue-number" aria-label={`Nomor antrean ${ticket.queue_number}`}>
+                  <span>No.</span>
+                  <strong>{ticket.queue_number ?? '-'}</strong>
+                </div>
+                <div className="queue-detail">
+                  <strong>{ticket.buyer_name || ticket.customer_name || 'Tanpa nama'}</strong>
+                  <span>{ticket.product_name || 'Pesanan'}</span>
+                  <small>{wibTimeLabel(ticket.created_at)} · {formatRupiah(ticket.amount)}</small>
+                </div>
+                {status === 'pending' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => markDone(ticket.id)}
+                    disabled={busyId === ticket.id}
+                  >
+                    {busyId === ticket.id ? 'Menyimpan...' : 'Tandai selesai'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </main>
   )
 }

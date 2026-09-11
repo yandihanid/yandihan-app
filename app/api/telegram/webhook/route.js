@@ -164,7 +164,7 @@ export async function POST(req) {
     // datang dari luar -- RPC menurunkannya sendiri dari token ini.
     const { data: cashier } = await supabase
       .from('cashiers')
-      .select('id, store_id, token')
+      .select('id, store_id, token, stores!inner(require_sub_product)')
       .eq('telegram_chat_id', chatKey)
       .maybeSingle()
 
@@ -177,6 +177,14 @@ export async function POST(req) {
     // transaksi (pembedanya multi-kasir, loyalitas, dan laporan lanjutan).
     // Blok lamanya juga salah hitung -- memakai batas hari UTC padahal
     // penggunanya WIB, dan `count` yang null diperlakukan sebagai "belum penuh".
+
+    if (cashier.stores?.require_sub_product) {
+      await sendMessage(
+        chatId,
+        'Toko ini mewajibkan sub-produk pada setiap pesanan. Format Telegram belum mendukung pilihan tambahan, jadi catat transaksi melalui link kasir web.'
+      )
+      return NextResponse.json({ ok: true })
+    }
 
     const parsed = parseReport(text)
     if (parsed.error) {
@@ -259,7 +267,13 @@ function replyFor(result, paymentMethod, origin) {
     lines.push(`Uang diterima: ${formatRupiah(result.cashReceived)}`)
     lines.push(`Kembalian: ${formatRupiah(result.changeAmount)}`)
   }
-  if (result.status === 'pending') lines.push('Status: masuk daftar tunggu.')
+  if (result.status === 'pending') {
+    lines.push(
+      result.queueNumber == null
+        ? 'Status: masuk antrean.'
+        : `Nomor antrean: ${result.queueNumber}`
+    )
+  }
   if (origin) lines.push('', 'Lihat/Cetak Struk:', `${origin}/r/${result.transactionId}`)
   return lines.join('\n')
 }
@@ -391,11 +405,12 @@ async function resolveProducts(supabase, storeId, items) {
     .from('products')
     .select('id, name')
     .eq('store_id', storeId)
+    .eq('is_sub_product', false)
     .limit(1000)
 
   if (error) return { error: 'Gagal memuat daftar produk. Coba lagi.' }
   if (!products || products.length === 0) {
-    return { error: 'Toko ini belum punya produk. Tambahkan produk dulu di dashboard.' }
+    return { error: 'Toko ini belum punya produk utama. Atur jenis produk di dashboard terlebih dahulu.' }
   }
 
   const byName = new Map(products.map((p) => [String(p.name).trim().toLowerCase(), p]))

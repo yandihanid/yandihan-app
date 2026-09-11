@@ -1,0 +1,198 @@
+-- 0007_product_types_and_fnb_queue.sql
+-- Klasifikasi katalog dan nomor antrean F&B harian (WIB).
+
+alter table public.products
+  add column if not exists is_sub_product boolean not null default false;
+
+alter table public.transactions
+  add column if not exists queue_date date;
+alter table public.transactions
+  add column if not exists queue_number integer;
+
+create table if not exists public.queue_counters (
+  store_id uuid not null references public.stores (id) on delete cascade,
+  queue_date date not null,
+  last_number integer not null default 0,
+  primary key (store_id, queue_date),
+  constraint queue_counters_last_number_positive check (last_number >= 0)
+);
+
+alter table public.queue_counters enable row level security;
+revoke all on table public.queue_counters from public, anon, authenticated;
+grant all on table public.queue_counters to service_role;
+
+create unique index if not exists transactions_store_queue_number_key
+  on public.transactions (store_id, queue_date, queue_number)
+  where queue_number is not null;
+
+create index if not exists transactions_store_queue_status_idx
+  on public.transactions (store_id, queue_date, status, created_at);
+
+create or replace function public.assign_fnb_queue_number()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_date date;
+begin
+  if new.status <> 'pending' then
+    new.queue_date := null;
+    new.queue_number := null;
+    return new;
+  end if;
+
+  if new.queue_number is not null then return new; end if;
+
+  v_date := (coalesce(new.created_at, now()) at time zone 'Asia/Jakarta')::date;
+  insert into public.queue_counters (store_id, queue_date, last_number)
+  values (new.store_id, v_date, 1)
+  on conflict (store_id, queue_date) do update
+    set last_number = public.queue_counters.last_number + 1
+  returning last_number into new.queue_number;
+
+  new.queue_date := v_date;
+  return new;
+end
+$fn$;
+
+revoke all on function public.assign_fnb_queue_number() from public, anon, authenticated;
+
+drop trigger if exists transactions_assign_fnb_queue_number on public.transactions;
+create trigger transactions_assign_fnb_queue_number
+  before insert on public.transactions
+  for each row execute function public.assign_fnb_queue_number();
+
+create or replace function public.validate_transaction_item_type()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_is_sub boolean;
+  v_product_store uuid;
+  v_transaction_store uuid;
+begin
+  if new.product_id is null then return new; end if;
+
+  select p.is_sub_product, p.store_id
+    into v_is_sub, v_product_store
+  from public.products p
+  where p.id = new.product_id;
+
+  select t.store_id into v_transaction_store
+  from public.transactions t
+  where t.id = new.transaction_id;
+
+  if v_product_store is null or v_product_store <> v_transaction_store then
+    raise exception using errcode = 'P0001', message = 'catalog_product_unavailable';
+  end if;
+
+  if new.parent_item_id is null and v_is_sub then
+    raise exception using errcode = 'P0001', message = 'sub_product_as_main';
+  end if;
+
+  if new.parent_item_id is not null and not v_is_sub then
+    raise exception using errcode = 'P0001', message = 'main_product_as_sub';
+  end if;
+
+  return new;
+end
+$fn$;
+
+revoke all on function public.validate_transaction_item_type() from public, anon, authenticated;
+
+drop trigger if exists transaction_items_validate_catalog_type on public.transaction_items;
+create trigger transaction_items_validate_catalog_type
+  before insert on public.transaction_items
+  for each row execute function public.validate_transaction_item_type();
+
+-- Pertahankan implementasi transaksi 0003 sebagai inti, lalu bungkus tanpa
+-- mengubah signature publik. Trigger di atas menjalankan validasi katalog dan
+-- nomor antrean di transaksi database yang sama dengan pengurangan stok.
+do $rename$
+begin
+  if to_regprocedure(
+    'public.submit_transaction_core(text,jsonb,text,numeric,text,text,uuid,text)'
+  ) is null then
+    if to_regprocedure(
+      'public.submit_transaction(text,jsonb,text,numeric,text,text,uuid,text)'
+    ) is null then
+      raise exception 'Jalankan migrasi 0003 sebelum 0007';
+    end if;
+
+    alter function public.submit_transaction(
+      text, jsonb, text, numeric, text, text, uuid, text
+    ) rename to submit_transaction_core;
+  end if;
+end
+$rename$;
+
+revoke all on function public.submit_transaction_core(
+  text, jsonb, text, numeric, text, text, uuid, text
+) from public, anon, authenticated, service_role;
+
+create or replace function public.submit_transaction(
+  p_token text,
+  p_items jsonb,
+  p_payment_method text,
+  p_cash_received numeric default null,
+  p_buyer_name text default null,
+  p_customer_phone text default null,
+  p_client_tx_id uuid default null,
+  p_receipt_url text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_result jsonb;
+  v_queue_number integer;
+begin
+  begin
+    v_result := public.submit_transaction_core(
+      p_token,
+      p_items,
+      p_payment_method,
+      p_cash_received,
+      p_buyer_name,
+      p_customer_phone,
+      p_client_tx_id,
+      p_receipt_url
+    );
+  exception
+    when raise_exception then
+      if sqlerrm in (
+        'catalog_product_unavailable',
+        'sub_product_as_main',
+        'main_product_as_sub'
+      ) then
+        return jsonb_build_object('ok', false, 'error_code', sqlerrm);
+      end if;
+      raise;
+  end;
+
+  if coalesce((v_result->>'ok')::boolean, false)
+     and nullif(v_result->>'transaction_id', '') is not null then
+    select t.queue_number
+      into v_queue_number
+    from public.transactions t
+    where t.id = (v_result->>'transaction_id')::uuid;
+
+    v_result := v_result || jsonb_build_object('queue_number', v_queue_number);
+  end if;
+
+  return v_result;
+end
+$fn$;
+
+revoke all on function public.submit_transaction(
+  text, jsonb, text, numeric, text, text, uuid, text
+) from public, anon, authenticated;
+grant execute on function public.submit_transaction(
+  text, jsonb, text, numeric, text, text, uuid, text
+) to service_role;

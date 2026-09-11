@@ -86,11 +86,13 @@ function persist(token, entries) {
   try {
     localStorage.setItem(queueKey(token), JSON.stringify(entries))
   } catch {
-    // Kuota penuh / penyimpanan diblokir: tidak ada yang bisa dilakukan selain
-    // membiarkan antrean seperti apa adanya.
+    // Kuota penuh / penyimpanan diblokir: pemanggil harus tahu bahwa data belum
+    // tersimpan agar transaksi di layar tidak dianggap aman.
+    return false
   }
   snapshots.delete(token)
   emit()
+  return true
 }
 
 export function enqueue(token, entry) {
@@ -98,12 +100,42 @@ export function enqueue(token, entry) {
   if (current.length >= MAX_ENTRIES) {
     return { ok: false, reason: 'full', limit: MAX_ENTRIES }
   }
-  persist(token, [...current, entry])
+  if (!persist(token, [...current, entry])) {
+    return { ok: false, reason: 'storage', limit: MAX_ENTRIES }
+  }
   return { ok: true }
 }
 
 export function replaceQueue(token, entries) {
-  persist(token, entries)
+  return persist(token, entries)
+}
+
+/** Pure queue selectors/transitions. Keeping these independent from storage makes
+ * lossless sync behavior explicit and testable. */
+export function syncCandidates(entries, { includeBlocked = false } = {}) {
+  return entries.filter((entry) => includeBlocked || !entry.blocked)
+}
+
+export function transitionAfterSync(entries, clientTxId, outcome) {
+  if (outcome.type === 'network') return entries
+
+  if (outcome.type === 'success' || outcome.type === 'delete') {
+    return entries.filter((entry) => entry.clientTxId !== clientTxId)
+  }
+
+  if (outcome.type === 'rejected') {
+    return entries.map((entry) =>
+      entry.clientTxId === clientTxId
+        ? {
+            ...entry,
+            blocked: true,
+            syncError: outcome.error || 'Transaksi ditolak server.',
+          }
+        : entry
+    )
+  }
+
+  return entries
 }
 
 export async function storeReceiptBlob(clientTxId, file) {

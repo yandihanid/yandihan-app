@@ -7,7 +7,7 @@ Yandihan Kasir adalah POS multi-tenant untuk warung dan UMKM Indonesia. Pemilik 
 - Transaksi CASH dan QRIS/Transfer dengan pengurangan stok atomik.
 - Antrean offline PWA, sinkronisasi idempoten, dan bukti transfer.
 - Struk publik thermal dengan rincian item, diskon, uang diterima, dan kembalian.
-- Realtime dashboard, waiting list, serta loyalitas pelanggan untuk PRO aktif.
+- Realtime dashboard, loyalitas pelanggan untuk PRO aktif, serta antrean F&B harian.
 - Laporan dasar untuk FREE dan laporan produk/kasir/metode/tren untuk PRO.
 - Pembelian PRO Rp78.000 untuk 30 hari melalui Midtrans Snap. Tidak ada recurring otomatis.
 - FREE tetap mendapat transaksi tanpa batas dan satu slot kasir total (web atau Telegram).
@@ -72,10 +72,16 @@ Jalankan migrasi secara manual melalui **Supabase SQL Editor** dalam urutan beri
 4. `supabase/migrations/0004_subscription_orders.sql`
 5. `supabase/migrations/0005_rate_limits.sql`
 6. `supabase/migrations/0006_report_rpcs.sql`
+7. `supabase/migrations/0007_product_types_and_fnb_queue.sql`
+8. `supabase/migrations/0008_reconcile_transaction_rpc.sql`
 
-`add_loyalty_customers.sql` adalah migrasi lama; perubahan loyalitasnya sudah dicakup secara idempoten oleh baseline dan kebijakan/RPC saat ini. Untuk project baru, gunakan urutan bernomor di atas.
+`add_loyalty_customers.sql` adalah migrasi lama; perubahan loyalitasnya sudah dicakup secara idempoten oleh baseline dan kebijakan/RPC saat ini. Untuk project baru, jalankan `0001`–`0008` berurutan. Database yang sudah berhasil menjalankan `0007` cukup melanjutkan dengan `0008`; jangan menjalankan ulang atau mengedit migrasi historis.
 
 Migrasi `0006` menambah RPC laporan. Seluruh fungsi memakai rentang setengah-terbuka `[from, to)`, grup tanggal WIB, pemeriksaan pemilik toko melalui `auth.uid()`, dan execute grant hanya untuk `authenticated`.
+
+Migrasi `0007` menambah jenis katalog dan antrean F&B. Migrasi forward-only `0008` merekonsiliasi fungsi transaksi untuk database yang sudah memakai `0007`, memperkuat validasi relasi item, dan memastikan nomor antrean hanya dialokasikan saat mode antrean aktif. Jalankan `0006`, `0007`, lalu `0008` sesuai urutan sebelum merilis kode ini. Produk lama otomatis menjadi **produk utama**; pemilik dapat mengubahnya menjadi **sub-produk/tambahan** di Dashboard → Produk. Jika pengaturan Wajib sub-produk aktif, setiap produk utama di transaksi harus memiliki minimal satu sub-produk katalog yang valid.
+
+Saat Mode antrean F&B aktif, transaksi mendapat nomor urut per toko yang reset setiap pergantian tanggal WIB. Link kasir menyediakan menu **Antrean** dengan tab **Belum selesai** dan **Selesai**. Transaksi offline belum memiliki nomor sampai sinkronisasi server berhasil; aplikasi tidak membuat nomor lokal agar tidak bentrok.
 
 ## Storage bukti pembayaran
 
@@ -131,7 +137,8 @@ Gunakan dua akun pemilik dengan dua toko berbeda:
 - Pastikan akun A tidak bisa membaca/mengubah toko, produk, transaksi, pelanggan, kasir, order, atau laporan akun B.
 - Buat kasir web dan Telegram; pada FREE pastikan total slot tetap satu, pada PRO boleh lebih dari satu.
 - Rotasi token kasir dan pastikan tautan lama tidak berlaku; uji device binding.
-- Buat transaksi multi-item CASH dan QRIS/TF, cek stok, subtotal, diskon loyalitas, total, uang/kembalian, struk, dan bukti.
+- Buat transaksi multi-item CASH dan QRIS/TF, cek klasifikasi produk utama/sub-produk, stok, subtotal, diskon loyalitas, total, uang/kembalian, struk, dan bukti.
+- Aktifkan mode F&B, kirim transaksi bersamaan, pastikan nomor antrean unik per hari WIB, lalu uji tab Belum selesai/Selesai dan device binding.
 - Retry transaksi dengan `client_tx_id` sama dan pastikan tidak tercatat dua kali.
 - Uji data laporan di atas 1.000 transaksi, batas 00:00 WIB, filter pembayaran, FREE, PRO aktif, dan PRO kedaluwarsa.
 - Offline-kan perangkat kasir, antrekan transaksi + bukti, kembali online, lalu periksa sinkronisasi dan Cache Storage tidak menyimpan URL token/API/struk.
@@ -140,8 +147,9 @@ Gunakan dua akun pemilik dengan dua toko berbeda:
 
 ## Troubleshooting
 
-- **“Fungsi transaksi belum terpasang”**: jalankan migrasi `0003`.
+- **“Fungsi transaksi belum terpasang”**: jalankan migrasi `0008` (setelah `0007`), lalu reload schema cache Supabase bila perlu.
 - **“Migrasi laporan belum terpasang”**: jalankan migrasi `0006`, lalu reload schema cache Supabase bila perlu.
+- **“Migrasi katalog/antrean belum terpasang”**: jalankan migrasi `0007` lalu `0008` setelah `0006`, lalu reload schema cache Supabase bila perlu.
 - **Snap tidak muncul**: cocokkan client/server key dengan `MIDTRANS_IS_PRODUCTION`, periksa CSP dan console browser.
 - **Webhook Midtrans 401**: server key/mode tidak cocok atau signature berubah.
 - **Telegram selalu 401**: daftarkan ulang webhook dengan nilai `secret_token` yang sama dengan env.

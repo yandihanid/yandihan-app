@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
-import { submitTransaction } from './actions'
 import { compressImage, dataUrlToFile, readFileAsDataUrl } from './imageUtils'
+import { cashierDeviceHeaders } from './device'
 import {
   dropReceiptBlob,
   enqueue,
@@ -12,10 +12,13 @@ import {
   serverQueue,
   storeReceiptBlob,
   subscribeQueue,
+  syncCandidates,
   takeReceiptBlob,
+  transitionAfterSync,
 } from './offlineQueue'
-import { formatDateTimeWib, formatRupiah, normalizePhone } from '@/lib/format'
+import { formatDateTimeWib, formatRupiah, normalizePhone, parseRupiah } from '@/lib/format'
 import { discountAmount } from '@/lib/loyalty'
+import { splitProducts } from '@/lib/catalog'
 
 // Layar yang paling sering dipakai di produk ini, dan sebelumnya yang paling
 // banyak rusaknya. Yang berubah di pass ini:
@@ -62,12 +65,6 @@ function subscribeOnline(callback) {
 const getOnline = () => navigator.onLine
 const getOnlineServer = () => true
 
-function digitsToInt(value) {
-  const digits = String(value ?? '').replace(/\D/g, '')
-  if (!digits) return null
-  return Number.parseInt(digits, 10)
-}
-
 export default function CashierForm({
   token,
   products = [],
@@ -92,12 +89,18 @@ export default function CashierForm({
   const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [retryVersion, setRetryVersion] = useState(0)
 
   const isOnline = useSyncExternalStore(subscribeOnline, getOnline, getOnlineServer)
   const queue = useSyncExternalStore(
     subscribeQueue,
     useCallback(() => readQueue(token), [token]),
     serverQueue
+  )
+
+  const { main: mainProducts, sub: subProducts } = useMemo(
+    () => splitProducts(products),
+    [products]
   )
 
   const byId = useMemo(() => {
@@ -125,12 +128,12 @@ export default function CashierForm({
   const loyaltyFor = loyalty?.phone === phoneNormalized ? loyalty : null
 
   // Angka ini hanya PRATINJAU. Server menghitung ulang diskonnya sendiri di
-  // submitTransaction, jadi memalsukan respons /api/cashier/loyalty tidak
+  // submit endpoint, jadi memalsukan respons /api/cashier/loyalty tidak
   // menghasilkan potongan apa pun.
   const discountPercent = loyaltyFor?.eligible ? loyaltyFor.discountPercent : 0
   const discount = discountAmount(subtotal, discountPercent)
   const total = Math.max(0, subtotal - discount)
-  const received = paymentMethod === 'CASH' ? digitsToInt(cashReceived) : null
+  const received = paymentMethod === 'CASH' ? parseRupiah(cashReceived) : null
   const change = received != null && received >= total ? received - total : null
   const qtyInCart = useMemo(() => {
     const counts = new Map()
@@ -150,7 +153,7 @@ export default function CashierForm({
     const controller = new AbortController()
     const timer = setTimeout(() => {
       fetch(`/api/cashier/loyalty?phone=${encodeURIComponent(phoneNormalized)}`, {
-        headers: { 'x-cashier-token': token },
+        headers: { 'x-cashier-token': token, ...cashierDeviceHeaders() },
         cache: 'no-store',
         signal: controller.signal,
       })
@@ -271,48 +274,61 @@ export default function CashierForm({
     )
   }
 
-  const syncQueue = useCallback(async () => {
+  const syncQueue = useCallback(async ({ includeBlocked = false } = {}) => {
     if (syncingRef.current) return
-    const pending = readQueue(token)
+    const pending = syncCandidates(readQueue(token), { includeBlocked })
     if (pending.length === 0) return
 
     syncingRef.current = true
     lastAttemptRef.current = Date.now()
     setSyncing(true)
 
-    const remaining = []
     let sent = 0
     let rejected = 0
 
     try {
-      for (let i = 0; i < pending.length; i++) {
-        const entry = pending[i]
-        let result
+      for (const entry of pending) {
+        if (!readQueue(token).some((item) => item.clientTxId === entry.clientTxId)) continue
+        let outcome
         try {
-          result = await submitTransaction(await entryToFormData(entry))
+          outcome = await postTransaction(token, entry)
         } catch {
-          // Jaringan mati lagi di tengah sinkronisasi: sisanya tetap di antrean.
-          remaining.push(...pending.slice(i))
+          // Hasil request tidak diketahui. Entry ini dan semua setelahnya tidak
+          // disentuh agar retry dengan clientTxId yang sama tetap idempoten.
           break
         }
-        if (result?.error) rejected += 1
-        else sent += 1
-        await dropReceiptBlob(entry.receiptKey)
+
+        const current = readQueue(token)
+        const persisted = replaceQueue(
+          token,
+          transitionAfterSync(current, entry.clientTxId, outcome)
+        )
+        if (!persisted) {
+          setMessage({
+            type: 'warning',
+            text: 'Status sinkronisasi tidak dapat disimpan di perangkat. Transaksi tetap di antrean untuk dicoba lagi.',
+          })
+          break
+        }
+        if (outcome.type === 'success') {
+          sent += 1
+          await dropReceiptBlob(entry.receiptKey)
+        } else {
+          rejected += 1
+        }
       }
     } finally {
-      // finally, supaya satu throw tidak meninggalkan syncing=true permanen dan
-      // antrean tidak pernah ditulis balik (bug versi sebelumnya).
-      replaceQueue(token, remaining)
       syncingRef.current = false
       setSyncing(false)
+      setRetryVersion((version) => version + 1)
     }
 
     if (sent > 0 || rejected > 0) {
       const parts = []
       if (sent > 0) parts.push(`${sent} transaksi offline berhasil dikirim`)
-      if (rejected > 0) parts.push(`${rejected} ditolak server dan dikeluarkan dari antrean`)
+      if (rejected > 0) parts.push(`${rejected} ditolak server dan perlu diperiksa`)
       setMessage({ type: rejected > 0 ? 'warning' : 'success', text: `${parts.join(', ')}.` })
-      router.refresh()
+      if (sent > 0) router.refresh()
     }
   }, [token, router])
 
@@ -323,7 +339,7 @@ export default function CashierForm({
       syncQueue()
     }, wait)
     return () => clearTimeout(timer)
-  }, [isOnline, queue, syncQueue])
+  }, [isOnline, queue, retryVersion, syncQueue])
 
   async function queueOffline(payload, note) {
     const receiptKey = receipt?.file ? await storeReceiptBlob(payload.clientTxId, receipt.file) : null
@@ -343,9 +359,13 @@ export default function CashierForm({
       createdAt: Date.now(),
     })
     if (!result.ok) {
+      if (receiptKey) await dropReceiptBlob(receiptKey)
       setMessage({
         type: 'error',
-        text: `Antrean offline penuh (${result.limit} transaksi). Sambungkan internet dulu supaya antrean terkirim.`,
+        text:
+          result.reason === 'full'
+            ? `Antrean offline penuh (${result.limit} transaksi). Sambungkan internet dulu supaya antrean terkirim.`
+            : 'Transaksi tidak dapat disimpan di perangkat. Jangan tutup halaman; sambungkan internet lalu coba lagi.',
       })
       return false
     }
@@ -360,6 +380,10 @@ export default function CashierForm({
 
     if (lines.length === 0) {
       setMessage({ type: 'error', text: 'Belum ada item yang dipilih.' })
+      return
+    }
+    if (requireSubProduct && subProducts.length === 0) {
+      setMessage({ type: 'error', text: 'Belum ada sub-produk yang dapat dipilih.' })
       return
     }
     if (requireSubProduct && lines.some((line) => line.subs.length === 0)) {
@@ -397,24 +421,32 @@ export default function CashierForm({
         return
       }
 
-      let result
+      let outcome
       try {
-        result = await submitTransaction(await entryToFormData({ ...payload, receiptFile: receipt?.file || null }))
+        outcome = await postTransaction(token, { ...payload, receiptFile: receipt?.file || null })
       } catch {
         await queueOffline(payload, 'Koneksi terputus. Transaksi disimpan di antrean offline.')
         return
       }
 
-      if (result?.error) {
-        setMessage({ type: 'error', text: result.error })
+      if (outcome.type === 'rejected') {
+        setMessage({ type: 'error', text: outcome.error })
         return
       }
 
       resetForm()
-      router.push(`/r/${result.transactionId}`)
+      router.push(`/r/${outcome.data.transactionId}`)
     } finally {
       setLoading(false)
     }
+  }
+
+  async function deleteQueuedEntry(entry) {
+    const persisted = replaceQueue(
+      token,
+      transitionAfterSync(readQueue(token), entry.clientTxId, { type: 'delete' })
+    )
+    if (persisted) await dropReceiptBlob(entry.receiptKey)
   }
 
   const summary = (
@@ -448,18 +480,28 @@ export default function CashierForm({
     </div>
   )
 
-  if (products.length === 0) {
+  if (mainProducts.length === 0) {
     return (
       <div className="pos">
         <div className="pos-empty">
-          <strong>Belum ada produk</strong>
+          <strong>Belum ada produk utama</strong>
           <p style={{ margin: 0 }}>
-            Kasir tidak bisa mencatat penjualan sebelum ada produk beserta harganya. Harga selalu
-            diambil dari data produk, tidak diketik manual di layar ini.
+            Produk tambahan tidak dapat dijual sendiri. Minta pemilik toko menambahkan atau mengubah
+            minimal satu produk menjadi <strong>Produk utama</strong>.
           </p>
-          <p style={{ margin: 0, fontSize: '0.8125rem' }}>
-            Minta pemilik toko membuka <strong>Dashboard &rarr; Produk</strong> lalu menambahkan
-            produk.
+        </div>
+      </div>
+    )
+  }
+
+  if (requireSubProduct && subProducts.length === 0) {
+    return (
+      <div className="pos">
+        <div className="pos-empty">
+          <strong>Sub-produk wajib belum dikonfigurasi</strong>
+          <p style={{ margin: 0 }}>
+            Pengaturan toko mewajibkan tambahan pada setiap item, tetapi katalog belum memiliki
+            sub-produk. Minta pemilik toko menambah <strong>Sub-produk/tambahan</strong>.
           </p>
         </div>
       </div>
@@ -481,7 +523,7 @@ export default function CashierForm({
             <button
               type="button"
               className="pos-text-btn"
-              onClick={() => syncQueue()}
+              onClick={() => syncQueue({ includeBlocked: true })}
               disabled={!isOnline || syncing}
             >
               {syncing ? 'Mengirim...' : 'Kirim sekarang'}
@@ -501,7 +543,7 @@ export default function CashierForm({
           Pilih Produk
         </legend>
         <div className="pos-grid">
-          {products.map((product) => {
+          {mainProducts.map((product) => {
             const inCart = qtyInCart.get(product.id) || 0
             const soldOut = Number(product.stock) <= 0
             return (
@@ -555,7 +597,7 @@ export default function CashierForm({
                       min="1"
                       max="999"
                       value={line.qty}
-                      onChange={(e) => changeQty(line.key, 0, digitsToInt(e.target.value) ?? 1)}
+                      onChange={(e) => changeQty(line.key, 0, parseRupiah(e.target.value) ?? 1)}
                       aria-label={`Jumlah ${product?.name || 'item'}`}
                     />
                     <button
@@ -617,27 +659,30 @@ export default function CashierForm({
                   </div>
                 ))}
 
-                <label className="pos-line-sub" style={{ gap: 8 }}>
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                    + Sub-produk{requireSubProduct && line.subs.length === 0 ? ' (wajib)' : ''}
-                  </span>
-                  <select
-                    className="input"
-                    style={{ flex: 1, minHeight: 'var(--tap-target)' }}
-                    value=""
-                    onChange={(e) => {
-                      addSub(line.key, e.target.value)
-                      e.target.value = ''
-                    }}
-                  >
-                    <option value="">Pilih tambahan...</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} - {formatRupiah(product.price)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {subProducts.length > 0 && (
+                  <label className="pos-line-sub" style={{ gap: 8 }}>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                      + Sub-produk{requireSubProduct && line.subs.length === 0 ? ' (wajib)' : ''}
+                    </span>
+                    <select
+                      className="input"
+                      style={{ flex: 1, minHeight: 'var(--tap-target)' }}
+                      value=""
+                      onChange={(e) => {
+                        addSub(line.key, e.target.value)
+                        e.target.value = ''
+                      }}
+                    >
+                      <option value="">Pilih tambahan...</option>
+                      {subProducts.map((product) => (
+                        <option key={product.id} value={product.id} disabled={Number(product.stock) <= 0}>
+                          {product.name} - {formatRupiah(product.price)}
+                          {Number(product.stock) <= 0 ? ' (stok habis)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
             )
           })}
@@ -773,7 +818,7 @@ export default function CashierForm({
             type="text"
             inputMode="numeric"
             value={cashReceived ? Number(cashReceived).toLocaleString('id-ID') : ''}
-            onChange={(e) => setCashReceived(String(digitsToInt(e.target.value) ?? ''))}
+            onChange={(e) => setCashReceived(String(parseRupiah(e.target.value) ?? ''))}
             placeholder="0"
           />
         </div>
@@ -798,16 +843,18 @@ export default function CashierForm({
               <span className="pos-line-name">
                 {formatDateTimeWib(entry.createdAt)} &middot; {entry.paymentMethod}
                 {entry.receiptKey || entry.receiptDataUrl ? ' (dengan bukti)' : ''}
+                {entry.syncError && (
+                  <>
+                    <br />
+                    <span style={{ color: 'var(--danger)' }}>Ditolak: {entry.syncError}</span>
+                  </>
+                )}
               </span>
               <button
                 type="button"
                 className="pos-text-btn"
-                onClick={() =>
-                  replaceQueue(
-                    token,
-                    readQueue(token).filter((item) => item.clientTxId !== entry.clientTxId)
-                  )
-                }
+                onClick={() => deleteQueuedEntry(entry)}
+                disabled={syncing}
               >
                 Hapus
               </button>
@@ -823,13 +870,11 @@ export default function CashierForm({
   )
 }
 
-/** Membentuk FormData yang dibaca submitTransaction. Satu fungsi untuk jalur
- *  online dan jalur antrean offline, supaya keduanya tidak bisa lagi berbeda
- *  bentuk. Versi lama melewati key `receiptFile` saat sinkronisasi sementara
- *  server membaca `receipt`, jadi bukti QRIS offline tidak pernah ikut terkirim. */
+/** Membentuk FormData yang dibaca route transaksi. Satu fungsi untuk jalur
+ * online dan jalur antrean offline, supaya keduanya tidak bisa lagi berbeda
+ * bentuk. Token hanya dikirim sebagai header, tidak pernah menjadi field form. */
 async function entryToFormData(entry) {
   const fd = new FormData()
-  fd.append('token', entry.token)
   fd.append('items', entry.items)
   fd.append('paymentMethod', entry.paymentMethod)
   fd.append('cashReceived', entry.cashReceived || '')
@@ -843,4 +888,28 @@ async function entryToFormData(entry) {
   if (file) fd.append('receipt', file)
 
   return fd
+}
+
+async function postTransaction(token, entry) {
+  const response = await fetch('/api/cashier/transactions', {
+    method: 'POST',
+    headers: {
+      'x-cashier-token': token,
+      ...cashierDeviceHeaders(),
+    },
+    body: await entryToFormData(entry),
+  })
+
+  let data = null
+  try {
+    data = await response.json()
+  } catch {
+    data = null
+  }
+
+  if (response.ok && data?.success) return { type: 'success', data }
+  return {
+    type: 'rejected',
+    error: data?.error || 'Transaksi ditolak server. Periksa data lalu coba lagi.',
+  }
 }

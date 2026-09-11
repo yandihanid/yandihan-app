@@ -18,6 +18,7 @@ const RECEIPT_FIELDS = `
   receipt_url,
   cash_received,
   change_amount,
+  queue_number,
   created_at,
   stores(name, address, phone),
   cashiers(name),
@@ -65,6 +66,11 @@ export default async function ReceiptPage({ params }) {
           {tx.stores?.phone && <p className={styles.storeDetail}>{tx.stores.phone}</p>}
           <p className={styles.headerLine}>Bukti Pembayaran</p>
           <p className={styles.headerLine}>No. {shortTxNumber(tx.id)}</p>
+          {tx.queue_number != null && (
+            <p className={styles.headerLine} style={{ fontSize: '1.25rem', fontWeight: 800 }}>
+              Antrean #{tx.queue_number}
+            </p>
+          )}
           <p className={styles.headerLine}>{formatDateTimeWib(tx.created_at)}</p>
         </header>
 

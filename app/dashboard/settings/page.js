@@ -31,7 +31,8 @@ const TOGGLES = [
   {
     field: 'require_sub_product',
     title: 'Wajib sub-produk',
-    description: 'Untuk produk paket: kasir harus memilih isi paketnya, tidak bisa dilewati.',
+    description:
+      'Setiap produk utama di kasir wajib memiliki minimal satu item yang ditandai sebagai sub-produk/tambahan.',
     fallback: false,
   },
   {
@@ -42,9 +43,9 @@ const TOGGLES = [
   },
   {
     field: 'waiting_list_enabled',
-    title: 'Nomor antrean',
+    title: 'Mode antrean F&B',
     description:
-      'Setiap transaksi dapat nomor antrean, dan layar antrean bisa dibuka di HP pembeli.',
+      'Transaksi mendapat nomor antrean harian WIB. Link kasir menampilkan menu Belum selesai dan Selesai.',
     fallback: false,
   },
 ]

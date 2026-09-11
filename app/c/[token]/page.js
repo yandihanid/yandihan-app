@@ -4,34 +4,10 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import CashierForm from './CashierForm'
 import WaitingList from './WaitingList'
+import { cashierDeviceHeaders } from './device'
 import { loyaltyEnabled, DEFAULT_VISIT_THRESHOLD } from '@/lib/loyalty'
 
 const PREFIX = 'yandihan_cashier_meta_'
-const DEVICE_KEY = 'yandihan_device_id'
-
-/** ID perangkat untuk device binding. Sebelumnya
- *  Math.random().toString(36).slice(2, 9) -- sekitar 36 bit dan bisa berulang.
- *  randomUUID() 122 bit acak kriptografis. */
-function deviceId() {
-  let id = null
-  try {
-    id = localStorage.getItem(DEVICE_KEY)
-  } catch {
-    return 'dev_unknown'
-  }
-  if (!id || id.length < 16) {
-    id =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : 'dev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12)
-    try {
-      localStorage.setItem(DEVICE_KEY, id)
-    } catch {
-      /* penyimpanan diblokir: binding tidak akan persist */
-    }
-  }
-  return id
-}
 
 /** async supaya setState-nya jatuh setelah batas microtask, bukan sinkron di
  *  dalam body useEffect (render berantai -- dilarang react-hooks). */
@@ -47,6 +23,7 @@ export default function CashierWeb() {
   const { token } = useParams()
   const [cashier, setCashier] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [screen, setScreen] = useState('transaction')
 
   // Indikator online/offline sekarang ada di dalam CashierForm (satu tempat,
   // bersama jumlah antrean yang belum terkirim), jadi header tidak perlu
@@ -75,7 +52,7 @@ export default function CashierWeb() {
         // tercatat di log proxy, terkirim lewat Referer, dan jadi cache key
         // service worker.
         const res = await fetch('/api/cashier', {
-          headers: { 'x-cashier-token': token, 'x-device-id': deviceId() },
+          headers: { 'x-cashier-token': token, ...cashierDeviceHeaders() },
           cache: 'no-store',
         })
         if (cancelled) return
@@ -124,22 +101,43 @@ export default function CashierWeb() {
         <h1 style={{ color: 'var(--primary-color)', margin: 0 }}>{store.name}</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)' }}>{cashier.name}</p>
       </header>
-      <main style={{ maxWidth: 560, margin: '0 auto' }}>
-        <div className="card">
-          {/* storeId, cashierId, dan discountPercent tidak lagi dikirim: server
-              menurunkan semuanya dari token (temuan A1, C1, B6). */}
-          <CashierForm
-            token={token}
-            products={cashier.products || []}
-            receiptRequired={store.receipt_required ?? true}
-            requireSubProduct={store.require_sub_product ?? false}
-            requireCustomerName={store.require_customer_name ?? false}
-            loyaltyEnabled={loyaltyEnabled(store)}
-            visitThreshold={store.visit_threshold ?? DEFAULT_VISIT_THRESHOLD}
-          />
-        </div>
-      </main>
-      {store.waiting_list_enabled && <WaitingList token={token} />}
+      {store.waiting_list_enabled && (
+        <nav className="cashier-nav" aria-label="Menu kasir">
+          <button
+            type="button"
+            className={screen === 'transaction' ? 'active' : ''}
+            onClick={() => setScreen('transaction')}
+          >
+            Transaksi
+          </button>
+          <button
+            type="button"
+            className={screen === 'queue' ? 'active' : ''}
+            onClick={() => setScreen('queue')}
+          >
+            Antrean
+          </button>
+        </nav>
+      )}
+      {screen === 'transaction' || !store.waiting_list_enabled ? (
+        <main style={{ maxWidth: 560, margin: '0 auto' }}>
+          <div className="card">
+            {/* storeId, cashierId, dan discountPercent tidak lagi dikirim: server
+                menurunkan semuanya dari token (temuan A1, C1, B6). */}
+            <CashierForm
+              token={token}
+              products={cashier.products || []}
+              receiptRequired={store.receipt_required ?? true}
+              requireSubProduct={store.require_sub_product ?? false}
+              requireCustomerName={store.require_customer_name ?? false}
+              loyaltyEnabled={loyaltyEnabled(store)}
+              visitThreshold={store.visit_threshold ?? DEFAULT_VISIT_THRESHOLD}
+            />
+          </div>
+        </main>
+      ) : (
+        <WaitingList token={token} active={screen === 'queue'} />
+      )}
     </div>
   )
 }

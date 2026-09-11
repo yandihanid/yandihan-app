@@ -12,16 +12,18 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireStoreOwnership, requireProductOwnership } from '@/lib/dal'
+import { parseProductType } from '@/lib/catalog'
 
 export async function addProduct(formData) {
   const name = String(formData.get('name') || '').trim()
   const price = formData.get('price')
   const stock = formData.get('stock')
+  const type = parseProductType(formData.get('productType'))
 
   const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
   if (ownErr) return { error: ownErr }
 
-  if (!name || price === null || stock === null) return { error: 'Data tidak lengkap' }
+  if (!name || price === null || stock === null || !type) return { error: 'Data tidak lengkap' }
   if (name.length > 120) return { error: 'Nama produk terlalu panjang (maks 120 karakter)' }
 
   const priceNum = parseInt(price, 10)
@@ -36,6 +38,7 @@ export async function addProduct(formData) {
     name,
     price: priceNum,
     stock: stockNum,
+    is_sub_product: type === 'sub',
   })
 
   if (error) {
@@ -50,20 +53,48 @@ export async function addProduct(formData) {
 
 export async function updateStock(formData) {
   const newStock = parseInt(formData.get('newStock'), 10)
+  const currentStock = parseInt(formData.get('currentStock'), 10)
 
   const { product, error: ownErr } = await requireProductOwnership(formData.get('productId'))
   if (ownErr) return { error: ownErr }
 
-  if (isNaN(newStock) || newStock < 0) return { error: 'Stok tidak valid' }
+  if (isNaN(newStock) || newStock < 0 || isNaN(currentStock) || currentStock < 0) {
+    return { error: 'Stok tidak valid' }
+  }
 
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('products')
     .update({ stock: newStock })
     .eq('id', product.id)
     .eq('store_id', product.store_id)
+    .eq('stock', currentStock)
+    .select('id')
+    .maybeSingle()
 
   if (error) return { error: 'Gagal mengubah stok' }
+  if (!data) {
+    return { error: 'Stok sudah berubah karena transaksi lain. Muat ulang lalu coba lagi.' }
+  }
+  revalidatePath('/dashboard/produk')
+  return { success: true }
+}
+
+export async function updateProductType(formData) {
+  const type = parseProductType(formData.get('productType'))
+  if (!type) return { error: 'Jenis produk tidak valid' }
+
+  const { product, error: ownErr } = await requireProductOwnership(formData.get('productId'))
+  if (ownErr) return { error: ownErr }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('products')
+    .update({ is_sub_product: type === 'sub' })
+    .eq('id', product.id)
+    .eq('store_id', product.store_id)
+
+  if (error) return { error: 'Gagal mengubah jenis produk' }
   revalidatePath('/dashboard/produk')
   return { success: true }
 }

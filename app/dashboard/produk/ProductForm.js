@@ -55,6 +55,15 @@ export default function ProductForm({ storeId }) {
           )}
         </Field>
 
+        <Field id="product-type" label="Jenis Produk" required>
+          {(props) => (
+            <select {...props} name="productType" className="input" defaultValue="main">
+              <option value="main">Produk utama</option>
+              <option value="sub">Sub-produk / tambahan</option>
+            </select>
+          )}
+        </Field>
+
         <Field id="product-price" label="Harga (Rp)" required>
           {(props) => (
             <Input
