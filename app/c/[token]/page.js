@@ -128,7 +128,6 @@ export default function CashierWeb() {
               token={token}
               products={cashier.products || []}
               receiptRequired={store.receipt_required ?? true}
-              requireSubProduct={store.require_sub_product ?? false}
               requireCustomerName={store.require_customer_name ?? false}
               loyaltyEnabled={loyaltyEnabled(store)}
               visitThreshold={store.visit_threshold ?? DEFAULT_VISIT_THRESHOLD}

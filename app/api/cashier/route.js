@@ -6,15 +6,14 @@ import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 //   * token dibaca dari header x-cashier-token, bukan `?token=` (query string
 //     bocor lewat Referer, log proxy, dan cache key service worker)
 //   * ada rate limit -- sebelumnya token bisa di-brute-force tanpa batas
-//   * select menyertakan require_sub_product, require_customer_name, dan
-//     waiting_list_enabled. Tanpa itu tiga toggle di halaman settings tidak
-//     pernah berefek apa pun (temuan B8)
+//   * select menyertakan require_customer_name dan waiting_list_enabled.
+//     Tanpa itu toggle di halaman settings tidak pernah berefek (temuan B8)
 //   * device binding tidak bisa lagi dilewati dengan menghilangkan deviceId
 //   * .single() -> .maybeSingle() supaya token tak dikenal bukan error 500
 
 const STORE_FIELDS =
   'id, name, subscription_tier, subscription_end_date, receipt_required, ' +
-  'require_sub_product, require_customer_name, waiting_list_enabled, ' +
+  'require_customer_name, waiting_list_enabled, ' +
   'pelanggan_enabled, visit_threshold, discount_percent'
 
 const NO_STORE = { 'cache-control': 'private, no-store' }

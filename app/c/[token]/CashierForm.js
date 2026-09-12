@@ -69,7 +69,6 @@ export default function CashierForm({
   token,
   products = [],
   receiptRequired = true,
-  requireSubProduct = false,
   requireCustomerName = false,
   loyaltyEnabled = false,
   visitThreshold = 5,
@@ -80,6 +79,7 @@ export default function CashierForm({
   const syncingRef = useRef(false)
 
   const [lines, setLines] = useState([])
+  const [openSubPicker, setOpenSubPicker] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [cashReceived, setCashReceived] = useState('')
   const [buyerName, setBuyerName] = useState('')
@@ -198,10 +198,12 @@ export default function CashierForm({
 
   function removeLine(key) {
     setLines((current) => current.filter((line) => line.key !== key))
+    setOpenSubPicker((current) => (current === key ? null : current))
   }
 
   function addSub(lineKey, productId) {
     if (!productId) return
+    setOpenSubPicker(null)
     setLines((current) =>
       current.map((line) => {
         if (line.key !== lineKey) return line
@@ -257,6 +259,7 @@ export default function CashierForm({
 
   function resetForm() {
     setLines([])
+    setOpenSubPicker(null)
     setCashReceived('')
     setBuyerName('')
     setCustomerPhone('')
@@ -382,14 +385,6 @@ export default function CashierForm({
       setMessage({ type: 'error', text: 'Belum ada item yang dipilih.' })
       return
     }
-    if (requireSubProduct && subProducts.length === 0) {
-      setMessage({ type: 'error', text: 'Belum ada sub-produk yang dapat dipilih.' })
-      return
-    }
-    if (requireSubProduct && lines.some((line) => line.subs.length === 0)) {
-      setMessage({ type: 'error', text: 'Setiap item wajib punya minimal satu sub-produk.' })
-      return
-    }
     if (requireCustomerName && !buyerName.trim()) {
       setMessage({ type: 'error', text: 'Nama pembeli wajib diisi.' })
       return
@@ -488,20 +483,6 @@ export default function CashierForm({
           <p style={{ margin: 0 }}>
             Produk tambahan tidak dapat dijual sendiri. Minta pemilik toko menambahkan atau mengubah
             minimal satu produk menjadi <strong>Produk utama</strong>.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (requireSubProduct && subProducts.length === 0) {
-    return (
-      <div className="pos">
-        <div className="pos-empty">
-          <strong>Sub-produk wajib belum dikonfigurasi</strong>
-          <p style={{ margin: 0 }}>
-            Pengaturan toko mewajibkan tambahan pada setiap item, tetapi katalog belum memiliki
-            sub-produk. Minta pemilik toko menambah <strong>Sub-produk/tambahan</strong>.
           </p>
         </div>
       </div>
@@ -660,28 +641,51 @@ export default function CashierForm({
                 ))}
 
                 {subProducts.length > 0 && (
-                  <label className="pos-line-sub" style={{ gap: 8 }}>
-                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                      + Sub-produk{requireSubProduct && line.subs.length === 0 ? ' (wajib)' : ''}
-                    </span>
-                    <select
-                      className="input"
-                      style={{ flex: 1, minHeight: 'var(--tap-target)' }}
-                      value=""
-                      onChange={(e) => {
-                        addSub(line.key, e.target.value)
-                        e.target.value = ''
-                      }}
-                    >
-                      <option value="">Pilih tambahan...</option>
-                      {subProducts.map((product) => (
-                        <option key={product.id} value={product.id} disabled={Number(product.stock) <= 0}>
-                          {product.name} - {formatRupiah(product.price)}
-                          {Number(product.stock) <= 0 ? ' (stok habis)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="pos-sub-actions">
+                    {openSubPicker === line.key ? (
+                      <div className="pos-sub-picker">
+                        <label className="sr-only" htmlFor={`sub-product-${line.key}`}>
+                          Pilih subproduk untuk {product?.name || 'item'}
+                        </label>
+                        <select
+                          id={`sub-product-${line.key}`}
+                          className="input"
+                          autoFocus
+                          value=""
+                          onChange={(e) => addSub(line.key, e.target.value)}
+                        >
+                          <option value="">Pilih subproduk...</option>
+                          {subProducts.map((subProduct) => (
+                            <option
+                              key={subProduct.id}
+                              value={subProduct.id}
+                              disabled={Number(subProduct.stock) <= 0}
+                            >
+                              {subProduct.name} - {formatRupiah(subProduct.price)}
+                              {Number(subProduct.stock) <= 0 ? ' (stok habis)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="pos-text-btn"
+                          onClick={() => setOpenSubPicker(null)}
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="pos-text-btn pos-add-sub"
+                        onClick={() => setOpenSubPicker(line.key)}
+                        aria-expanded="false"
+                        aria-controls={`sub-product-${line.key}`}
+                      >
+                        + Subproduk
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )

@@ -164,7 +164,7 @@ export async function POST(req) {
     // datang dari luar -- RPC menurunkannya sendiri dari token ini.
     const { data: cashier } = await supabase
       .from('cashiers')
-      .select('id, store_id, token, stores!inner(require_sub_product)')
+      .select('id, store_id, token')
       .eq('telegram_chat_id', chatKey)
       .maybeSingle()
 
@@ -177,14 +177,6 @@ export async function POST(req) {
     // transaksi (pembedanya multi-kasir, loyalitas, dan laporan lanjutan).
     // Blok lamanya juga salah hitung -- memakai batas hari UTC padahal
     // penggunanya WIB, dan `count` yang null diperlakukan sebagai "belum penuh".
-
-    if (cashier.stores?.require_sub_product) {
-      await sendMessage(
-        chatId,
-        'Toko ini mewajibkan sub-produk pada setiap pesanan. Format Telegram belum mendukung pilihan tambahan, jadi catat transaksi melalui link kasir web.'
-      )
-      return NextResponse.json({ ok: true })
-    }
 
     const parsed = parseReport(text)
     if (parsed.error) {

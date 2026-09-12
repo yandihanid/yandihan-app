@@ -13,12 +13,8 @@ export const metadata = {
 }
 
 /**
- * Empat setelan boolean toko, sekarang lewat satu komponen.
- *
- * Deskripsinya bukan hiasan: sebelumnya labelnya hanya "Wajib Sub‑Produk" dan
- * "Waiting List Ticket" — istilah yang tidak berarti apa pun bagi pemilik warung
- * yang baru membuka halaman ini. Yang berubah kalau tombolnya ditekan sekarang
- * ditulis di sebelah tombolnya.
+ * Setelan boolean toko lewat satu komponen. Setiap deskripsi menjelaskan
+ * perubahan yang terjadi saat tombolnya ditekan.
  */
 const TOGGLES = [
   {
@@ -27,13 +23,6 @@ const TOGGLES = [
     description:
       'Kasir harus melampirkan foto bukti transfer sebelum transaksi non-tunai bisa dikirim.',
     fallback: true,
-  },
-  {
-    field: 'require_sub_product',
-    title: 'Wajib sub-produk',
-    description:
-      'Setiap produk utama di kasir wajib memiliki minimal satu item yang ditandai sebagai sub-produk/tambahan.',
-    fallback: false,
   },
   {
     field: 'require_customer_name',

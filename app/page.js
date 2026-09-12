@@ -2,6 +2,9 @@ import Link from 'next/link'
 import {
   ArrowRight,
   BarChart3,
+  CheckCircle2,
+  Clock3,
+  PackageCheck,
   Receipt,
   Send,
   ShieldCheck,
@@ -201,72 +204,102 @@ export default function Home() {
           <div className="lp-blob lp-blob-b" aria-hidden="true" />
 
           <div className="lp-hero-inner">
-            {/* Badge lama berbunyi "SaaS Kasir & Laporan Keuangan UMKM #1".
-                Klaim peringkat tanpa sumber diganti janji yang bisa dibuktikan
-                dari kodenya sendiri: PLAN_LIMITS.FREE tidak punya batas
-                transaksi dan maxCashiers-nya 1. */}
-            <span className="lp-badge">
-              <span className="lp-badge-dot" aria-hidden="true" />
-              Gratis selamanya untuk 1 kasir
-            </span>
+            <div className="lp-hero-copy">
+              <span className="lp-badge">
+                <span className="lp-badge-dot" aria-hidden="true" />
+                Gratis selamanya untuk 1 kasir
+              </span>
 
-            <h1 className="lp-hero-title">
-              Lepas dari catatan manual,
-              <br />
-              <span className="lp-hero-accent">masuk ke laporan realtime.</span>
-            </h1>
+              <h1 className="lp-hero-title">
+                Operasional toko rapi,
+                <span className="lp-hero-accent"> tanpa catatan yang tercecer.</span>
+              </h1>
 
-            <p className="lp-hero-sub">
-              Kasir Anda mencatat penjualan dari HP lewat satu tautan, tanpa memasang aplikasi.
-              Anda melihat omzet, stok, dan struknya berubah di dashboard saat itu juga.
-            </p>
+              <p className="lp-hero-sub">
+                Kasir mencatat penjualan dari HP lewat satu tautan. Anda memantau omzet, stok,
+                antrean, dan struk digital dari dashboard yang sama—secara realtime.
+              </p>
 
-            <div className="lp-hero-cta">
-              <Link href="/signup" className="btn btn-primary btn-lg">
-                Mulai Gratis Sekarang
-                <ArrowRight size={20} aria-hidden="true" />
-              </Link>
-              {/* Dulu di sini ada <a href="/yandihan-kasir.apk" download>.
-                  Berkas APK-nya keluar dari repositori, jadi tautan itu akan
-                  404 setelah deploy berikutnya. Panduan adalah tujuan yang
-                  benar-benar ada, dan memang itu yang dibutuhkan pemilik toko
-                  yang baru datang. */}
-              <Link href="/guide" className="btn btn-secondary btn-lg">
-                Lihat Cara Kerjanya
-              </Link>
+              <div className="lp-hero-cta">
+                <Link href="/signup" className="btn btn-primary btn-lg">
+                  Mulai Gratis Sekarang
+                  <ArrowRight size={20} aria-hidden="true" />
+                </Link>
+                <Link href="/guide" className="btn btn-secondary btn-lg">
+                  Lihat Cara Kerjanya
+                </Link>
+              </div>
+
+              <div className="lp-hero-proof" aria-label="Keunggulan utama">
+                <span><CheckCircle2 size={17} aria-hidden="true" /> Tanpa kartu kredit</span>
+                <span><CheckCircle2 size={17} aria-hidden="true" /> Tanpa instalasi</span>
+                <span><CheckCircle2 size={17} aria-hidden="true" /> Tetap jalan saat offline</span>
+              </div>
             </div>
 
-            <p className="lp-hero-note">
-              Tanpa kartu kredit. Tanpa masa percobaan yang habis.
-            </p>
+            <div className="lp-product-showcase" aria-label="Ilustrasi dashboard Yandihan">
+              <div className="lp-showcase-glow" aria-hidden="true" />
+              <div className="lp-dashboard-mockup">
+                <div className="lp-mockup-topbar">
+                  <div className="lp-mockup-brand">
+                    <span className="lp-logo-mark" aria-hidden="true">Y</span>
+                    <span>Dashboard Toko</span>
+                  </div>
+                  <span className="lp-live-pill"><span aria-hidden="true" /> Realtime</span>
+                </div>
+
+                <div className="lp-mockup-content">
+                  <div className="lp-mockup-stats">
+                    <div className="lp-mockup-stat lp-mockup-stat-primary">
+                      <span>Omzet hari ini</span>
+                      <strong>Rp 1.842.000</strong>
+                      <small><TrendingUp size={14} aria-hidden="true" /> 18 transaksi masuk</small>
+                    </div>
+                    <div className="lp-mockup-stat">
+                      <span>Antrean aktif</span>
+                      <strong>04</strong>
+                      <small><Clock3 size={14} aria-hidden="true" /> Terpantau langsung</small>
+                    </div>
+                  </div>
+
+                  <div className="lp-mockup-panel">
+                    <div className="lp-mockup-panel-head">
+                      <div>
+                        <strong>Transaksi terbaru</strong>
+                        <span>Masuk otomatis dari kasir</span>
+                      </div>
+                      <span>Lihat semua</span>
+                    </div>
+                    <div className="lp-mockup-rows">
+                      <div className="lp-mockup-row">
+                        <span className="lp-mockup-icon lp-icon-green"><Receipt size={17} /></span>
+                        <span><strong>Nasi Goreng + Es Teh</strong><small>Kasir Utama · baru saja</small></span>
+                        <strong>Rp 28.000</strong>
+                      </div>
+                      <div className="lp-mockup-row">
+                        <span className="lp-mockup-icon lp-icon-blue"><PackageCheck size={17} /></span>
+                        <span><strong>Stok diperbarui</strong><small>Otomatis setelah transaksi</small></span>
+                        <span className="lp-mockup-status">Selesai</span>
+                      </div>
+                      <div className="lp-mockup-row">
+                        <span className="lp-mockup-icon lp-icon-purple"><BarChart3 size={17} /></span>
+                        <span><strong>Laporan hari ini</strong><small>Siap dibaca pemilik toko</small></span>
+                        <strong>+12%</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="lp-preview-note">Tampilan dan angka di atas merupakan ilustrasi produk.</p>
+            </div>
           </div>
         </section>
 
-        {/* ── Pratinjau dashboard ────────────────────────────────────────── */}
-        <section className="lp-preview" aria-labelledby="lp-preview-title">
-          <h2 id="lp-preview-title" className="sr-only">
-            Contoh tampilan dashboard
-          </h2>
-          <div className="lp-preview-shell">
-            <div className="lp-preview-frame">
-              <div className="lp-window-bar" aria-hidden="true">
-                <span className="lp-window-dot lp-window-dot-red" />
-                <span className="lp-window-dot lp-window-dot-yellow" />
-                <span className="lp-window-dot lp-window-dot-green" />
-              </div>
-              <div className="lp-preview-body">
-                <p className="lp-preview-label">Total Pemasukan Bulan Ini</p>
-                <p className="lp-preview-value">Rp 24.500.000</p>
-                <p className="lp-preview-delta">
-                  <TrendingUp size={16} aria-hidden="true" />
-                  Naik 15% dari bulan lalu
-                </p>
-                {/* Angka di atas adalah contoh. Menyebutnya terang-terangan
-                    lebih baik daripada membiarkan pengunjung membacanya
-                    sebagai omzet toko sungguhan. */}
-                <p className="lp-preview-note">Angka pada contoh ini hanya ilustrasi.</p>
-              </div>
-            </div>
+        <section className="lp-value-strip" aria-label="Manfaat Yandihan">
+          <div className="lp-inner lp-value-grid">
+            <div><strong>1 tautan</strong><span>untuk mulai mencatat dari HP kasir</span></div>
+            <div><strong>Realtime</strong><span>omzet dan stok masuk ke dashboard</span></div>
+            <div><strong>Offline-ready</strong><span>transaksi tersimpan saat sinyal putus</span></div>
           </div>
         </section>
 

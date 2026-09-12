@@ -27,7 +27,6 @@ import { requireStoreOwnership } from '@/lib/dal'
  */
 const ALLOWED_FIELDS = [
   'receipt_required',
-  'require_sub_product',
   'require_customer_name',
   'waiting_list_enabled',
 ]
