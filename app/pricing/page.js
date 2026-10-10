@@ -51,7 +51,7 @@ const DETAILS = [
     icon: ShieldCheck,
     tone: 'lp-icon-purple',
     title: 'Bagaimana cara membayarnya?',
-    desc: 'Lewat Midtrans, dari dalam dashboard setelah Anda masuk. Pilihan yang muncul di halaman pembayaran mengikuti metode yang tersedia di sana, seperti transfer bank, QRIS, atau e-wallet. Masa aktif ditambah 30 hari sejak pembayaran dikonfirmasi, dan kalau diperpanjang sebelum habis, sisa harinya tidak hangus melainkan ditambahkan di atasnya.',
+    desc: 'Lewat Xendit, dari dalam dashboard setelah Anda masuk. Pilihan yang muncul di halaman pembayaran mengikuti metode yang tersedia di sana, seperti transfer bank, QRIS, atau e-wallet. Masa aktif ditambah 30 hari sejak pembayaran dikonfirmasi, dan kalau diperpanjang sebelum habis, sisa harinya tidak hangus melainkan ditambahkan di atasnya.',
   },
 ]
 
@@ -66,7 +66,7 @@ const BILLING_FAQ = [
   },
   {
     q: 'Pembayaran sudah masuk tapi paket masih GRATIS?',
-    a: 'Konfirmasi dari Midtrans biasanya datang dalam beberapa detik dan paket langsung berubah. Kalau Anda menutup jendela pembayaran sebelum konfirmasi masuk, klik tombol "Cek Status Pembayaran" di dashboard: statusnya ditanyakan langsung ke Midtrans, dan kalau sudah lunas masa aktifnya ditambahkan saat itu. Menekannya berkali-kali aman, satu pembayaran tidak bisa dihitung dua kali.',
+    a: 'Konfirmasi dari Xendit biasanya datang dalam beberapa detik dan paket langsung berubah. Kalau Anda menutup jendela pembayaran sebelum konfirmasi masuk, klik tombol "Cek Status Pembayaran" di dashboard: statusnya ditanyakan langsung ke Xendit, dan kalau sudah lunas masa aktifnya ditambahkan saat itu. Menekannya berkali-kali aman, satu pembayaran tidak bisa dihitung dua kali.',
   },
 ]
 

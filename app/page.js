@@ -17,7 +17,7 @@ import SiteHeader from '@/components/landing/SiteHeader'
 import SiteFooter from '@/components/landing/SiteFooter'
 import FaqAccordion from '@/components/landing/FaqAccordion'
 import PlanCards from '@/components/landing/PlanCards'
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from '@/lib/site'
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, LEGAL_ENTITY } from '@/lib/site'
 
 /**
  * Landing page. SERVER COMPONENT -- dan itu perubahan terpenting di file ini.
@@ -409,6 +409,12 @@ export default function Home() {
               Buat Akun Gratis
               <ArrowRight size={20} aria-hidden="true" />
             </Link>
+            {/* Hubungan merek -> badan hukum, dicantumkan juga di body halaman
+                utama (bukan hanya footer) supaya kepemilikan terlihat jelas dan
+                konsisten -- bagian dari syarat verifikasi merchant. */}
+            <p className="lp-cta-owner">
+              {SITE_NAME} adalah produk dari {LEGAL_ENTITY}.
+            </p>
           </div>
         </section>
       </main>

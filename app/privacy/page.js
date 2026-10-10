@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import SiteHeader from '@/components/landing/SiteHeader'
 import SiteFooter from '@/components/landing/SiteFooter'
-import { SITE_NAME, SUPPORT_EMAIL, supportMailto } from '@/lib/site'
+import { SITE_NAME, SUPPORT_EMAIL, supportMailto, LEGAL_ENTITY, PAYMENT_GATEWAY } from '@/lib/site'
 
 /**
  * Kebijakan Privasi.
@@ -37,7 +37,7 @@ export const metadata = {
   },
 }
 
-const LAST_UPDATED = '5 September 2026'
+const LAST_UPDATED = '10 Oktober 2026'
 
 export default function PrivacyPage() {
   const mailto = supportMailto('Pertanyaan Kebijakan Privasi')
@@ -55,6 +55,7 @@ export default function PrivacyPage() {
             Ringkasnya: kami menyimpan data yang dibutuhkan agar kasir dan laporan Anda
             berfungsi, dan tidak lebih. Kami tidak menjual data Anda, tidak memakainya
             untuk iklan, dan tidak memasang pelacak pihak ketiga apa pun di aplikasi ini.
+            Layanan ini diselenggarakan oleh {LEGAL_ENTITY}.
           </p>
         </div>
 
@@ -157,10 +158,10 @@ export default function PrivacyPage() {
             menyimpan log server teknis dalam waktu terbatas.
           </li>
           <li>
-            <strong>Midtrans</strong> -- memproses pembayaran langganan. Saat Anda
-            membayar, alamat email akun Anda dan rincian pesanan dikirim ke Midtrans agar
+            <strong>{PAYMENT_GATEWAY}</strong> -- memproses pembayaran langganan. Saat Anda
+            membayar, alamat email akun Anda dan rincian pesanan dikirim ke {PAYMENT_GATEWAY} agar
             pembayaran bisa dicocokkan dan buktinya bisa dikirimkan kepada Anda. Data
-            kartu atau rekening Anda dimasukkan di halaman Midtrans dan tidak pernah
+            kartu atau rekening Anda dimasukkan di halaman {PAYMENT_GATEWAY} dan tidak pernah
             melewati server kami.
           </li>
           <li>

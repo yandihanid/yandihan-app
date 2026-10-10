@@ -3,22 +3,22 @@ import SiteHeader from '@/components/landing/SiteHeader'
 import SiteFooter from '@/components/landing/SiteFooter'
 import { PRO_PRICE_IDR } from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
-import { SITE_NAME, SUPPORT_EMAIL, supportMailto } from '@/lib/site'
+import { SITE_NAME, SUPPORT_EMAIL, supportMailto, LEGAL_ENTITY, BUSINESS_ADDRESS, PAYMENT_GATEWAY } from '@/lib/site'
 
 /**
  * Syarat & Ketentuan.
  *
  * Dua alasan halaman ini ada, dan keduanya bukan formalitas:
- *   1. Penyedia pembayaran di Indonesia (termasuk Midtrans) meminta tautan
+ *   1. Penyedia pembayaran di Indonesia (termasuk Xendit) meminta tautan
  *      Syarat & Ketentuan dan Kebijakan Privasi yang bisa diakses publik saat
  *      verifikasi merchant. Tanpa keduanya, akun produksi tidak lolos review.
  *   2. Footer sudah menautkannya sejak landing page ditulis ulang, jadi tanpa
  *      file ini tautannya 404.
  *
  * Aturan yang saya pakai saat menulisnya: setiap kalimat yang menyebut perilaku
- * aplikasi harus cocok dengan kode yang menegakkannya. Yang tidak bisa saya
- * pastikan (badan hukum, domisili penyelesaian sengketa) TIDAK saya karang --
- * lihat komentar HTML di bawah, tempatnya sudah disiapkan.
+ * aplikasi harus cocok dengan kode yang menegakkannya. Badan hukum penyelenggara
+ * kini sudah ditetapkan (LEGAL_ENTITY di lib/site.js) dan dicantumkan di bagian
+ * "Tentang layanan ini".
  */
 export const metadata = {
   title: 'Syarat & Ketentuan',
@@ -37,7 +37,7 @@ export const metadata = {
   },
 }
 
-const LAST_UPDATED = '5 September 2026'
+const LAST_UPDATED = '10 Oktober 2026'
 
 export default function TermsPage() {
   const mailto = supportMailto('Pertanyaan Syarat & Ketentuan')
@@ -46,13 +46,6 @@ export default function TermsPage() {
     <>
       <SiteHeader />
 
-      {/*
-        Badan hukum penyelenggara dan domisili penyelesaian sengketa belum
-        ditentukan. Isi dua tempat berikut sebelum halaman ini dipakai untuk
-        verifikasi merchant:
-          - nama badan hukum / pemilik usaha di bagian "Tentang layanan ini"
-          - yurisdiksi di bagian "Hukum yang berlaku"
-      */}
       <main className="lp-prose">
         <h1>Syarat &amp; Ketentuan</h1>
         <p className="lp-prose-updated">Terakhir diperbarui: {LAST_UPDATED}</p>
@@ -70,9 +63,10 @@ export default function TermsPage() {
         <h2>1. Tentang layanan ini</h2>
         <p>
           {SITE_NAME} adalah layanan berbasis web untuk mencatat penjualan, mengelola
-          stok produk, dan melihat laporan penjualan usaha kecil. Dengan membuat akun
-          atau memakai layanan ini, Anda setuju dengan ketentuan di halaman ini. Kalau
-          Anda tidak setuju, jangan memakai layanan ini.
+          stok produk, dan melihat laporan penjualan usaha kecil. Layanan ini merupakan
+          produk yang dimiliki dan dioperasikan oleh <strong>{LEGAL_ENTITY}</strong>.
+          Dengan membuat akun atau memakai layanan ini, Anda setuju dengan ketentuan di
+          halaman ini. Kalau Anda tidak setuju, jangan memakai layanan ini.
         </p>
         <p>
           Layanan ini ditujukan untuk pemakaian usaha. Anda menyatakan bahwa Anda cukup
@@ -136,8 +130,8 @@ export default function TermsPage() {
             atas sisa hari yang belum terpakai, bukan menggantinya.
           </li>
           <li>
-            Pembayaran diproses oleh Midtrans. Data kartu, rekening, atau dompet digital
-            Anda tidak pernah melewati server kami.
+            Pembayaran diproses oleh {PAYMENT_GATEWAY}. Data kartu, rekening, atau dompet
+            digital Anda tidak pernah melewati server kami.
           </li>
           <li>
             Saat masa aktif PRO berakhir, akun Anda kembali ke paket GRATIS. Data Anda
@@ -230,6 +224,10 @@ export default function TermsPage() {
         </p>
 
         <h2>11. Menghubungi kami</h2>
+        <p>
+          Layanan ini diselenggarakan oleh <strong>{LEGAL_ENTITY}</strong>, beralamat di{' '}
+          {BUSINESS_ADDRESS}.
+        </p>
         {mailto ? (
           <p>
             Pertanyaan tentang ketentuan ini bisa dikirim ke{' '}

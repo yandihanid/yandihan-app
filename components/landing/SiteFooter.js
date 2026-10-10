@@ -1,6 +1,13 @@
 import Link from 'next/link'
-import { Mail } from 'lucide-react'
-import { SITE_NAME, SOCIAL_LINKS, supportMailto } from '@/lib/site'
+import { Mail, MapPin } from 'lucide-react'
+import {
+  SITE_NAME,
+  SOCIAL_LINKS,
+  supportMailto,
+  SUPPORT_EMAIL,
+  LEGAL_ENTITY,
+  BUSINESS_ADDRESS,
+} from '@/lib/site'
 
 /**
  * Footer halaman publik. Server Component -- tidak ada state di sini.
@@ -34,8 +41,14 @@ export default function SiteFooter() {
           <Link href="/pricing" className="lp-footer-link">
             Harga
           </Link>
+          <Link href="/alur-pembayaran" className="lp-footer-link">
+            Alur Pembayaran
+          </Link>
           <Link href="/guide" className="lp-footer-link">
             Panduan
+          </Link>
+          <Link href="/kontak" className="lp-footer-link">
+            Kontak
           </Link>
           <Link href="/login" className="lp-footer-link">
             Masuk
@@ -85,13 +98,34 @@ export default function SiteFooter() {
           </div>
         )}
 
+        {/* Blok kontak bisnis & badan hukum. Ditampilkan di SEMUA halaman publik
+            karena verifikasi merchant (Xendit) mensyaratkan kontak dan badan
+            usaha yang mudah ditemukan, konsisten di seluruh situs. */}
+        <div className="lp-footer-business">
+          <p>
+            {SITE_NAME} adalah produk dari <strong>{LEGAL_ENTITY}</strong>.
+          </p>
+          <p>
+            <MapPin size={14} aria-hidden="true" style={{ marginRight: '0.35rem', verticalAlign: '-2px' }} />
+            {BUSINESS_ADDRESS}
+          </p>
+          {SUPPORT_EMAIL && (
+            <p>
+              <Mail size={14} aria-hidden="true" style={{ marginRight: '0.35rem', verticalAlign: '-2px' }} />
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="lp-footer-link" style={{ minHeight: 'auto' }}>
+                {SUPPORT_EMAIL}
+              </a>
+            </p>
+          )}
+        </div>
+
         {/* Tahunnya dievaluasi saat build, bukan saat kunjungan: halaman ini
             statis dan `Date` bukan API request-time, jadi Next tidak
             mendinamiskannya. Itu memang yang kita mau -- satu halaman statis
             untuk semua pengunjung -- dan tahun pada notice hak cipta yang
             mengikuti tanggal rilis sudah lazim. */}
         <p className="lp-footer-legal">
-          &copy; {new Date().getFullYear()} {SITE_NAME}. Seluruh hak cipta dilindungi.
+          &copy; {new Date().getFullYear()} {LEGAL_ENTITY}. Seluruh hak cipta dilindungi.
         </p>
       </div>
     </footer>

@@ -2747,6 +2747,14 @@ tr:hover td {
   color: var(--primary-hover);
 }
 
+/* Baris kepemilikan merek -> badan hukum di bawah tombol CTA. Lebih redup dari
+   subjudul supaya hadir tanpa bersaing dengan ajakan utama. */
+.lp-cta-owner {
+  margin: 1.75rem auto 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
 /* ── Footer ── */
 
 .lp-footer {
@@ -2827,6 +2835,28 @@ tr:hover td {
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-muted);
+}
+
+/* Blok kontak bisnis & badan hukum di footer: nama PT, alamat, email.
+   Dipakai untuk verifikasi merchant, jadi harus terbaca tapi tidak mencuri
+   perhatian dari tautan utama di atasnya. */
+.lp-footer-business {
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.lp-footer-business p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.lp-footer-business strong {
+  color: var(--text-main);
+  font-weight: 700;
 }
 
 /* ── Halaman teks panjang: /terms, /privacy ── */

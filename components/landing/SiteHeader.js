@@ -15,6 +15,7 @@ export const PUBLIC_NAV_LINKS = [
   { href: '/#cara-kerja', label: 'Cara Kerja' },
   { href: '/#fitur', label: 'Fitur' },
   { href: '/pricing', label: 'Harga' },
+  { href: '/alur-pembayaran', label: 'Alur Pembayaran' },
   { href: '/#faq', label: 'FAQ' },
 ]
 
