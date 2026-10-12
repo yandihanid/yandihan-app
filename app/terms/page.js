@@ -3,7 +3,7 @@ import SiteHeader from '@/components/landing/SiteHeader'
 import SiteFooter from '@/components/landing/SiteFooter'
 import { PRO_PRICE_IDR } from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
-import { SITE_NAME, SUPPORT_EMAIL, supportMailto, LEGAL_ENTITY, BUSINESS_ADDRESS, PAYMENT_GATEWAY } from '@/lib/site'
+import { SITE_NAME, SUPPORT_EMAIL, supportMailto, LEGAL_ENTITY, BUSINESS_ADDRESS, PAYMENT_GATEWAY, PSE_SCOPE, PSE_AUTHORITY, PSE_REGISTRATION_ID } from '@/lib/site'
 
 /**
  * Syarat & Ketentuan.
@@ -72,6 +72,11 @@ export default function TermsPage() {
           Layanan ini ditujukan untuk pemakaian usaha. Anda menyatakan bahwa Anda cukup
           umur dan berwenang mengikatkan diri pada ketentuan ini, atas nama diri sendiri
           atau atas nama usaha yang Anda wakili.
+        </p>
+        <p>
+          <strong>yandihan.my.id</strong> terdaftar sebagai Penyelenggara Sistem
+          Elektronik (PSE) {PSE_SCOPE} pada {PSE_AUTHORITY}
+          {PSE_REGISTRATION_ID ? ` dengan Nomor Tanda Daftar PSE ${PSE_REGISTRATION_ID}` : ''}.
         </p>
 
         <h2>2. Akun Anda</h2>

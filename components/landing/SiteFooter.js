@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Mail, MapPin } from 'lucide-react'
+import { Mail, MapPin, ShieldCheck } from 'lucide-react'
 import {
   SITE_NAME,
   SOCIAL_LINKS,
@@ -7,6 +7,9 @@ import {
   SUPPORT_EMAIL,
   LEGAL_ENTITY,
   BUSINESS_ADDRESS,
+  PSE_SCOPE,
+  PSE_AUTHORITY,
+  PSE_REGISTRATION_ID,
 } from '@/lib/site'
 
 /**
@@ -117,6 +120,13 @@ export default function SiteFooter() {
               </a>
             </p>
           )}
+          {/* Pernyataan terdaftar PSE Lingkup Privat (Komdigi). Nomor TD PSE
+              baru dirender kalau PSE_REGISTRATION_ID diisi di lib/site.js. */}
+          <p>
+            <ShieldCheck size={14} aria-hidden="true" style={{ marginRight: '0.35rem', verticalAlign: '-2px' }} />
+            Terdaftar sebagai Penyelenggara Sistem Elektronik (PSE) {PSE_SCOPE} pada {PSE_AUTHORITY}
+            {PSE_REGISTRATION_ID ? ` (No. TD PSE ${PSE_REGISTRATION_ID})` : ''}.
+          </p>
         </div>
 
         {/* Tahunnya dievaluasi saat build, bukan saat kunjungan: halaman ini

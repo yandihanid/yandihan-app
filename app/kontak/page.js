@@ -8,6 +8,9 @@ import {
   supportMailto,
   LEGAL_ENTITY,
   BUSINESS_ADDRESS,
+  PSE_SCOPE,
+  PSE_AUTHORITY,
+  PSE_REGISTRATION_ID,
 } from '@/lib/site'
 
 /**
@@ -68,6 +71,13 @@ export default function ContactPage() {
           pengelolaan layanan, penagihan langganan, dan penanganan pertanyaan pengguna.
           Untuk urusan apa pun yang berkaitan dengan akun atau pembayaran Anda, kirim
           email dari alamat email akun Anda ke alamat kontak di atas.
+        </p>
+
+        <h2>Pendaftaran PSE</h2>
+        <p>
+          <strong>yandihan.my.id</strong> terdaftar sebagai Penyelenggara Sistem
+          Elektronik (PSE) {PSE_SCOPE} pada {PSE_AUTHORITY}
+          {PSE_REGISTRATION_ID ? ` dengan Nomor Tanda Daftar PSE ${PSE_REGISTRATION_ID}` : ''}.
         </p>
 
         <h2>Tautan terkait</h2>
