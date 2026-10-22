@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, LayoutDashboard, Package, Settings, Users } from 'lucide-react'
+import { BarChart3, CreditCard, LayoutDashboard, Package, Settings, Users } from 'lucide-react'
 
 /**
  * Navigasi dashboard. Satu-satunya alasan komponen ini client: `usePathname()`.
@@ -24,6 +24,7 @@ const MENU = [
   { href: '/dashboard/laporan', label: 'Laporan', icon: BarChart3 },
   { href: '/dashboard/produk', label: 'Produk', icon: Package },
   { href: '/dashboard/pelanggan', label: 'Pelanggan', icon: Users },
+  { href: '/dashboard/billing', label: 'Billing', icon: CreditCard },
   { href: '/dashboard/settings', label: 'Pengaturan', icon: Settings },
 ]
 

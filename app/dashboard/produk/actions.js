@@ -19,6 +19,10 @@ export async function addProduct(formData) {
   const price = formData.get('price')
   const stock = formData.get('stock')
   const type = parseProductType(formData.get('productType'))
+  const rawImage = String(formData.get('imageUrl') || '').trim()
+  const imageUrl = rawImage && (rawImage.startsWith('http://') || rawImage.startsWith('https://') || rawImage.startsWith('data:image/'))
+    ? rawImage
+    : null
 
   const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
   if (ownErr) return { error: ownErr }
@@ -39,6 +43,7 @@ export async function addProduct(formData) {
     price: priceNum,
     stock: stockNum,
     is_sub_product: type === 'sub',
+    image_url: imageUrl,
   })
 
   if (error) {

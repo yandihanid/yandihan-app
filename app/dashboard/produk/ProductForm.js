@@ -92,6 +92,17 @@ export default function ProductForm({ storeId }) {
           )}
         </Field>
 
+        <Field id="product-image" label="Foto / Gambar Produk (Opsional)">
+          {(props) => (
+            <Input
+              {...props}
+              name="imageUrl"
+              type="url"
+              placeholder="https://... atau URL foto produk"
+            />
+          )}
+        </Field>
+
         <Button type="submit" disabled={pending}>
           {pending ? 'Menyimpan…' : 'Tambah Produk'}
         </Button>

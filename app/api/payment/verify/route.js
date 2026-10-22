@@ -29,7 +29,7 @@ export async function POST(req) {
     const service = createServiceClient()
     const { data: order } = await service
       .from('subscription_orders')
-      .select('order_id, store_id, amount, consumed_at')
+      .select('order_id, store_id, amount, plan, consumed_at')
       .eq('order_id', orderId)
       .eq('user_id', user.id)
       .maybeSingle()
@@ -54,12 +54,14 @@ export async function POST(req) {
       return NextResponse.json({ paid: false, status: statusData.transaction_status ?? 'unknown' })
     }
 
+    const days = order.plan === 'PRO_ANNUAL' || Number(order.amount) >= 700000 ? 365 : 30
+
     const { data, error } = await service.rpc('consume_subscription_order', {
       p_order_id: orderId,
       p_gross_amount: Number(statusData.gross_amount),
       p_midtrans_transaction_id: statusData.transaction_id ?? null,
       p_payload: statusData,
-      p_days: 30,
+      p_days: days,
     })
 
     if (error) {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { PRO_PRICE_IDR } from '@/lib/plan'
+import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
 
 // Harga dibaca dari PRO_PRICE_IDR, tidak lagi ditulis ulang di sini. Sebelumnya
@@ -147,7 +147,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
     }
   }
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (planType = 'monthly') => {
     if (!SNAP_CLIENT_KEY) {
       setStatusMsg({ type: 'error', text: 'Pembayaran belum dikonfigurasi. Hubungi pengelola aplikasi.' })
       return
@@ -163,7 +163,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
       const res = await fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId })
+        body: JSON.stringify({ storeId, planType })
       })
 
       const data = await res.json()
@@ -239,22 +239,40 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
           </div>
         </div>
         {isExpiringSoon && (
-          <button
-            onClick={handleUpgrade}
-            disabled={loading}
-            style={{
-              backgroundColor: '#d97706',
-              color: 'white',
-              border: 'none',
-              padding: '0.6rem 1.25rem',
-              borderRadius: '99px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
-          >
-            {loading ? '...' : 'Perpanjang PRO'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => handleUpgrade('monthly')}
+              disabled={loading}
+              style={{
+                backgroundColor: '#d97706',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '99px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              {loading ? '...' : '+1 Bulan'}
+            </button>
+            <button
+              onClick={() => handleUpgrade('annual')}
+              disabled={loading}
+              style={{
+                backgroundColor: '#b45309',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '99px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              {loading ? '...' : '+1 Tahun (Hemat 17%)'}
+            </button>
+          </div>
         )}
       </div>
     )
@@ -341,13 +359,13 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={handleUpgrade}
+            onClick={() => handleUpgrade('monthly')}
             disabled={loading}
             style={{
               backgroundColor: 'var(--secondary-color)',
               color: 'var(--primary-color)',
               border: 'none',
-              padding: '0.75rem 1.5rem',
+              padding: '0.75rem 1.25rem',
               borderRadius: '99px',
               fontWeight: '700',
               cursor: 'pointer',
@@ -356,10 +374,31 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.5rem',
-              fontSize: '0.95rem'
+              fontSize: '0.9rem'
             }}
           >
-            {loading ? <span style={{ opacity: 0.7 }}>Memproses...</span> : '🚀 Beli Paket PRO'}
+            {loading ? <span style={{ opacity: 0.7 }}>Memproses...</span> : `🚀 Bulanan (${formatRupiah(PRO_PRICE_IDR)}/bln)`}
+          </button>
+          <button
+            onClick={() => handleUpgrade('annual')}
+            disabled={loading}
+            style={{
+              backgroundColor: '#fff',
+              color: 'var(--primary-color)',
+              border: 'none',
+              padding: '0.75rem 1.25rem',
+              borderRadius: '99px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              position: 'relative',
+              zIndex: 10,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.9rem'
+            }}
+          >
+            {loading ? <span style={{ opacity: 0.7 }}>Memproses...</span> : `⭐ 1 Tahun Hemat 17% (${formatRupiah(PRO_ANNUAL_PRICE_IDR)}/thn)`}
           </button>
         </div>
       </div>

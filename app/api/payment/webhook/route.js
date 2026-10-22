@@ -41,12 +41,20 @@ export async function POST(req) {
   }
 
   const service = createServiceClient()
+  const { data: order } = await service
+    .from('subscription_orders')
+    .select('plan, amount')
+    .eq('order_id', body.order_id)
+    .maybeSingle()
+
+  const days = order?.plan === 'PRO_ANNUAL' || Number(order?.amount) >= 700000 ? 365 : 30
+
   const { data, error } = await service.rpc('consume_subscription_order', {
     p_order_id: body.order_id,
     p_gross_amount: Number(body.gross_amount),
     p_midtrans_transaction_id: body.transaction_id ?? null,
     p_payload: body,
-    p_days: 30,
+    p_days: days,
   })
 
   if (error) {

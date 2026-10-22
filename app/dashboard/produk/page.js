@@ -51,7 +51,7 @@ export default async function GudangProduk() {
   const supabase = await createClient()
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, price, stock, is_sub_product, created_at')
+    .select('id, name, price, stock, is_sub_product, image_url, created_at')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 

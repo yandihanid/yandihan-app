@@ -97,7 +97,43 @@ export default function ProductRow({ product }) {
 
   return (
     <tr>
-      <td style={{ fontWeight: 500 }}>{product.name}</td>
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 6,
+                objectFit: 'cover',
+                border: '1px solid var(--border-color)',
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 6,
+                backgroundColor: 'var(--border-color)',
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.75rem',
+                flexShrink: 0,
+              }}
+              aria-hidden="true"
+            >
+              📦
+            </div>
+          )}
+          <span style={{ fontWeight: 500 }}>{product.name}</span>
+        </div>
+      </td>
       <td>
         <div className="product-type-cell">
           <Badge variant={product.is_sub_product ? 'warning' : 'info'}>

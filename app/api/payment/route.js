@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireStoreOwnership } from '@/lib/dal'
-import { PRO_PRICE_IDR } from '@/lib/plan'
+import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
 import { snapApiUrl, midtransAuthHeader } from '@/lib/midtrans'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
   try {
-    const { storeId } = await req.json()
+    const { storeId, planType = 'monthly' } = await req.json()
 
     const { store, user, error: ownErr } = await requireStoreOwnership(storeId)
     if (ownErr) return NextResponse.json({ error: ownErr }, { status: 403 })
@@ -16,13 +16,20 @@ export async function POST(req) {
     const rate = await checkRateLimit(`payment:create:${user.id}`, { limit: 10, windowSeconds: 300 })
     if (!rate.allowed) return tooManyRequests(rate.retryAfter)
 
+    const isAnnual = planType === 'annual'
+    const grossAmount = isAnnual ? PRO_ANNUAL_PRICE_IDR : PRO_PRICE_IDR
+    const planDurationDays = isAnnual ? 365 : 30
+    const planItemName = isAnnual
+      ? 'Yandihan Kasir PRO - 1 tahun (Tahunan)'
+      : 'Yandihan Kasir PRO - 1 bulan'
+    const planItemId = isAnnual ? 'PRO-1Y' : 'PRO-1M'
+
     // order_id tidak lagi `PRO-${Date.now()}`.
     // Timestamp milidetik mudah ditebak, dan order lama tidak terikat ke toko
     // mana pun sehingga webhook harus mempercayai metadata dari body request.
     // Sekarang: UUID acak, dan pemetaan order -> toko/user disimpan di DB.
     // Midtrans membatasi order_id 50 karakter; 'PRO-' + 32 hex = 36.
     const orderId = `PRO-${randomUUID().replace(/-/g, '')}`
-    const grossAmount = PRO_PRICE_IDR
 
     const service = createServiceClient()
 
@@ -34,7 +41,7 @@ export async function POST(req) {
       store_id: store.id,
       user_id: user.id,
       amount: grossAmount,
-      plan: 'PRO',
+      plan: isAnnual ? 'PRO_ANNUAL' : 'PRO',
       status: 'pending',
     })
 
@@ -56,8 +63,8 @@ export async function POST(req) {
         },
         item_details: [
           {
-            id: 'PRO-1M',
-            name: 'Yandihan Kasir PRO - 1 bulan',
+            id: planItemId,
+            name: planItemName,
             price: grossAmount,
             quantity: 1,
           },

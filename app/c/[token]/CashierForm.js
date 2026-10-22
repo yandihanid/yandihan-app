@@ -537,7 +537,17 @@ export default function CashierForm({
                 aria-pressed={inCart > 0}
                 aria-label={`${product.name}, ${formatRupiah(product.price)}${soldOut ? ', stok habis' : ''}`}
               >
-                <span>{product.name}</span>
+                {product.image_url && (
+                  <div className="pos-product-img-wrap">
+                    <img
+                      src={product.image_url}
+                      alt=""
+                      className="pos-product-img"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+                <span className="pos-product-title">{product.name}</span>
                 <span className="pos-product-price">{formatRupiah(product.price)}</span>
                 <span className="pos-product-stock">
                   {soldOut ? 'Stok habis' : `Stok ${product.stock}`}

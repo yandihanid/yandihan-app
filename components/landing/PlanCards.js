@@ -1,22 +1,14 @@
 import Link from 'next/link'
 import { CheckCircle2 } from 'lucide-react'
-import { PRO_PRICE_IDR } from '@/lib/plan'
+import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
 import { FREE_FEATURES, PRO_FEATURES } from '@/lib/plans.content'
 import { formatRupiah } from '@/lib/format'
 
 /**
  * Kartu harga, dipakai landing page dan /pricing. Server Component.
  *
- * Harga PRO dibaca dari PRO_PRICE_IDR, bukan ditulis sebagai teks. Versi
- * sebelumnya menulis "Rp 78.000" literal di landing sementara tagihan Midtrans
- * mengirim angka lain -- pelanggan melihat satu harga dan dibebani harga lain.
- *
- * Tujuan CTA PRO: `/login?next=/dashboard`. Belum ada rute checkout mandiri di
- * aplikasi ini -- UpgradeBanner hanya dirender di dalam /dashboard
- * (app/dashboard/page.js:56), jadi upgrade memang mensyaratkan pemilik yang
- * sudah masuk dan sudah punya toko. Mengarahkannya ke halaman yang tidak ada
- * akan jadi 404; mengarahkannya ke /login dengan penjelasan singkat di bawah
- * tombol adalah keadaan sebenarnya.
+ * Harga PRO dibaca dari PRO_PRICE_IDR dan PRO_ANNUAL_PRICE_IDR.
+ * Menyediakan opsi bulanan dan tahunan (Rp 780.000/tahun = Rp 65.000/bulan).
  */
 export default function PlanCards({ headingLevel: H = 'h3' }) {
   return (
@@ -43,14 +35,16 @@ export default function PlanCards({ headingLevel: H = 'h3' }) {
       </article>
 
       <article className="lp-plan lp-plan-featured">
-        <span className="lp-plan-ribbon">PALING POPULER</span>
+        <span className="lp-plan-ribbon">HEMAT 17% TAHUNAN</span>
         <span className="lp-plan-tag">PRO</span>
         <H className="lp-plan-price">
           {formatRupiah(PRO_PRICE_IDR)} <span className="lp-plan-period">/ bulan</span>
         </H>
+        <p style={{ margin: '-0.25rem 0 0.5rem', fontSize: '0.875rem', color: 'var(--primary-color)', fontWeight: 600 }}>
+          Atau {formatRupiah(PRO_ANNUAL_PRICE_IDR)} / tahun (setara Rp 65.000/bln)
+        </p>
         <p className="lp-plan-desc">
-          Untuk toko yang sudah punya pegawai dan pelanggan langganan. Dibayar per bulan, bisa
-          berhenti kapan saja.
+          Untuk toko yang sudah punya pegawai dan pelanggan langganan. Tersedia langganan bulanan maupun tahunan, tanpa perpanjangan paksa.
         </p>
 
         <ul className="lp-plan-list">
