@@ -6,7 +6,8 @@ import { formatRupiah } from '@/lib/format'
 import { TAX_INFO, LEGAL_ENTITY, PAYMENT_GATEWAY } from '@/lib/site'
 import OnboardingChecklist from '../OnboardingChecklist'
 import UpgradeBanner from '../UpgradeBanner'
-import { Calendar, CheckCircle2, Clock, FileText, Info, ShieldCheck } from 'lucide-react'
+import OrderActionRow from './OrderActionRow'
+import { Calendar, CheckCircle2, Clock, Download, FileText, Info, ShieldCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -162,10 +163,34 @@ export default async function BillingPage() {
             </div>
           </div>
 
-          <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            <Info size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-            Transaksi diproses secara sah dan mematuhi peraturan perpajakan Republik Indonesia berdasarkan Surat Keterangan PP 55 Tahun 2022. Pembayaran gateway diproses aman melalui {PAYMENT_GATEWAY}.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginTop: 'auto' }}>
+            <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5, flex: '1 1 200px' }}>
+              <Info size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+              Transaksi sah dan mematuhi perpajakan RI (PP 55 Tahun 2022).
+            </p>
+            <a
+              href="/suket-pp-55-2022.pdf"
+              download="Suket-PP-55-Yandihan.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontSize: '0.8rem',
+                padding: '0.4rem 0.8rem',
+                backgroundColor: 'var(--secondary-color)',
+                color: 'var(--primary-color)',
+                border: '1px solid var(--primary-color)',
+                borderRadius: '6px',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              <Download size={14} />
+              Unduh Dokumen Suket PP 55 (PDF)
+            </a>
+          </div>
         </section>
       </div>
 
@@ -185,6 +210,7 @@ export default async function BillingPage() {
                   <th>Nominal</th>
                   <th>Status</th>
                   <th>Tanggal Order</th>
+                  <th style={{ textAlign: 'right' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -222,6 +248,9 @@ export default async function BillingPage() {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <OrderActionRow order={ord} storeId={store.id} />
                       </td>
                     </tr>
                   )
