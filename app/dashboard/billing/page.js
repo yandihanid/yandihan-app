@@ -1,7 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { verifySession, getMyStore } from '@/lib/dal'
 import { planTier, isPro, PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR, SUBSCRIPTION_PLANS } from '@/lib/plan'
-import { isMidtransProduction } from '@/lib/midtrans'
 import { formatRupiah } from '@/lib/format'
 import { TAX_INFO, LEGAL_ENTITY, PAYMENT_GATEWAY } from '@/lib/site'
 import OnboardingChecklist from '../OnboardingChecklist'
@@ -57,8 +56,7 @@ export default async function BillingPage() {
         storeId={store.id}
         subscriptionTier={tier}
         subscriptionEndDate={store.subscription_end_date}
-        midtransProduction={isMidtransProduction()}
-      />
+/>
 
       {/* Grid Informasi Paket & Kredensial Pajak */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>

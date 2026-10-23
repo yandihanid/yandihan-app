@@ -26,9 +26,14 @@ import { formatRupiah } from '@/lib/format'
 // supaya pembacanya ikut diperbarui. Event `storage` ikut didengarkan agar tab
 // lain yang menyelesaikan pembayaran (dan menghapus kuncinya) juga membuat
 // banner di tab ini hilang.
+
 const ORDER_KEY = 'yandihan_pending_order'
 const STORE_KEY = 'yandihan_pending_store'
-const SNAP_CLIENT_KEY = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ''
+
+// Referensi pembayaran sekarang menggunakan Xendit. Snap.js/Midtrans tidak lagi
+// dipanggil dari sini; alur pembayaran lurus ke /api/payment (Xendit) lalu
+// langsung terverifikasi via RPC consume_subscription_order.
+const SNAP_CLIENT_KEY = '' // not used anymore
 
 const listeners = new Set()
 
@@ -71,15 +76,10 @@ function clearPendingOrder() {
  *  browser sebelum store terbaca. */
 const pendingOrderServerSnapshot = () => null
 
-export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionEndDate, midtransProduction = false }) {
+export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionEndDate }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState(null)
-  const snapScriptUrl = midtransProduction
-    ? 'https://app.midtrans.com/snap/snap.js'
-    : 'https://app.sandbox.midtrans.com/snap/snap.js'
 
-  // Order tertunda hanya dianggap milik toko yang sedang dibuka -- pemilik
-  // dengan beberapa toko tidak boleh melihat tombol "Cek Status" toko lain.
   const readPendingOrder = useCallback(() => {
     try {
       if (localStorage.getItem(STORE_KEY) !== storeId) return null
@@ -94,117 +94,6 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
     readPendingOrder,
     pendingOrderServerSnapshot
   )
-
-  // Snap browser harus memakai lingkungan yang sama dengan API server. URL
-  // diturunkan dari MIDTRANS_IS_PRODUCTION di Server Component, sedangkan
-  // client key memang variabel publik karena dibaca Snap.js di browser.
-  useEffect(() => {
-    if (!SNAP_CLIENT_KEY) return
-
-    const existing = document.querySelector(`script[src="${snapScriptUrl}"]`)
-    if (existing) return
-
-    const script = document.createElement('script')
-    script.src = snapScriptUrl
-    script.setAttribute('data-client-key', SNAP_CLIENT_KEY)
-    script.async = true
-    script.onerror = () => {
-      setStatusMsg({ type: 'error', text: 'Sistem pembayaran gagal dimuat. Muat ulang halaman lalu coba lagi.' })
-    }
-    document.body.appendChild(script)
-
-    return () => {
-      script.onerror = null
-    }
-  }, [snapScriptUrl])
-
-  // Verify payment status from Midtrans directly
-  const verifyPayment = async (orderId) => {
-    setLoading(true)
-    setStatusMsg(null)
-    try {
-      const res = await fetch('/api/payment/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId })
-      })
-      const data = await res.json()
-
-      if (data.paid) {
-        clearPendingOrder()
-        setStatusMsg({ type: 'success', text: '✅ Pembayaran terkonfirmasi! Halaman akan diperbarui...' })
-        setTimeout(() => window.location.reload(), 1500)
-      } else {
-        setStatusMsg({ 
-          type: 'warn', 
-          text: `⏳ Pembayaran belum terkonfirmasi (status: ${data.status || 'unknown'}). Jika sudah bayar, tunggu beberapa saat lalu coba lagi.`
-        })
-      }
-    } catch {
-      setStatusMsg({ type: 'error', text: 'Gagal memverifikasi. Coba lagi.' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleUpgrade = async (planType = 'monthly') => {
-    if (!SNAP_CLIENT_KEY) {
-      setStatusMsg({ type: 'error', text: 'Pembayaran belum dikonfigurasi. Hubungi pengelola aplikasi.' })
-      return
-    }
-    if (!window.snap?.pay) {
-      setStatusMsg({ type: 'warn', text: 'Sistem pembayaran masih dimuat. Tunggu sebentar lalu coba lagi.' })
-      return
-    }
-
-    setLoading(true)
-    setStatusMsg(null)
-    try {
-      const res = await fetch('/api/payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, planType })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || !data.token) {
-        setStatusMsg({ type: 'error', text: data.error || 'Gagal membuat transaksi. Coba lagi.' })
-        return
-      }
-
-      // Store orderId for fallback verify
-      if (data.orderId) {
-        savePendingOrder(data.orderId, storeId)
-      }
-
-      window.snap.pay(data.token, {
-        onSuccess: async function() {
-          setStatusMsg({ type: 'success', text: '✅ Pembayaran berhasil! Memverifikasi status...' })
-          // Directly verify and upgrade
-          if (data.orderId) {
-            await verifyPayment(data.orderId)
-          } else {
-            setTimeout(() => window.location.reload(), 1500)
-          }
-        },
-        onPending: function() {
-          setStatusMsg({ type: 'warn', text: '⏳ Pembayaran Anda masih dalam proses. Selesaikan pembayaran dan klik "Cek Status Pembayaran" di bawah.' })
-        },
-        onError: function() {
-          setStatusMsg({ type: 'error', text: '❌ Pembayaran gagal. Silakan coba lagi.' })
-        },
-        onClose: function() {
-          setStatusMsg({ type: 'warn', text: '💡 Popup pembayaran ditutup. Jika sudah bayar, klik "Cek Status Pembayaran" di bawah.' })
-        }
-      })
-    } catch (error) {
-      console.error('Gagal membuka pembayaran', { message: error?.message })
-      setStatusMsg({ type: 'error', text: 'Terjadi kesalahan saat membuka pembayaran. Coba lagi.' })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // === PRO tier: show expiry info instead ===
   if (subscriptionTier !== 'FREE') {
@@ -233,15 +122,14 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
               Paket PRO Aktif
             </p>
             <p style={{ margin: 0, fontSize: '0.875rem', color: isExpiringSoon ? '#b45309' : '#166534' }}>
-              Berlaku hingga: <strong>{expiry.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
-              {' '}({daysLeft > 0 ? `${daysLeft} hari lagi` : 'Sudah berakhir'})
+              Berlaku hingga: <strong>{expiry.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({daysLeft > 0 ? daysLeft + ' hari lagi' : 'Sudah berakhir'})</strong>
             </p>
           </div>
         </div>
         {isExpiringSoon && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
-              onClick={() => handleUpgrade('monthly')}
+              onClick={() => window.location.href = '/dashboard/billing?payment=monthly'}
               disabled={loading}
               style={{
                 backgroundColor: '#d97706',
@@ -257,7 +145,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
               {loading ? '...' : '+1 Bulan'}
             </button>
             <button
-              onClick={() => handleUpgrade('annual')}
+              onClick={() => window.location.href = '/dashboard/billing?payment=annual'}
               disabled={loading}
               style={{
                 backgroundColor: '#b45309',
@@ -313,11 +201,11 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
               ⏳ Ada pembayaran yang belum selesai
             </p>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#b45309' }}>
-              Jika Anda sudah membayar, klik tombol &quot;Cek Status&quot; untuk mengaktifkan PRO.
+              Jika Anda sudah membayar, klik tombol "Cek Status" untuk mengaktifkan PRO.
             </p>
           </div>
           <button
-            onClick={() => verifyPayment(pendingOrderId)}
+            onClick={() => window.location.href = '/dashboard/billing'}
             disabled={loading}
             style={{
               backgroundColor: '#d97706',
@@ -354,12 +242,12 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
           Upgrade ke Yandihan PRO ✨
         </h3>
         <p style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9, position: 'relative', zIndex: 10, maxWidth: '600px', lineHeight: 1.6 }}>
-          Kasir tanpa batas, program loyalitas pelanggan, dan laporan lanjutan. Hanya{' '}
+          Kasir tanpa batas, program loyalitas pelanggan, dan laporan lanjutan. Hanya
           <strong>{formatRupiah(PRO_PRICE_IDR)} / bulan</strong>, tanpa penagihan otomatis.
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => handleUpgrade('monthly')}
+            onClick={() => window.location.href = '/dashboard/billing?payment=monthly'}
             disabled={loading}
             style={{
               backgroundColor: 'var(--secondary-color)',
@@ -380,7 +268,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
             {loading ? <span style={{ opacity: 0.7 }}>Memproses...</span> : `🚀 Bulanan (${formatRupiah(PRO_PRICE_IDR)}/bln)`}
           </button>
           <button
-            onClick={() => handleUpgrade('annual')}
+            onClick={() => window.location.href = '/dashboard/billing?payment=annual'}
             disabled={loading}
             style={{
               backgroundColor: '#fff',

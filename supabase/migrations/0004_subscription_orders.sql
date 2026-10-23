@@ -1,15 +1,10 @@
 -- 0004_subscription_orders.sql
 --
--- Temuan (tinggi): order Midtrans dibuat dengan `PRO-${Date.now()}`, tidak
--- diikat ke toko/user mana pun, dan tidak punya penanda "sudah dipakai".
--- Akibatnya:
---   * order_id mudah ditebak (hanya timestamp milidetik)
---   * webhook mempercayai `metadata.store_id` dari body request
---   * satu pembayaran yang sukses bisa di-verify berulang kali untuk
---     memperpanjang PRO selamanya (replay)
+-- Riwayat order langganan toko. Setiap order memiliki penanda "sudah dikonsumsi"
+-- (consumed_at non-null) agar webhook/RPC tidak bisa memperpanjang dua kali.
+-- Order dibuat via /api/payment (Xendit) atau /api/cashier/transactions.
 --
--- Tabel ini menjadikan order sebagai catatan server-side: siapa yang membeli,
--- untuk toko mana, berapa, dan apakah sudah dikonsumsi.
+-- Kolom midtrans_* dihapus; diganti xendit_invoice_id untuk melacak invoice Xendit.
 
 create table if not exists public.subscription_orders (
   order_id text primary key,
@@ -20,9 +15,8 @@ create table if not exists public.subscription_orders (
   status text not null default 'pending',
   -- Diisi sekali saat langganan benar-benar diperpanjang. Non-null = jangan
   -- pernah diproses lagi, dari webhook maupun dari /api/payment/verify.
-  consumed_at timestamptz,
-  midtrans_transaction_id text,
-  midtrans_payload jsonb,
+  consumed_at timestamptx,
+  xendit_invoice_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -58,7 +52,7 @@ create policy "subscription_orders_owner_select" on public.subscription_orders
 create or replace function public.consume_subscription_order(
   p_order_id text,
   p_gross_amount numeric,
-  p_midtrans_transaction_id text default null,
+  p_xendit_invoice_id text default null,
   p_payload jsonb default null,
   p_days integer default 30
 )
@@ -101,7 +95,7 @@ begin
   if p_gross_amount is null or p_gross_amount <> v_order.amount then
     update public.subscription_orders
     set status = 'amount_mismatch',
-        midtrans_payload = coalesce(p_payload, midtrans_payload),
+        xendit_invoice_id = coalesce(p_xendit_invoice_id, xendit_invoice_id),
         updated_at = now()
     where subscription_orders.order_id = p_order_id;
 
@@ -123,8 +117,7 @@ begin
   update public.subscription_orders
   set status = 'paid',
       consumed_at = now(),
-      midtrans_transaction_id = coalesce(p_midtrans_transaction_id, midtrans_transaction_id),
-      midtrans_payload = coalesce(p_payload, midtrans_payload),
+      xendit_invoice_id = coalesce(p_xendit_invoice_id, xendit_invoice_id),
       updated_at = now()
   where subscription_orders.order_id = p_order_id;
 

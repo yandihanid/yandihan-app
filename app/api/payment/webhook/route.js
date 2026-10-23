@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { verifyMidtransSignature, isPaidStatus } from '@/lib/midtrans'
+import { verifyXenditSignature, isXenditPaidStatus } from '@/lib/xendit'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 // KEAMANAN (temuan A2). Versi sebelumnya:
@@ -19,7 +19,7 @@ import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 export async function POST(req) {
   const ip = clientIp(req)
 
-  const rate = await checkRateLimit(`midtrans:webhook:${ip}`, { limit: 60, windowSeconds: 60 })
+  const rate = await checkRateLimit(`xendit:webhook:${ip}`, { limit: 60, windowSeconds: 60 })
   if (!rate.allowed) return tooManyRequests(rate.retryAfter)
 
   let body
@@ -29,14 +29,14 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Body tidak valid' }, { status: 400 })
   }
 
-  if (!verifyMidtransSignature(body)) {
+  if (!verifyXenditSignature(body.callbackToken, body, body.signature)) {
     // Jangan bocorkan alasan detailnya.
     return NextResponse.json({ error: 'Signature tidak valid' }, { status: 401 })
   }
 
   // Status selain lunas (pending, expire, cancel, deny) tidak perlu tindakan.
-  // Tetap balas 200 supaya Midtrans berhenti mengirim ulang notifikasi.
-  if (!isPaidStatus(body)) {
+  // Tetap balas 200 supaya notifikasi berhenti dikirim kembali.
+  if (!isXenditPaidStatus(body)) {
     return NextResponse.json({ message: 'Diterima, belum lunas' }, { status: 200 })
   }
 
@@ -52,13 +52,13 @@ export async function POST(req) {
   const { data, error } = await service.rpc('consume_subscription_order', {
     p_order_id: body.order_id,
     p_gross_amount: Number(body.gross_amount),
-    p_midtrans_transaction_id: body.transaction_id ?? null,
+    p_xendit_invoice_id: body.id ?? null,
     p_payload: body,
     p_days: days,
   })
 
   if (error) {
-    // 500 di sini disengaja: Midtrans akan mencoba lagi, dan itu yang kita mau
+    // 500 di sini disengaja: Xendit akan mencoba lagi, dan itu yang kita mau
     // kalau kegagalannya di sisi kita (DB). RPC-nya idempoten, jadi percobaan
     // ulang tidak akan memperpanjang langganan dua kali.
     console.error('consume_subscription_order gagal', { orderId: body.order_id, code: error.code })
@@ -69,9 +69,9 @@ export async function POST(req) {
 
   if (result?.reason === 'order_not_found') {
     // Signature valid tapi order tidak ada di DB kita: kemungkinan notifikasi
-    // dari project Midtrans lain yang memakai server key yang sama. Balas 200
+    // dari project lain yang memakai server key yang sama. Balas 200
     // supaya tidak diretry selamanya.
-    console.warn('Notifikasi Midtrans untuk order yang tidak dikenal', { orderId: body.order_id })
+    console.warn('Notifikasi Xendit untuk order yang tidak dikenal', { orderId: body.order_id })
     return NextResponse.json({ message: 'Order tidak dikenal' }, { status: 200 })
   }
 

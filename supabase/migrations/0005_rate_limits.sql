@@ -2,7 +2,6 @@
 --
 -- Temuan (tinggi): tidak ada rate limit di mana pun. Yang paling terasa:
 --   * GET /api/cashier menerima token mentah -> bisa di-brute-force
---   * kedua webhook (Midtrans, Telegram) bisa dibanjiri POST
 --
 -- Kenapa tabel Postgres dan bukan variabel di memori: Vercel menjalankan
 -- setiap route di instance serverless yang bisa mati/berganti kapan saja, jadi
