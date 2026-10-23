@@ -83,7 +83,9 @@ export default function CashierForm({
   const [cashReceived, setCashReceived] = useState('')
   const [buyerName, setBuyerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-  const [loyalty, setLoyalty] = useState(null)
+  const [selectedPromo, setSelectedPromo] = useState(null)
+  const [promos, setPromos] = useState([])
+  const [promosLoading, setPromosLoading] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -119,7 +121,24 @@ export default function CashierForm({
     return Math.round(sum)
   }, [lines, priceOf])
 
-  const phoneNormalized = normalizePhone(customerPhone)
+  // Fetch promos when component mounts (only if loyalty/pelanggan is enabled)
+  useEffect(() => {
+    if (!loyaltyEnabled || !isOnline) return
+    const controller = new AbortController()
+    fetch('/api/cashier/promos', {
+      headers: { 'x-cashier-token': token },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.promos) setPromos(data.promos)
+      })
+      .catch(() => {
+        // Gagal mengambil promo tidak boleh menghalangi transaksi.
+      })
+    return () => controller.abort()
+  }, [loyaltyEnabled, isOnline, token])
 
   // Hasil lookup loyalitas disimpan bersama nomornya, jadi kalau nomor di form
   // berubah hasil lama otomatis tidak terpakai. Tanpa ini perlu setLoyalty(null)
@@ -396,6 +415,11 @@ export default function CashierForm({
       setMessage({ type: 'error', text: `Uang tidak cukup. Total ${formatRupiah(total)}.` })
       return
     }
+    // Validasi promo: jika promo dipilih dan punya batas pakai, nomor HP wajib diisi
+    if (selectedPromo && selectedPromo.usage_limit_per_phone && !phoneNormalized) {
+      setMessage({ type: 'error', text: 'Nomor HP wajib diisi untuk menggunakan promo ini.' })
+      return
+    }
 
     const payload = {
       clientTxId: crypto.randomUUID(),
@@ -410,6 +434,31 @@ export default function CashierForm({
     setLoading(true)
     setMessage(null)
     try {
+      // Jika promo dipilih, validasi dan catat penggunaan promo terlebih dahulu
+      if (selectedPromo && phoneNormalized) {
+        try {
+          const promoRes = await fetch('/api/cashier/promo', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-cashier-token': token,
+            },
+            body: JSON.stringify({
+              promoId: selectedPromo.id,
+              phone: phoneNormalized,
+            }),
+          })
+          if (!promoRes.ok) {
+            const promoData = await promoRes.json()
+            setMessage({ type: 'error', text: promoData.error || 'Promo tidak dapat digunakan.' })
+            return
+          }
+        } catch {
+          setMessage({ type: 'error', text: 'Gagal memvalidasi promo. Coba lagi.' })
+          return
+        }
+      }
+
       if (!isOnline) {
         await queueOffline(payload, 'Sedang offline. Transaksi disimpan dan akan terkirim otomatis.')
         return
@@ -771,6 +820,43 @@ export default function CashierForm({
                     ? `Pelanggan baru. Diskon setelah ${visitThreshold} kunjungan.`
                     : 'Diisi kalau pembeli ingin kunjungannya dihitung.'}
           </p>
+        </div>
+      )}
+
+      {/* Promo selection */}
+      {loyaltyEnabled && promos.length > 0 && (
+        <div className="form-group">
+          <label className="label" htmlFor="pos-promo">
+            Promo (opsional)
+          </label>
+          <select
+            id="pos-promo"
+            className="input"
+            value={selectedPromo?.id || ''}
+            onChange={(e) => {
+              const promo = promos.find((p) => p.id === e.target.value)
+              setSelectedPromo(promo || null)
+              if (promo && promo.usage_limit_per_phone && !phoneNormalized) {
+                setMessage({ type: 'error', text: 'Nomor HP wajib diisi untuk menggunakan promo ini.' })
+              } else {
+                setMessage(null)
+              }
+            }}
+          >
+            <option value="">-- Pilih promo --</option>
+            {promos.map((promo) => (
+              <option key={promo.id} value={promo.id}>
+                {promo.name} ({promo.type === 'fixed_price' ? 'Harga Fix' : 'Diskon ' + promo.value + '%'})
+                {promo.usage_limit_per_phone ? ` - max ${promo.usage_limit_per_phone}x per HP` : ''}
+              </option>
+            ))}
+          </select>
+          {selectedPromo && (
+            <p style={{ margin: '6px 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+              Promo: {selectedPromo.name}
+              {selectedPromo.usage_limit_per_phone ? ' (wajib nomor HP)' : ''}
+            </p>
+          )}
         </div>
       )}
 
