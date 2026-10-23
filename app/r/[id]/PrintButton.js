@@ -51,7 +51,7 @@ export default function PrintButton() {
       {cashierToken && (
         <button
           type="button"
-          onClick={() => router.push(`/c/${cashierToken}`)}
+          onClick={() => window.location.href = `/c/${cashierToken}`}
           style={{
             padding: '0.75rem 2rem',
             borderRadius: '99px',

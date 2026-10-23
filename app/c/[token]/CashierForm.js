@@ -429,7 +429,7 @@ export default function CashierForm({
       }
 
       resetForm()
-      router.push(`/r/${outcome.data.transactionId}`)
+      window.location.href = `/r/${outcome.data.transactionId}`
     } finally {
       setLoading(false)
     }
