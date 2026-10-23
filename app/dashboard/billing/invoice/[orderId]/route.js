@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireUser } from '@/lib/dal'
 import { formatRupiah } from '@/lib/format'
 import { TAX_INFO, LEGAL_ENTITY, BUSINESS_ADDRESS, PAYMENT_GATEWAY } from '@/lib/site'
+import { isXenditProduction } from '@/lib/xendit'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,7 +102,7 @@ export async function GET(req, { params }) {
       </div>
       <div>
         <div class="section-title">Metode Pembayaran:</div>
-        <p class="info-p">Payment Gateway Resmi (${PAYMENT_GATEWAY})</p>
+        <p class="info-p">Payment Gateway Resmi (Xendit)</p>
         ${isPaid && order.consumed_at ? `<p class="info-p" style="color: #15803d; font-size: 0.85rem;">Dikonfirmasi lunas pada: ${new Date(order.consumed_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} WIB</p>` : ''}
       </div>
     </div>

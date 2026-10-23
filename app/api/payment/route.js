@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireStoreOwnership } from '@/lib/dal'
 import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
-import { snapApiUrl, midtransAuthHeader } from '@/lib/midtrans'
-import { expireStaleSubscriptionOrders } from '@/lib/subscriptionOrders'
+import { createXenditInvoice, isXenditProduction } from '@/lib/xendit'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
@@ -25,22 +24,12 @@ export async function POST(req) {
       : 'Yandihan Kasir PRO - 1 bulan'
     const planItemId = isAnnual ? 'PRO-1Y' : 'PRO-1M'
 
-    // order_id tidak lagi `PRO-${Date.now()}`.
-    // Timestamp milidetik mudah ditebak, dan order lama tidak terikat ke toko
-    // mana pun sehingga webhook harus mempercayai metadata dari body request.
-    // Sekarang: UUID acak, dan pemetaan order -> toko/user disimpan di DB.
-    // Midtrans membatasi order_id 50 karakter; 'PRO-' + 32 hex = 36.
+    // order_id dengan prefix PRO- + UUID tanpa dash
     const orderId = `PRO-${randomUUID().replace(/-/g, '')}`
 
     const service = createServiceClient()
 
-    // Jangan biarkan order lama berstatus pending menumpuk saat pengguna
-    // membuat sesi pembayaran baru.
-    await expireStaleSubscriptionOrders()
-
-    // Catat order SEBELUM memanggil Midtrans. Kalau dicatat setelahnya dan
-    // pencatatannya gagal, pembayaran yang sudah lunas tidak akan pernah bisa
-    // dikaitkan ke toko mana pun.
+    // Catat order SEBELUM memanggil Xendit
     const { error: orderErr } = await service.from('subscription_orders').insert({
       order_id: orderId,
       store_id: store.id,
@@ -54,51 +43,39 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Gagal membuat order. Coba lagi.' }, { status: 500 })
     }
 
-    const midtransRes = await fetch(snapApiUrl(), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: midtransAuthHeader(),
-      },
-      body: JSON.stringify({
-        transaction_details: {
-          order_id: orderId,
-          gross_amount: grossAmount,
+    // Buat invoice Xendit
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const xenditRes = await createXenditInvoice({
+      externalId: orderId,
+      amount: grossAmount,
+      description: planItemName,
+      customerEmail: user.email,
+      customerName: store.name,
+      items: [
+        {
+          name: planItemName,
+          quantity: 1,
+          price: grossAmount,
+          category: 'Software',
         },
-        item_details: [
-          {
-            id: planItemId,
-            name: planItemName,
-            price: grossAmount,
-            quantity: 1,
-          },
-        ],
-        customer_details: {
-          email: user.email,
-        },
-        // metadata tetap dikirim untuk memudahkan pelacakan di dashboard
-        // Midtrans, TAPI tidak pernah dipercaya lagi oleh webhook. Sumber
-        // kebenarannya tabel subscription_orders.
-        metadata: {
-          store_id: store.id,
-        },
-      }),
+      ],
+      successRedirectUrl: `${baseUrl}/dashboard/billing?payment=success`,
+      failureRedirectUrl: `${baseUrl}/dashboard/billing?payment=failed`,
+      callbackUrl: `${baseUrl}/api/payment/xendit/callback`,
     })
 
-    const midtransData = await midtransRes.json()
+    const xenditData = await xenditRes.json()
 
-    if (!midtransRes.ok || !midtransData?.token) {
+    if (!xenditRes.ok || !xenditData?.id) {
       await service
         .from('subscription_orders')
         .update({ status: 'gateway_error', updated_at: new Date().toISOString() })
         .eq('order_id', orderId)
 
-      // Detail error gateway hanya untuk log server, bukan untuk client.
-      console.error('Midtrans Snap error', {
+      console.error('Xendit Invoice error', {
         orderId,
-        status: midtransRes.status,
-        code: midtransData?.status_code,
+        status: xenditRes.status,
+        code: xenditData?.code,
       })
       return NextResponse.json(
         { error: 'Gagal menghubungi gateway pembayaran. Coba lagi.' },
@@ -106,7 +83,17 @@ export async function POST(req) {
       )
     }
 
-    return NextResponse.json({ token: midtransData.token, orderId })
+    // Simpan invoice_id Xendit ke order untuk referensi
+    await service
+      .from('subscription_orders')
+      .update({ xendit_invoice_id: xenditData.id, updated_at: new Date().toISOString() })
+      .eq('order_id', orderId)
+
+    return NextResponse.json({
+      invoiceUrl: xenditData.invoice_url,
+      invoiceId: xenditData.id,
+      orderId,
+    })
   } catch (error) {
     console.error('Payment create error', { ip: clientIp(req), message: error?.message })
     return NextResponse.json({ error: 'Terjadi kesalahan. Coba lagi.' }, { status: 500 })

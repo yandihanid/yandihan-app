@@ -7,6 +7,7 @@ import {
   CASHIER_SESSION_TTL_SECONDS,
   createCashierSession,
   tokenBucket,
+  setSessionCookie,
 } from '@/lib/cashierAuth'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
@@ -89,13 +90,7 @@ export async function POST(req) {
     { headers: NO_STORE }
   )
 
-  response.cookies.set(CASHIER_SESSION_COOKIE, session.token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: CASHIER_SESSION_TTL_SECONDS,
-  })
+  setSessionCookie(response, session.token)
 
   return response
 }

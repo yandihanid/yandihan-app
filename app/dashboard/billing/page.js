@@ -4,7 +4,6 @@ import { planTier, isPro, PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR, SUBSCRIPTION_PLAN
 import { isMidtransProduction } from '@/lib/midtrans'
 import { formatRupiah } from '@/lib/format'
 import { TAX_INFO, LEGAL_ENTITY, PAYMENT_GATEWAY } from '@/lib/site'
-import { PENDING_ORDER_TTL_MINUTES, expireStaleSubscriptionOrders } from '@/lib/subscriptionOrders'
 import OnboardingChecklist from '../OnboardingChecklist'
 import UpgradeBanner from '../UpgradeBanner'
 import OrderActionRow from './OrderActionRow'
@@ -32,17 +31,13 @@ export default async function BillingPage() {
   const activePro = isPro(store)
   const expiryDate = store.subscription_end_date ? new Date(store.subscription_end_date) : null
 
-  // Bersihkan order pending yang sudah kedaluwarsa SEBELUM daftar dibaca,
-  // supaya riwayat tidak menampilkan "menunggu" untuk pembayaran yang sudah
-  // tidak mungkin diselesaikan.
-  await expireStaleSubscriptionOrders()
-
-  // Ambil riwayat order langganan toko
+  // Ambil riwayat order langganan toko (hanya yang sudah lunas)
   const supabase = await createClient()
   const { data: orders } = await supabase
     .from('subscription_orders')
     .select('order_id, amount, plan, status, consumed_at, created_at')
     .eq('store_id', store.id)
+    .eq('status', 'paid')
     .order('created_at', { ascending: false })
     .limit(20)
 
@@ -202,13 +197,9 @@ export default async function BillingPage() {
 
       {/* Riwayat Order Pembayaran */}
       <section className="card">
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-          Riwayat Tagihan & Pembayaran
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
+          Riwayat Pembayaran Berhasil
         </h3>
-        <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-          Order yang masih menunggu akan otomatis berstatus <strong>Gagal</strong> setelah{' '}
-          {PENDING_ORDER_TTL_MINUTES} menit jika pembayaran tidak diselesaikan.
-        </p>
 
         {orders && orders.length > 0 ? (
           <div className="table-scroll">
@@ -224,49 +215,44 @@ export default async function BillingPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((ord) => {
-                  const isPaid = ord.status === 'paid'
-                  const isPending = ord.status === 'pending'
-                  const label = isPaid ? 'Lunas' : isPending ? 'Menunggu' : 'Gagal'
-                  return (
-                    <tr key={ord.order_id}>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{ord.order_id}</td>
-                      <td>
-                        {ord.plan === 'PRO_ANNUAL' || Number(ord.amount) >= 700000
-                          ? 'PRO Tahunan (1 Tahun)'
-                          : 'PRO Bulanan (30 Hari)'}
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{formatRupiah(ord.amount)}</td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '0.2rem 0.5rem',
-                            borderRadius: '99px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            backgroundColor: isPaid ? '#dcfce7' : isPending ? '#fef3c7' : '#fee2e2',
-                            color: isPaid ? '#15803d' : isPending ? '#92400e' : '#b91c1c',
-                          }}
-                        >
-                          {label}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        {new Date(ord.created_at).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <OrderActionRow order={ord} storeId={store.id} />
-                      </td>
-                    </tr>
-                  )
-                })}
+                {orders.map((ord) => (
+                  <tr key={ord.order_id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{ord.order_id}</td>
+                    <td>
+                      {ord.plan === 'PRO_ANNUAL' || Number(ord.amount) >= 700000
+                        ? 'PRO Tahunan (1 Tahun)'
+                        : 'PRO Bulanan (30 Hari)'}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{formatRupiah(ord.amount)}</td>
+                    <td>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '99px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          backgroundColor: '#dcfce7',
+                          color: '#15803d',
+                        }}
+                      >
+                        Lunas
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      {new Date(ord.created_at).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <OrderActionRow order={ord} storeId={store.id} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
