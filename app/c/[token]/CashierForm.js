@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { compressImage, dataUrlToFile, readFileAsDataUrl } from './imageUtils'
-import { cashierDeviceHeaders } from './device'
 import {
   dropReceiptBlob,
   enqueue,
@@ -153,7 +152,7 @@ export default function CashierForm({
     const controller = new AbortController()
     const timer = setTimeout(() => {
       fetch(`/api/cashier/loyalty?phone=${encodeURIComponent(phoneNormalized)}`, {
-        headers: { 'x-cashier-token': token, ...cashierDeviceHeaders() },
+        headers: { 'x-cashier-token': token },
         cache: 'no-store',
         signal: controller.signal,
       })
@@ -519,7 +518,9 @@ export default function CashierForm({
         </div>
       )}
 
-      <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
+      <div className="pos-layout">
+        <div className="pos-col pos-col-main">
+          <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
         <legend className="label" style={{ padding: 0, marginBottom: 8 }}>
           Pilih Produk
         </legend>
@@ -612,6 +613,14 @@ export default function CashierForm({
 
                 {line.subs.map((sub) => (
                   <div key={sub.key} className="pos-line-sub">
+                    <span className="pos-line-sub-thumb" aria-hidden="true">
+                      {byId.get(sub.productId)?.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={byId.get(sub.productId).image_url} alt="" loading="lazy" />
+                      ) : (
+                        <span>{(byId.get(sub.productId)?.name || '?').slice(0, 1).toUpperCase()}</span>
+                      )}
+                    </span>
                     <span className="pos-line-name">
                       {byId.get(sub.productId)?.name || 'Produk terhapus'}{' '}
                       <span className="pos-product-price">
@@ -653,29 +662,43 @@ export default function CashierForm({
                 {subProducts.length > 0 && (
                   <div className="pos-sub-actions">
                     {openSubPicker === line.key ? (
-                      <div className="pos-sub-picker">
-                        <label className="sr-only" htmlFor={`sub-product-${line.key}`}>
-                          Pilih subproduk untuk {product?.name || 'item'}
-                        </label>
-                        <select
-                          id={`sub-product-${line.key}`}
-                          className="input"
-                          autoFocus
-                          value=""
-                          onChange={(e) => addSub(line.key, e.target.value)}
-                        >
-                          <option value="">Pilih subproduk...</option>
-                          {subProducts.map((subProduct) => (
-                            <option
-                              key={subProduct.id}
-                              value={subProduct.id}
-                              disabled={Number(subProduct.stock) <= 0}
-                            >
-                              {subProduct.name} - {formatRupiah(subProduct.price)}
-                              {Number(subProduct.stock) <= 0 ? ' (stok habis)' : ''}
-                            </option>
-                          ))}
-                        </select>
+                      <div
+                        id={`sub-product-${line.key}`}
+                        className="pos-sub-picker"
+                        role="group"
+                        aria-label={`Pilih subproduk untuk ${product?.name || 'item'}`}
+                      >
+                        <div className="pos-sub-grid">
+                          {subProducts.map((subProduct) => {
+                            const soldOut = Number(subProduct.stock) <= 0
+                            return (
+                              <button
+                                key={subProduct.id}
+                                type="button"
+                                className="pos-sub-option"
+                                onClick={() => addSub(line.key, subProduct.id)}
+                                disabled={soldOut}
+                                aria-label={`${subProduct.name}, ${formatRupiah(subProduct.price)}${soldOut ? ', stok habis' : ''}`}
+                              >
+                                <span className="pos-sub-option-img" aria-hidden="true">
+                                  {subProduct.image_url ? (
+                                    // URL dari Supabase Storage; ukurannya kecil dan
+                                    // sudah dikompresi sebelum diunggah.
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={subProduct.image_url} alt="" loading="lazy" />
+                                  ) : (
+                                    <span>{(subProduct.name || '?').slice(0, 1).toUpperCase()}</span>
+                                  )}
+                                </span>
+                                <span className="pos-sub-option-body">
+                                  <strong>{subProduct.name}</strong>
+                                  <span>{formatRupiah(subProduct.price)}</span>
+                                  <small>{soldOut ? 'Stok habis' : `Stok ${subProduct.stock}`}</small>
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
                         <button
                           type="button"
                           className="pos-text-btn"
@@ -689,7 +712,7 @@ export default function CashierForm({
                         type="button"
                         className="pos-text-btn pos-add-sub"
                         onClick={() => setOpenSubPicker(line.key)}
-                        aria-expanded="false"
+                        aria-expanded={openSubPicker === line.key}
                         aria-controls={`sub-product-${line.key}`}
                       >
                         + Subproduk
@@ -703,8 +726,11 @@ export default function CashierForm({
         </div>
       )}
 
-      <div className="form-group">
-        <label className="label" htmlFor="pos-buyer">
+        </div>
+
+        <div className="pos-col pos-col-side">
+          <div className="form-group">
+            <label className="label" htmlFor="pos-buyer">
           Nama Pembeli {requireCustomerName ? '(wajib)' : '(opsional)'}
         </label>
         <input
@@ -880,6 +906,8 @@ export default function CashierForm({
           </p>
         </div>
       )}
+        </div>
+      </div>
     </form>
   )
 }
@@ -909,7 +937,6 @@ async function postTransaction(token, entry) {
     method: 'POST',
     headers: {
       'x-cashier-token': token,
-      ...cashierDeviceHeaders(),
     },
     body: await entryToFormData(entry),
   })

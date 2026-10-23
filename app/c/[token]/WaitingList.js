@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatRupiah } from '@/lib/format'
 import { wibTimeLabel } from '@/lib/time'
-import { cashierDeviceHeaders } from './device'
 
 const POLL_MS = 15000
 const TABS = [
@@ -44,7 +43,6 @@ export default function WaitingList({ token, active = true }) {
       const res = await fetch(`/api/cashier/waiting-list?status=${requestedStatus}`, {
         headers: {
           'x-cashier-token': token,
-          ...cashierDeviceHeaders(),
         },
         cache: 'no-store',
         signal: controller.signal,
@@ -114,7 +112,6 @@ export default function WaitingList({ token, active = true }) {
         headers: {
           'Content-Type': 'application/json',
           'x-cashier-token': token,
-          ...cashierDeviceHeaders(),
         },
         body: JSON.stringify({ id }),
       })

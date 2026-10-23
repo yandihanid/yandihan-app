@@ -8,30 +8,19 @@ import Input from '@/components/ui/Input'
 import { addCashier } from './actions'
 
 /**
- * Tambah kasir baru.
+ * Tambah akun kasir.
  *
- * Perubahan dari versi sebelumnya:
- *
- * 1. `router.refresh()` tidak lagi dipanggil di sini. `addCashier` sudah
- *    memanggil revalidatePath('/dashboard/settings'), jadi refresh manual berarti
- *    dua pengambilan data untuk satu perubahan — dan versi lama menjalankannya
- *    bahkan setelah gagal, jadi setiap penolakan kuota memicu refresh yang tidak
- *    mengubah apa pun.
- * 2. Pesan error tidak lagi berupa <div> dengan warna hardcode; Alert
- *    membawa role="alert" supaya penolakan kuota benar-benar dibacakan.
- * 3. Input dikosongkan lewat form.reset() setelah sukses, bukan dengan state
- *    terkontrol — satu state kurang untuk hal yang sudah dilakukan browser.
+ * Yang dibuat adalah AKUN LOGIN untuk satu link toko, bukan link baru. Karena
+ * itu field-nya nama, username, dan kata sandi. Kuota mengikuti paket: GRATIS
+ * satu akun, PRO tanpa batas.
  */
-export default function AddCashierForm({ storeId }) {
+export default function AddCashierForm({ storeId, isPro, remaining }) {
   const formRef = useRef(null)
   const [state, formAction, pending] = useActionState(
     async (_prev, formData) => addCashier(formData),
     null
   )
 
-  // Reset setelah action berhasil. Dilakukan di efek dan bukan di dalam action
-  // karena hasil action baru diketahui setelah render berikutnya; `state`
-  // adalah satu-satunya sinyal bahwa penambahan itu benar-benar terjadi.
   useEffect(() => {
     if (state?.success) formRef.current?.reset()
   }, [state])
@@ -39,25 +28,67 @@ export default function AddCashierForm({ storeId }) {
   return (
     <div className="settings-block">
       {state?.error && <Alert variant="error">{state.error}</Alert>}
-      {state?.success && <Alert variant="success">Kasir ditambahkan.</Alert>}
+      {state?.success && <Alert variant="success">Akun kasir ditambahkan.</Alert>}
+
+      <div className="settings-section-head">
+        <div>
+          <h4>Tambah akun kasir</h4>
+          <p>
+            {isPro
+              ? 'Paket PRO: tambahkan akun sebanyak kebutuhan tim.'
+              : remaining > 0
+                ? 'Paket GRATIS: satu akun kasir. Upgrade ke PRO untuk menambah lagi.'
+                : 'Kuota akun kasir paket GRATIS sudah terpakai.'}
+          </p>
+        </div>
+      </div>
 
       <form ref={formRef} action={formAction} className="settings-form">
         <input type="hidden" name="storeId" value={storeId} />
 
-        <div className="settings-form-row">
-          <Field
-            id="cashier-name"
-            label="Tambah Kasir"
-            required
-            hint="Setiap kasir dapat link sendiri untuk dibuka di HP."
-          >
+        <div className="settings-form-grid">
+          <Field id="cashier-name" label="Nama kasir" required hint="Nama yang muncul di struk.">
             {(props) => (
-              <Input {...props} name="name" maxLength={80} placeholder="Misal: Budi Shift Pagi" />
+              <Input {...props} name="name" maxLength={80} placeholder="Misal: Budi Shift Pagi" autoComplete="off" />
             )}
           </Field>
 
+          <Field
+            id="cashier-username"
+            label="Username"
+            required
+            hint="Huruf kecil, angka, titik, garis bawah, atau tanda hubung."
+          >
+            {(props) => (
+              <Input
+                {...props}
+                name="username"
+                maxLength={32}
+                placeholder="budi"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            )}
+          </Field>
+
+          <Field id="cashier-password" label="Kata sandi" required hint="Minimal 6 karakter.">
+            {(props) => (
+              <Input
+                {...props}
+                name="password"
+                type="password"
+                maxLength={72}
+                placeholder="Kata sandi kasir"
+                autoComplete="new-password"
+              />
+            )}
+          </Field>
+        </div>
+
+        <div className="settings-form-actions">
           <Button type="submit" disabled={pending}>
-            {pending ? 'Memproses…' : 'Tambah Kasir'}
+            {pending ? 'Menyimpan…' : 'Tambah Akun Kasir'}
           </Button>
         </div>
       </form>

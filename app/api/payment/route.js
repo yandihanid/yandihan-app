@@ -4,6 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { requireStoreOwnership } from '@/lib/dal'
 import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
 import { snapApiUrl, midtransAuthHeader } from '@/lib/midtrans'
+import { expireStaleSubscriptionOrders } from '@/lib/subscriptionOrders'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
@@ -32,6 +33,10 @@ export async function POST(req) {
     const orderId = `PRO-${randomUUID().replace(/-/g, '')}`
 
     const service = createServiceClient()
+
+    // Jangan biarkan order lama berstatus pending menumpuk saat pengguna
+    // membuat sesi pembayaran baru.
+    await expireStaleSubscriptionOrders()
 
     // Catat order SEBELUM memanggil Midtrans. Kalau dicatat setelahnya dan
     // pencatatannya gagal, pembayaran yang sudah lunas tidak akan pernah bisa

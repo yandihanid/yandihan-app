@@ -21,7 +21,7 @@ import { wibDayRange } from '@/lib/time'
 // penjualan selamanya.
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
-const CASHIER_COLUMNS = 'id, store_id, device_id, stores!inner(waiting_list_enabled)'
+const CASHIER_COLUMNS = 'id, store_id, stores!inner(waiting_list_enabled)'
 
 async function authorize(req, { limit, windowSeconds }) {
   const token = readCashierToken(req)

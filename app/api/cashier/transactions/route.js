@@ -97,7 +97,7 @@ export async function POST(request) {
     }
 
     const result = await submitTransactionRpc(supabase, {
-      token: auth.token,
+      cashierId: cashier.id,
       items: parsed.items,
       paymentMethod,
       cashReceived,

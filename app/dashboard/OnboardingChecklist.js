@@ -26,7 +26,7 @@ const STEP_ICONS = [Store, Package, UserPlus, Send]
 /** Pesan WhatsApp untuk langkah keempat. Dibangun di server supaya tautannya
  *  ikut ter-render tanpa JavaScript; wa.me bekerja di ponsel maupun desktop. */
 function waShareHref(link) {
-  const text = `Halo, ini link kasir ${SITE_NAME} untuk toko kita. Buka di HP, tidak perlu install aplikasi:\n\n${link}\n\nSimpan link-nya, jangan dibagikan ke orang lain.`
+  const text = `Halo, ini link kasir ${SITE_NAME} untuk toko kita. Buka di HP atau tablet, lalu masuk dengan username dan kata sandi yang sudah saya berikan:\n\n${link}\n\nSatu link ini dipakai semua kasir. Jangan bagikan ke orang di luar toko.`
   return `https://wa.me/?text=${encodeURIComponent(text)}`
 }
 
@@ -53,16 +53,16 @@ export default function OnboardingChecklist({
       cta: { label: 'Tambah Produk', href: '/dashboard/produk' },
     },
     {
-      title: 'Tambah kasir',
-      desc: 'Setiap kasir dapat link sendiri. Paket GRATIS: 1 slot kasir.',
+      title: 'Tambah akun kasir',
+      desc: 'Satu link toko, akun login berbeda untuk tiap kasir. Paket GRATIS: 1 akun; PRO: bebas.',
       done: cashierCount > 0,
-      cta: { label: 'Tambah Kasir', href: '/dashboard/settings' },
+      cta: { label: 'Tambah Akun Kasir', href: '/dashboard/settings' },
     },
     {
       title: 'Bagikan link kasir',
       desc: cashierLink
-        ? 'Kirim link ke HP kasir. Transaksi pertama akan langsung muncul di sini.'
-        : 'Tersedia setelah kasir dibuat.',
+        ? 'Kirim link toko dan kata sandi ke kasir. Mereka masuk lewat halaman link itu.'
+        : 'Tersedia setelah toko dan akun kasir dibuat.',
       done: transactionCount > 0,
       cta: cashierLink
         ? { label: 'Bagikan via WhatsApp', href: waShareHref(cashierLink), external: true }

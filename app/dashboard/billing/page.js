@@ -4,6 +4,7 @@ import { planTier, isPro, PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR, SUBSCRIPTION_PLAN
 import { isMidtransProduction } from '@/lib/midtrans'
 import { formatRupiah } from '@/lib/format'
 import { TAX_INFO, LEGAL_ENTITY, PAYMENT_GATEWAY } from '@/lib/site'
+import { PENDING_ORDER_TTL_MINUTES, expireStaleSubscriptionOrders } from '@/lib/subscriptionOrders'
 import OnboardingChecklist from '../OnboardingChecklist'
 import UpgradeBanner from '../UpgradeBanner'
 import OrderActionRow from './OrderActionRow'
@@ -30,6 +31,11 @@ export default async function BillingPage() {
   const tier = planTier(store)
   const activePro = isPro(store)
   const expiryDate = store.subscription_end_date ? new Date(store.subscription_end_date) : null
+
+  // Bersihkan order pending yang sudah kedaluwarsa SEBELUM daftar dibaca,
+  // supaya riwayat tidak menampilkan "menunggu" untuk pembayaran yang sudah
+  // tidak mungkin diselesaikan.
+  await expireStaleSubscriptionOrders()
 
   // Ambil riwayat order langganan toko
   const supabase = await createClient()
@@ -60,7 +66,7 @@ export default async function BillingPage() {
       />
 
       {/* Grid Informasi Paket & Kredensial Pajak */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
         {/* Status Paket Saat Ini */}
         <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -196,9 +202,13 @@ export default async function BillingPage() {
 
       {/* Riwayat Order Pembayaran */}
       <section className="card">
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.35rem' }}>
           Riwayat Tagihan & Pembayaran
         </h3>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+          Order yang masih menunggu akan otomatis berstatus <strong>Gagal</strong> setelah{' '}
+          {PENDING_ORDER_TTL_MINUTES} menit jika pembayaran tidak diselesaikan.
+        </p>
 
         {orders && orders.length > 0 ? (
           <div className="table-scroll">
@@ -216,6 +226,8 @@ export default async function BillingPage() {
               <tbody>
                 {orders.map((ord) => {
                   const isPaid = ord.status === 'paid'
+                  const isPending = ord.status === 'pending'
+                  const label = isPaid ? 'Lunas' : isPending ? 'Menunggu' : 'Gagal'
                   return (
                     <tr key={ord.order_id}>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{ord.order_id}</td>
@@ -233,11 +245,11 @@ export default async function BillingPage() {
                             borderRadius: '99px',
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            backgroundColor: isPaid ? '#dcfce7' : '#fef3c7',
-                            color: isPaid ? '#15803d' : '#92400e',
+                            backgroundColor: isPaid ? '#dcfce7' : isPending ? '#fef3c7' : '#fee2e2',
+                            color: isPaid ? '#15803d' : isPending ? '#92400e' : '#b91c1c',
                           }}
                         >
-                          {isPaid ? 'Lunas' : ord.status}
+                          {label}
                         </span>
                       </td>
                       <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>

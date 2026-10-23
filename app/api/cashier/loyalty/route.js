@@ -18,7 +18,7 @@ import { loyaltyState } from '@/lib/loyalty'
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
 const CASHIER_COLUMNS =
-  'id, store_id, device_id, stores!inner(subscription_tier, subscription_end_date, ' +
+  'id, store_id, stores!inner(subscription_tier, subscription_end_date, ' +
   'pelanggan_enabled, visit_threshold, discount_percent)'
 
 export async function GET(req) {

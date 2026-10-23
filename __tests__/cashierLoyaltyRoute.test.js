@@ -21,9 +21,9 @@ vi.mock('@/lib/rateLimit', () => ({
 
 import { GET } from '@/app/api/cashier/loyalty/route'
 
-function request(deviceId = 'device-one') {
-  const headers = new Headers({ 'x-cashier-token': 'cashier-token' })
-  if (deviceId) headers.set('x-device-id', deviceId)
+function request({ session = 'valid-session' } = {}) {
+  const headers = new Headers({ 'x-cashier-token': 'store-token' })
+  if (session) headers.set('cookie', `yandihan_cashier_session=${session}`)
   return new Request('http://localhost/api/cashier/loyalty?phone=081234567890', { headers })
 }
 
@@ -42,27 +42,23 @@ const enabledStore = {
   discount_percent: 10,
 }
 
-describe('cashier loyalty route authorization', () => {
+describe('cashier loyalty route (session-based)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     checkRateLimit.mockResolvedValue({ allowed: true })
   })
 
-  it.each([
-    [null, 'Penyimpanan browser harus diizinkan', 403],
-    ['device-two', 'Link kasir ini sudah dipakai di perangkat lain', 403],
-  ])('rejects device %s before querying customers', async (deviceId, error, status) => {
-    const from = vi.fn()
-    authorizeCashier.mockResolvedValue({ error, status, supabase: { from } })
+  it('rejects request without session cookie', async () => {
+    authorizeCashier.mockResolvedValue({ error: 'Sesi kasir berakhir. Silakan masuk kembali.', status: 401 })
+    const req = request({ session: null })
 
-    const response = await GET(request(deviceId))
+    const response = await GET(req)
 
-    expect(response.status).toBe(status)
-    expect(await response.json()).toEqual({ error })
-    expect(from).not.toHaveBeenCalled()
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: 'Sesi kasir berakhir. Silakan masuk kembali.' })
   })
 
-  it('queries loyalty after the bound device is authorized', async () => {
+  it('queries loyalty after successful authorization', async () => {
     const { supabase, query } = customerSupabase({
       id: 'customer-1',
       name: 'Pelanggan',
@@ -71,11 +67,10 @@ describe('cashier loyalty route authorization', () => {
       total_spent: 100000,
     })
     authorizeCashier.mockResolvedValue({
-      token: 'cashier-token',
+      token: 'store-token',
       cashier: {
         id: 'cashier-1',
         store_id: 'store-1',
-        device_id: 'device-one',
         stores: enabledStore,
       },
       supabase,
@@ -88,5 +83,25 @@ describe('cashier loyalty route authorization', () => {
     expect(query.eq).toHaveBeenCalledWith('store_id', 'store-1')
     expect(query.eq).toHaveBeenCalledWith('phone', '081234567890')
     expect(await response.json()).toMatchObject({ enabled: true, known: true, eligible: true })
+  })
+
+  it('returns disabled when loyalty is not enabled', async () => {
+    const disabledStore = { ...enabledStore, pelanggan_enabled: false }
+    const { supabase } = customerSupabase(null)
+    authorizeCashier.mockResolvedValue({
+      token: 'store-token',
+      cashier: {
+        id: 'cashier-1',
+        store_id: 'store-1',
+        stores: disabledStore,
+      },
+      supabase,
+    })
+
+    const response = await GET(request())
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ enabled: false })
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })

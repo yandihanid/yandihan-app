@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireUser } from '@/lib/dal'
 import { revalidatePath } from 'next/cache'
 
-export async function deletePendingOrder(orderId) {
+export async function markOrderFailed(orderId) {
   if (!orderId) return { error: 'Order ID tidak valid' }
 
   const { user, error: authErr } = await requireUser()
@@ -12,7 +12,7 @@ export async function deletePendingOrder(orderId) {
 
   const supabase = await createClient()
 
-  // Hanya boleh menghapus order yang statusnya belum lunas/pending
+  // Hanya boleh menandai gagal order yang statusnya belum lunas
   const { data: order } = await supabase
     .from('subscription_orders')
     .select('order_id, status, user_id')
@@ -22,17 +22,17 @@ export async function deletePendingOrder(orderId) {
 
   if (!order) return { error: 'Order tidak ditemukan' }
   if (order.status === 'paid') {
-    return { error: 'Order yang sudah lunas tidak dapat dihapus' }
+    return { error: 'Order yang sudah lunas tidak dapat diubah' }
   }
 
-  const { error: delErr } = await supabase
+  const { error: updErr } = await supabase
     .from('subscription_orders')
-    .delete()
+    .update({ status: 'gagal', updated_at: new Date().toISOString() })
     .eq('order_id', orderId)
     .eq('user_id', user.id)
 
-  if (delErr) {
-    return { error: 'Gagal menghapus order pembayaran' }
+  if (updErr) {
+    return { error: 'Gagal memperbarui status order' }
   }
 
   revalidatePath('/dashboard/billing')

@@ -40,7 +40,7 @@ export async function GET(req) {
 
   const auth = await authorizeCashier(
     req,
-    `id, name, store_id, device_id, stores!inner(${STORE_FIELDS})`
+    `id, name, store_id, stores!inner(${STORE_FIELDS})`
   )
   if (auth.error) {
     return NextResponse.json({ error: auth.error }, { status: auth.status, headers: NO_STORE })
@@ -54,7 +54,7 @@ export async function GET(req) {
     .eq('store_id', cashier.store_id)
     .order('name', { ascending: true })
 
-  // device_id tidak perlu dikirim balik ke browser, dan token memang tidak
+  // device_id tidak perlu dikirim balik ke browser, dan token link memang tidak
   // pernah ada di select ini.
   return NextResponse.json(
     {

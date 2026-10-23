@@ -1,142 +1,74 @@
-'use client'
+import { Link2Off } from 'lucide-react'
+import { getCashierPageSession } from '@/lib/cashierAuth'
+import CashierApp from './CashierApp'
+import LoginForm from './LoginForm'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import CashierForm from './CashierForm'
-import WaitingList from './WaitingList'
-import { cashierDeviceHeaders } from './device'
-import { loyaltyEnabled, DEFAULT_VISIT_THRESHOLD } from '@/lib/loyalty'
+export const dynamic = 'force-dynamic'
 
-const PREFIX = 'yandihan_cashier_meta_'
-
-/** async supaya setState-nya jatuh setelah batas microtask, bukan sinkron di
- *  dalam body useEffect (render berantai -- dilarang react-hooks). */
-async function readCachedCashier(token) {
-  try {
-    return JSON.parse(localStorage.getItem(PREFIX + token) || 'null')
-  } catch {
-    return null
-  }
+export const metadata = {
+  title: 'Kasir',
+  robots: { index: false, follow: false },
 }
 
-export default function CashierWeb() {
-  const { token } = useParams()
-  const [cashier, setCashier] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [screen, setScreen] = useState('transaction')
+/**
+ * Satu pintu masuk untuk semua kasir sebuah toko.
+ *
+ * Link /c/<token> hanya mengidentifikasi toko. Isi halaman ditentukan oleh
+ * sesi login di cookie: tanpa sesi tampil form username + kata sandi, dengan
+ * sesi tampil layar kasir. Pemeriksaan dilakukan di server, bukan di browser.
+ */
+export default async function CashierPage({ params }) {
+  const { token } = await params
+  const { store, cashier, supabase } = await getCashierPageSession(token)
 
-  // Indikator online/offline sekarang ada di dalam CashierForm (satu tempat,
-  // bersama jumlah antrean yang belum terkirim), jadi header tidak perlu
-  // menghitungnya lagi sendiri.
-
-  // Registrasi service worker (PWA + mode offline kasir). Sebelumnya ada di
-  // dalam CashierForm; dipindah ke sini supaya terdaftar satu kali per layar
-  // kasir, tidak tergantung apakah form-nya sudah dirender.
-  useEffect(() => {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (!token) return
-    let cancelled = false
-
-    const load = async () => {
-      const cached = await readCachedCashier(token)
-      if (cancelled) return
-      if (cached?.id) {
-        setCashier(cached)
-        setLoading(false)
-      }
-      try {
-        // Token dikirim lewat header, bukan query string: `?token=` ikut
-        // tercatat di log proxy, terkirim lewat Referer, dan jadi cache key
-        // service worker.
-        const res = await fetch('/api/cashier', {
-          headers: { 'x-cashier-token': token, ...cashierDeviceHeaders() },
-          cache: 'no-store',
-        })
-        if (cancelled) return
-        if (res.ok) {
-          const data = await res.json()
-          setCashier(data)
-          try {
-            localStorage.setItem(PREFIX + token, JSON.stringify(data))
-          } catch {
-            /* penyimpanan penuh: mode offline tidak tersedia */
-          }
-        } else if (!cached?.id) {
-          const body = await res.json().catch(() => null)
-          setCashier({ error: body?.error || 'Link tidak valid' })
-        }
-      } catch {
-        // Offline. Kalau ada cache perangkat, kasir tetap bisa bekerja; kalau
-        // tidak, baru tampilkan pesan. Sebelumnya fetch yang gagal membuat
-        // load() reject sehingga layar berhenti di 'Memuat...' selamanya.
-        if (cancelled) return
-        if (!cached?.id) setCashier({ error: 'Tidak ada koneksi. Coba lagi setelah online.' })
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [token])
-
-  if (loading) return <p style={{ textAlign: 'center', marginTop: '4rem' }}>Memuat...</p>
-  if (!cashier || cashier.error) {
+  if (!store) {
     return (
-      <p style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--danger-color)' }}>
-        {cashier?.error || 'Link tidak valid'}
-      </p>
+      <main className="cashier-gate">
+        <section className="card cashier-gate-card" role="alert">
+          <div className="cashier-gate-icon" aria-hidden="true">
+            <Link2Off size={26} />
+          </div>
+          <h1>Link kasir tidak valid</h1>
+          <p>
+            Link ini sudah tidak berlaku. Minta pemilik toko menyalin ulang link kasir dari
+            menu Pengaturan.
+          </p>
+        </section>
+      </main>
     )
   }
 
-  const store = cashier.stores || {}
+  if (!cashier) {
+    return <LoginForm token={token} storeName={store.name} />
+  }
+
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, name, price, stock, is_sub_product, image_url')
+    .eq('store_id', store.id)
+    .order('name', { ascending: true })
+
+  // cashier_token tidak ikut dikirim ke browser: token sudah ada di URL, dan
+  // tidak ada komponen client yang membutuhkannya.
+  const publicStore = {
+    id: store.id,
+    name: store.name,
+    subscription_tier: store.subscription_tier,
+    subscription_end_date: store.subscription_end_date,
+    receipt_required: store.receipt_required,
+    require_customer_name: store.require_customer_name,
+    waiting_list_enabled: store.waiting_list_enabled,
+    pelanggan_enabled: store.pelanggan_enabled,
+    visit_threshold: store.visit_threshold,
+    discount_percent: store.discount_percent,
+  }
+
   return (
-    <div style={{ backgroundColor: 'var(--bg-color)', padding: '1rem', minHeight: '100vh' }}>
-      <header style={{ textAlign: 'center', margin: '1.5rem 0' }}>
-        <h1 style={{ color: 'var(--primary-color)', margin: 0 }}>{store.name}</h1>
-        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)' }}>{cashier.name}</p>
-      </header>
-      {store.waiting_list_enabled && (
-        <nav className="cashier-nav" aria-label="Menu kasir">
-          <button
-            type="button"
-            className={screen === 'transaction' ? 'active' : ''}
-            onClick={() => setScreen('transaction')}
-          >
-            Transaksi
-          </button>
-          <button
-            type="button"
-            className={screen === 'queue' ? 'active' : ''}
-            onClick={() => setScreen('queue')}
-          >
-            Antrean
-          </button>
-        </nav>
-      )}
-      {screen === 'transaction' || !store.waiting_list_enabled ? (
-        <main style={{ maxWidth: 560, margin: '0 auto' }}>
-          <div className="card">
-            {/* storeId, cashierId, dan discountPercent tidak lagi dikirim: server
-                menurunkan semuanya dari token (temuan A1, C1, B6). */}
-            <CashierForm
-              token={token}
-              products={cashier.products || []}
-              receiptRequired={store.receipt_required ?? true}
-              requireCustomerName={store.require_customer_name ?? false}
-              loyaltyEnabled={loyaltyEnabled(store)}
-              visitThreshold={store.visit_threshold ?? DEFAULT_VISIT_THRESHOLD}
-            />
-          </div>
-        </main>
-      ) : (
-        <WaitingList token={token} active={screen === 'queue'} />
-      )}
-    </div>
+    <CashierApp
+      token={token}
+      cashier={{ id: cashier.id, name: cashier.name }}
+      store={publicStore}
+      products={products || []}
+    />
   )
 }

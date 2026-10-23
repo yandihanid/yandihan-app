@@ -6,11 +6,15 @@
 // hanya dengan menukar `storeId` di payload. Sekarang lewat lib/dal.js.
 
 import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
 import { requireStoreOwnership, requireCashierOwnership, requireUser } from '@/lib/dal'
 import { normalizePhone } from '@/lib/format'
 import { maxCashiers, planTier } from '@/lib/plan'
+import { hashPassword } from '@/lib/password'
+import { normalizeUsername, validatePassword, validateUsername } from '@/lib/cashierAccount'
+import { deleteCashierSessionsForStore } from '@/lib/cashierAuth'
 
 /**
  * Simpan nama toko — buat kalau belum ada, ubah kalau sudah.
@@ -52,12 +56,19 @@ export async function updateStore(formData) {
     const { store, error: ownErr } = await requireStoreOwnership(storeId)
     if (ownErr) return { error: ownErr }
 
+    // Toko lama yang dibuat sebelum migrasi 0012 mungkin belum punya token
+    // link. Pastikan ada saat profil disimpan, supaya halaman Pengaturan tidak
+    // pernah menampilkan link kosong.
+    const patch = store.cashier_token
+      ? profile
+      : { ...profile, cashier_token: generateCashierToken() }
+
     // .select('id') + maybeSingle(): UPDATE yang tidak mengenai satu baris pun
     // dijawab sukses oleh PostgREST. Tanpa ini, tulisan yang ditolak RLS
     // terbaca sebagai tersimpan.
     const { data, error } = await supabase
       .from('stores')
-      .update(profile)
+      .update(patch)
       .eq('id', store.id)
       .eq('user_id', store.user_id)
       .select('id')
@@ -76,6 +87,7 @@ export async function updateStore(formData) {
   const { error } = await supabase.from('stores').insert({
     ...profile,
     user_id: user.id,
+    cashier_token: generateCashierToken(),
   })
 
   if (error) return { error: 'Gagal membuat toko' }
@@ -87,21 +99,31 @@ export async function updateStore(formData) {
   return { success: true }
 }
 
-// Token kasir dibuat di sini, bukan diserahkan ke DEFAULT kolom DB.
-// Sebelumnya `insert({ store_id, name })` tidak pernah mengirim `token`, jadi
-// kekuatan kredensial POS bergantung pada default yang tidak ada di repo.
+// Token link toko dibuat di sini, bukan diserahkan ke DEFAULT kolom DB.
 // 24 byte = 192 bit, base64url supaya aman dipakai sebagai segmen URL /c/<token>.
 function generateCashierToken() {
   return randomBytes(24).toString('base64url')
 }
 
+function isDuplicateUsername(error) {
+  return error?.code === '23505' || /duplicate key/i.test(error?.message || '')
+}
+
 export async function addCashier(formData) {
   const name = String(formData.get('name') || '').trim()
+  const username = normalizeUsername(formData.get('username'))
+  const password = String(formData.get('password') || '')
 
   const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
   if (ownErr) return { error: ownErr }
   if (!name) return { error: 'Nama kasir wajib diisi' }
   if (name.length > 80) return { error: 'Nama kasir terlalu panjang (maks 80 karakter)' }
+
+  const usernameError = validateUsername(username)
+  if (usernameError) return { error: usernameError }
+
+  const passwordError = validatePassword(password)
+  if (passwordError) return { error: passwordError }
 
   const supabase = await createClient()
 
@@ -127,11 +149,62 @@ export async function addCashier(formData) {
     }
   }
 
-  const { error } = await supabase
-    .from('cashiers')
-    .insert({ store_id: store.id, name, token: generateCashierToken() })
+  const { error } = await supabase.from('cashiers').insert({
+    store_id: store.id,
+    name,
+    username,
+    password_hash: hashPassword(password),
+  })
 
+  if (isDuplicateUsername(error)) {
+    return { error: `Username "${username}" sudah dipakai kasir lain di toko ini.` }
+  }
   if (error) return { error: 'Gagal menambahkan kasir' }
+
+  revalidatePath('/dashboard/settings')
+  return { success: true }
+}
+
+/**
+ * Ubah nama/username dan (opsional) atur ulang kata sandi.
+ *
+ * Kata sandi kosong berarti "jangan diubah". Ini yang dipakai pemilik untuk
+ * mereset akun kasir yang lupa kata sandi tanpa menghapus riwayatnya.
+ */
+export async function updateCashierAccount(formData) {
+  const cashierId = formData.get('cashierId')
+  const name = String(formData.get('name') || '').trim()
+  const username = normalizeUsername(formData.get('username'))
+  const password = String(formData.get('password') || '')
+
+  const { cashier, error: ownErr } = await requireCashierOwnership(cashierId)
+  if (ownErr) return { error: ownErr }
+  if (!name) return { error: 'Nama kasir wajib diisi' }
+  if (name.length > 80) return { error: 'Nama kasir terlalu panjang (maks 80 karakter)' }
+
+  const usernameError = validateUsername(username)
+  if (usernameError) return { error: usernameError }
+
+  const passwordError = validatePassword(password, { required: false })
+  if (passwordError) return { error: passwordError }
+
+  const patch = { name, username }
+  if (password) patch.password_hash = hashPassword(password)
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('cashiers')
+    .update(patch)
+    .eq('id', cashier.id)
+    .eq('store_id', cashier.store_id)
+    .select('id')
+    .maybeSingle()
+
+  if (isDuplicateUsername(error)) {
+    return { error: `Username "${username}" sudah dipakai kasir lain di toko ini.` }
+  }
+  if (error) return { error: 'Gagal menyimpan akun kasir' }
+  if (!data) return { error: 'Perubahan tidak tersimpan. Coba muat ulang halaman.' }
 
   revalidatePath('/dashboard/settings')
   return { success: true }
@@ -155,26 +228,33 @@ export async function deleteCashier(formData) {
 }
 
 /**
- * Cetak ulang token kasir. Dibutuhkan karena token bisa bocor (dulu ikut
- * ter-render di halaman struk publik, temuan A4) dan sampai sekarang tidak ada
- * cara mencabutnya selain menghapus kasirnya.
- * Sekaligus me-reset device binding supaya kasir bisa pindah perangkat.
+ * Ganti token link toko. Link lama langsung mati dan SEMUA sesi kasir toko ini
+ * dicabut, karena link yang bocor biasanya berarti perangkat yang memegangnya
+ * juga tidak lagi tepercaya. Akun kasir dan riwayat transaksi tidak berubah.
  */
-export async function rotateCashierToken(formData) {
-  const { cashier, error: ownErr } = await requireCashierOwnership(formData.get('cashierId'))
+export async function rotateStoreCashierToken(storeId) {
+  const { store, error: ownErr } = await requireStoreOwnership(storeId)
   if (ownErr) return { error: ownErr }
 
+  const token = generateCashierToken()
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('cashiers')
-    .update({ token: generateCashierToken(), device_id: null })
-    .eq('id', cashier.id)
-    .eq('store_id', cashier.store_id)
-    .select('token')
-    .single()
+    .from('stores')
+    .update({ cashier_token: token })
+    .eq('id', store.id)
+    .eq('user_id', store.user_id)
+    .select('cashier_token')
+    .maybeSingle()
 
-  if (error) return { error: 'Gagal membuat token baru' }
+  if (error) return { error: 'Gagal membuat link baru' }
+  if (!data) return { error: 'Link tidak tersimpan. Coba muat ulang halaman.' }
+
+  // cashier_sessions tidak punya policy untuk authenticated, jadi pembersihan
+  // sesi lewat service role.
+  const service = createServiceClient()
+  await deleteCashierSessionsForStore(service, store.id)
 
   revalidatePath('/dashboard/settings')
-  return { success: true, token: data.token }
+  revalidatePath('/dashboard')
+  return { success: true, token: data.cashier_token }
 }

@@ -2,34 +2,33 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { deletePendingOrder } from './actions'
-import { CheckCircle2, Download, ExternalLink, Play, Trash2 } from 'lucide-react'
+import { markOrderFailed } from './actions'
+import { Download, Play, XCircle } from 'lucide-react'
 
 export default function OrderActionRow({ order, storeId }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const isPaid = order.status === 'paid'
+  const isPending = order.status === 'pending'
 
   const handlePayNow = (orderId) => {
-    // Simpan pending order ke localStorage agar tombol verifikasi muncul
     try {
       localStorage.setItem('yandihan_pending_order', orderId)
       localStorage.setItem('yandihan_pending_store', storeId)
     } catch {}
 
-    // Scroll ke atas agar pengguna melihat banner pembayaran / cek status
     window.scrollTo({ top: 0, behavior: 'smooth' })
     alert(`Order ${orderId} siap dilanjutkan. Anda dapat mengecek status pembayaran atau mengklik tombol upgrade di atas jika ingin membuat sesi baru.`)
   }
 
-  const handleDelete = async (orderId) => {
-    if (!confirm(`Hapus order ${orderId}? Pembayaran yang belum selesai untuk order ini akan dibatalkan.`)) {
+  const handleCancelPayment = async (orderId) => {
+    if (!confirm(`Tandai order ${orderId} sebagai gagal?`)) {
       return
     }
 
     setLoading(true)
     try {
-      const res = await deletePendingOrder(orderId)
+      const res = await markOrderFailed(orderId)
       if (res?.error) {
         alert(res.error)
       } else {
@@ -42,7 +41,7 @@ export default function OrderActionRow({ order, storeId }) {
         router.refresh()
       }
     } catch {
-      alert('Gagal menghapus order. Coba lagi.')
+      alert('Gagal memperbarui status order. Coba lagi.')
     } finally {
       setLoading(false)
     }
@@ -74,8 +73,8 @@ export default function OrderActionRow({ order, storeId }) {
         {isPaid ? 'Invoice Lunas' : 'Invoice'}
       </a>
 
-      {/* Jika status masih pending / belum lunas: Tampilkan tombol Lanjut & Hapus */}
-      {!isPaid && (
+      {/* Jika status pending: Opsi Lanjut atau Batalkan jadi Gagal */}
+      {isPending && (
         <>
           <button
             type="button"
@@ -102,7 +101,7 @@ export default function OrderActionRow({ order, storeId }) {
 
           <button
             type="button"
-            onClick={() => handleDelete(order.order_id)}
+            onClick={() => handleCancelPayment(order.order_id)}
             disabled={loading}
             style={{
               display: 'inline-flex',
@@ -111,16 +110,16 @@ export default function OrderActionRow({ order, storeId }) {
               fontSize: '0.75rem',
               padding: '0.3rem 0.5rem',
               borderRadius: '6px',
-              border: 'none',
-              backgroundColor: '#fee2e2',
+              border: '1px solid #fecaca',
+              backgroundColor: '#fff',
               color: '#dc2626',
               fontWeight: 600,
               cursor: 'pointer',
             }}
-            title="Hapus Order Pending"
+            title="Tandai Gagal"
           >
-            <Trash2 size={13} />
-            Hapus
+            <XCircle size={13} />
+            Batal (Gagal)
           </button>
         </>
       )}

@@ -1,10 +1,13 @@
 import { createClient } from '@/utils/supabase/server'
 import { verifySession, getMyStore } from '@/lib/dal'
+import { isPro, maxCashiers } from '@/lib/plan'
 import Alert from '@/components/ui/Alert'
+import Button from '@/components/ui/Button'
 import AddCashierForm from './AddCashierForm'
 import CashierRow from './CashierRow'
 import SettingToggle from './SettingToggle'
 import SettingsForm from './SettingsForm'
+import StoreCashierLink from './StoreCashierLink'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,13 +52,25 @@ export default async function SettingsPage() {
   const store = await getMyStore()
 
   const supabase = await createClient()
-  const { data: cashiers } = store
+  const { data: cashierRows } = store
     ? await supabase
         .from('cashiers')
-        .select('id, name, token, device_id, telegram_chat_id, created_at')
+        .select('id, name, username, password_hash, created_at')
         .eq('store_id', store.id)
         .order('created_at', { ascending: true })
     : { data: [] }
+
+  // password_hash tidak pernah dikirim ke browser, bahkan dalam bentuk hash.
+  // Yang dibutuhkan UI hanya "sudah diatur atau belum".
+  const cashiers = (cashierRows || []).map(({ password_hash, ...cashier }) => ({
+    ...cashier,
+    hasPassword: Boolean(password_hash),
+  }))
+
+  const pro = isPro(store)
+  const limit = maxCashiers(store)
+  const remaining = Number.isFinite(limit) ? Math.max(limit - cashiers.length, 0) : Infinity
+  const canAddCashier = !store ? false : !Number.isFinite(limit) || cashiers.length < limit
 
   return (
     <div className="animate-fade-in flex flex-col gap-4">
@@ -92,35 +107,55 @@ export default async function SettingsPage() {
       </section>
 
       <section className="card">
-        <h3>Kasir Terhubung</h3>
+        <h3>Link & Akun Kasir</h3>
         {store ? (
           <>
-            <AddCashierForm storeId={store.id} />
-            {cashiers?.length ? (
+            <StoreCashierLink storeId={store.id} token={store.cashier_token} />
+
+            <div className="settings-divider" />
+
+            {canAddCashier ? (
+              <AddCashierForm storeId={store.id} isPro={pro} remaining={remaining} />
+            ) : (
+              <Alert variant="info" live={false} className="settings-quota">
+                <strong>Kuota akun kasir paket GRATIS sudah terpakai.</strong>
+                <span>
+                  Paket GRATIS mendukung 1 akun kasir. Upgrade ke PRO untuk menambahkan akun
+                  sebanyak kebutuhan tim — semuanya tetap memakai satu link toko.
+                </span>
+                <Button href="/dashboard/billing" size="sm">
+                  Upgrade ke PRO
+                </Button>
+              </Alert>
+            )}
+
+            {cashiers.length ? (
               <div className="table-scroll">
                 <table>
                   <thead>
                     <tr>
                       <th>Kasir</th>
-                      <th>Jenis</th>
-                      <th>Link Kasir</th>
+                      <th>Username</th>
+                      <th>Status</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cashiers.map((c) => (
-                      <CashierRow key={c.id} cashier={c} />
+                    {cashiers.map((cashier) => (
+                      <CashierRow key={cashier.id} cashier={cashier} />
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <p style={{ color: 'var(--text-muted)' }}>Belum ada kasir.</p>
+              <p style={{ color: 'var(--text-muted)' }}>
+                Belum ada akun kasir. Tambahkan akun pertama agar link di atas bisa dipakai.
+              </p>
             )}
           </>
         ) : (
           <Alert variant="info" live={false}>
-            Buat toko dulu sebelum menambah kasir.
+            Buat toko dulu sebelum menambah akun kasir.
           </Alert>
         )}
       </section>

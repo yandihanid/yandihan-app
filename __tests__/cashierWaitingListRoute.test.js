@@ -24,13 +24,15 @@ vi.mock('@/lib/time', () => ({
 
 import { GET, PATCH } from '@/app/api/cashier/waiting-list/route'
 
-const headers = { 'x-cashier-token': 'cashier-token', 'x-device-id': 'device-one' }
-
-function getRequest(status = 'pending') {
+function request(status = 'pending', { session = 'valid-session' } = {}) {
+  const headers = new Headers({ 'x-cashier-token': 'store-token' })
+  if (session) headers.set('cookie', `yandihan_cashier_session=${session}`)
   return new Request(`http://localhost/api/cashier/waiting-list?status=${status}`, { headers })
 }
 
-function patchRequest(body = { id: 'ticket-1' }) {
+function patchRequest(body = { id: 'ticket-1' }, { session = 'valid-session' } = {}) {
+  const headers = new Headers({ 'x-cashier-token': 'store-token', 'content-type': 'application/json' })
+  if (session) headers.set('cookie', `yandihan_cashier_session=${session}`)
   return new Request('http://localhost/api/cashier/waiting-list', {
     method: 'PATCH',
     headers,
@@ -61,14 +63,13 @@ function authorizeWith(supabase, enabled = true) {
     cashier: {
       id: 'cashier-1',
       store_id: 'store-1',
-      device_id: 'device-one',
       stores: { waiting_list_enabled: enabled },
     },
     supabase,
   })
 }
 
-describe('cashier waiting-list route', () => {
+describe('cashier waiting-list route (session-based)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     checkRateLimit.mockResolvedValue({ allowed: true })
@@ -78,7 +79,7 @@ describe('cashier waiting-list route', () => {
     const { supabase, query } = getSupabase()
     authorizeWith(supabase)
 
-    const response = await GET(getRequest(status))
+    const response = await GET(request(status))
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ enabled: true, tickets: [{ id: 'ticket-1' }] })
@@ -94,7 +95,7 @@ describe('cashier waiting-list route', () => {
     const { supabase } = getSupabase()
     authorizeWith(supabase)
 
-    const response = await GET(getRequest('cancelled'))
+    const response = await GET(request('cancelled'))
 
     expect(response.status).toBe(400)
     expect(supabase.from).not.toHaveBeenCalled()
@@ -104,7 +105,7 @@ describe('cashier waiting-list route', () => {
     const { supabase } = getSupabase()
     authorizeWith(supabase, false)
 
-    const response = await GET(getRequest())
+    const response = await GET(request())
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ tickets: [], enabled: false })
@@ -146,5 +147,15 @@ describe('cashier waiting-list route', () => {
 
     expect(response.status).toBe(403)
     expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('rejects request without session cookie', async () => {
+    authorizeCashier.mockResolvedValue({ error: 'Sesi kasir berakhir. Silakan masuk kembali.', status: 401 })
+    const req = request('pending', { session: null })
+
+    const response = await GET(req)
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: 'Sesi kasir berakhir. Silakan masuk kembali.' })
   })
 })

@@ -1044,6 +1044,56 @@ tr:hover td {
   }
 }
 
+/* Tablet landscape (1024px) - better POS layout */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .pos-layout {
+    grid-template-columns: 1fr 320px;
+  }
+  
+  .pos-col-main {
+    min-width: 0;
+  }
+  
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  
+  .pos-product-img-wrap {
+    height: 100px;
+  }
+}
+
+/* Tablet portrait and large mobile */
+@media (min-width: 561px) and (max-width: 768px) {
+  .pos-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}
+
+/* Desktop - two column POS layout */
+@media (min-width: 1025px) {
+  .pos-layout {
+    grid-template-columns: 1fr 360px;
+  }
+  
+  .pos-col-side {
+    position: sticky;
+    top: 1rem;
+  }
+  
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  
+  .pos-product-img-wrap {
+    height: 110px;
+  }
+}
+
 /* --- Grid produk yang bisa ditap --------------------------------------- */
 .pos-grid {
   display: grid;
@@ -3256,4 +3306,628 @@ tr:hover td {
 
 @media (prefers-reduced-motion: reduce) {
   .onb-progress::after { transition: none; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   Layar kasir: login, kerangka halaman, dan tata letak POS
+   ──────────────────────────────────────────────────────────
+   Halaman /c/<token> dipakai di HP satu tangan, tablet yang
+   dimiringkan, dan desktop. Karena itu POS memakai satu kolom
+   di layar sempit lalu dua kolom mulai 900px: produk + keranjang
+   di kiri, pembeli + pembayaran di kanan.
+   ══════════════════════════════════════════════════════════ */
+
+.cashier-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  background-color: var(--bg-color);
+}
+
+.cashier-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1120px;
+  margin: 0 auto 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background-color: var(--card-bg);
+}
+
+.cashier-header h1 {
+  margin: 0;
+  color: var(--primary-color);
+  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+  overflow-wrap: anywhere;
+}
+
+.cashier-header p {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.cashier-header-text {
+  min-width: 0;
+}
+
+.cashier-logout {
+  flex-shrink: 0;
+}
+
+.cashier-main {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.cashier-form-card {
+  padding: clamp(0.85rem, 2vw, 1.5rem);
+}
+
+.cashier-page .cashier-nav {
+  max-width: 1120px;
+}
+
+.cashier-page .cashier-nav button {
+  touch-action: manipulation;
+}
+
+/* --- Login kasir ------------------------------------------------------- */
+.cashier-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(37, 99, 235, 0.12), transparent 32rem),
+    var(--bg-color);
+}
+
+.cashier-login {
+  width: 100%;
+  max-width: 430px;
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+/* Tablet landscape: wider login card */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .cashier-login {
+    max-width: 480px;
+  }
+}
+
+/* Desktop: max-width login card */
+@media (min-width: 1025px) {
+  .cashier-login {
+    max-width: 430px;
+  }
+}
+
+.cashier-login-icon,
+.cashier-gate-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 1rem;
+  border-radius: 14px;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+}
+
+.cashier-login-head {
+  margin-bottom: 1.5rem;
+}
+
+.cashier-login-eyebrow {
+  margin: 0 0 0.25rem;
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cashier-login-head h1,
+.cashier-gate-card h1 {
+  margin: 0;
+  font-size: clamp(1.35rem, 5vw, 1.7rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.cashier-login-head p,
+.cashier-gate-card p {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.cashier-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cashier-login-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cashier-password {
+  position: relative;
+  display: block;
+}
+
+.cashier-password .input {
+  width: 100%;
+  padding-right: 3rem;
+}
+
+.cashier-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  display: grid;
+  place-items: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cashier-password-toggle:hover {
+  color: var(--text-main);
+  background-color: var(--bg-color);
+}
+
+.cashier-login-submit {
+  width: 100%;
+  min-height: var(--tap-target);
+  margin-top: 0.25rem;
+}
+
+.cashier-login-error {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--danger-light);
+  color: var(--danger-dark);
+  font-size: 0.85rem;
+}
+
+.cashier-login-foot {
+  margin: 1.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.cashier-gate-card {
+  width: 100%;
+  max-width: 430px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.cashier-gate-icon {
+  margin-inline: auto;
+}
+
+/* --- Cashier page layout ------------------------------------------------ */
+.cashier-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  background-color: var(--bg-color);
+}
+
+.cashier-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1120px;
+  margin: 0 auto 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background-color: var(--card-bg);
+}
+
+.cashier-header h1 {
+  margin: 0;
+  color: var(--primary-color);
+  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+  overflow-wrap: anywhere;
+}
+
+.cashier-header p {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.cashier-header-text {
+  min-width: 0;
+}
+
+.cashier-logout {
+  flex-shrink: 0;
+}
+
+.cashier-main {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.cashier-form-card {
+  padding: clamp(0.85rem, 2vw, 1.5rem);
+}
+
+/* Tablet: wider cashier page */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .cashier-page {
+    padding: 1rem;
+  }
+  .cashier-header {
+    padding: 1rem 1.25rem;
+  }
+  .cashier-form-card {
+    padding: 1.25rem;
+  }
+}
+
+/* Desktop: full width */
+@media (min-width: 1025px) {
+  .cashier-page {
+    padding: 1.25rem;
+  }
+}
+
+/* --- Tata letak POS --------------------------------------------------- */
+.pos-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.pos-col {
+  min-width: 0;
+}
+
+/* Tablet portrait and large mobile (561px - 768px): single column, wider product grid */
+@media (min-width: 561px) and (max-width: 768px) {
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .pos-product-img-wrap {
+    height: 95px;
+  }
+}
+
+/* Tablet landscape (769px - 1024px): two column layout with narrower sidebar */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .pos-layout {
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    align-items: start;
+  }
+  .pos-col-side {
+    position: sticky;
+    top: 1rem;
+  }
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .pos-product-img-wrap {
+    height: 100px;
+  }
+}
+
+/* Desktop (1025px+): full two column layout */
+@media (min-width: 1025px) {
+  .pos-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+    align-items: start;
+  }
+
+  .pos-col-side {
+    position: sticky;
+    top: 1rem;
+  }
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .pos-product-img-wrap {
+    height: 110px;
+  }
+}
+
+/* --- Pemilih subproduk bergambar -------------------------------------- */
+.pos-sub-picker {
+  display: block;
+  width: 100%;
+}
+
+.pos-sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pos-sub-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: var(--tap-target);
+  padding: 0.45rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 9px;
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), background-color 0.15s var(--ease-out);
+}
+
+.pos-sub-option:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  background-color: var(--secondary-color);
+}
+
+.pos-sub-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pos-sub-option-img {
+  display: grid;
+  flex: 0 0 48px;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 7px;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  font-weight: 800;
+}
+
+.pos-sub-option-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pos-sub-option-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.05rem;
+}
+
+.pos-sub-option-body strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pos-sub-option-body span {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.pos-sub-option-body small {
+  color: var(--warning-color);
+  font-size: 0.6875rem;
+}
+
+.pos-line-sub {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pos-line-sub-thumb {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 6px;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pos-line-sub-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --- Kartu link & akun kasir di Pengaturan ----------------------------- */
+.store-link {
+  padding: 1rem;
+  border: 1px solid var(--primary-light);
+  border-radius: 12px;
+  background-color: var(--secondary-color);
+}
+
+.store-link-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.store-link-icon {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: var(--card-bg);
+  color: var(--primary-color);
+}
+
+.store-link-head h4,
+.settings-section-head h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.store-link-head p,
+.settings-section-head p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.store-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.store-link-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-target);
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.store-link-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+}
+
+.store-link-foot p,
+.store-link-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.settings-divider {
+  height: 1px;
+  margin: 1.5rem 0;
+  background-color: var(--border-color);
+}
+
+.settings-section-head {
+  margin-bottom: 0.75rem;
+}
+
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 0.75rem;
+}
+
+.settings-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-quota {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.settings-quota span {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.cashier-username {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--bg-color);
+  font-size: 0.78rem;
+}
+
+.cashier-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+/* Tabel yang lebih lebar dari layar digulir di pembungkusnya sendiri, bukan
+   memaksa seluruh halaman ikut melebar. */
+@media (max-width: 640px) {
+  .table-scroll table {
+    min-width: 640px;
+  }
+
+  .settings-form-actions {
+    justify-content: stretch;
+  }
+
+  .settings-form-actions .btn {
+    width: 100%;
+  }
+
+  .store-link-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cashier-header {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 380px) {
+  .pos-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pos-sub-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-sub-option,
+  .pos-product-img {
+    transition: none;
+  }
 }
