@@ -102,7 +102,7 @@ export default function PelangganClient({ store: initialStore }) {
     async function loadProducts() {
       setProductsLoading(true)
       try {
-        const res = await fetch(`/api/produk?storeId=${store.id}`)
+        const res = await fetch(`/api/products?storeId=${store.id}`)
         if (!res.ok) throw new Error('Gagal memuat daftar produk')
         const data = await res.json()
         if (!cancelled) setProducts(data || [])
