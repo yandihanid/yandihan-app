@@ -123,6 +123,81 @@ export default async function BillingPage() {
         </section>
       </div>
 
+      {/* Informasi Kredensial Pajak (Suket PP 55 / 2022) */}
+      <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <ShieldCheck size={20} color="var(--primary-color)" />
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
+            Legalitas & Bukti Perpajakan
+          </h3>
+        </div>
+
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: 'var(--bg-color)',
+            borderRadius: 'var(--border-radius-sm)',
+            border: '1px solid var(--border-color)',
+            fontSize: '0.85rem',
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Status Wajib Pajak:</span>
+            <strong style={{ color: 'var(--success-color)' }}>PP 55 / 2022 (PPh Final UMKM 0,5%)</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Nomor Suket:</span>
+            <strong style={{ fontFamily: 'monospace' }}>{TAX_INFO.suketNumber}</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Wajib Pajak:</span>
+            <span>{TAX_INFO.taxpayerName}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>NPWP:</span>
+            <span style={{ fontFamily: 'monospace' }}>{TAX_INFO.npwp}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>KPP Terdaftar:</span>
+            <span>{TAX_INFO.kpp}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Badan Usaha / Operator:</span>
+            <span>{LEGAL_ENTITY}</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginTop: 'auto' }}>
+          <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5, flex: '1 1 200px' }}>
+            <Info size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+            Transaksi sah dan mematuhi perpajakan RI (PP 55 Tahun 2022).
+          </p>
+          <a
+            href="/suket-pp-55-2022.pdf"
+            download="Suket-PP-55-Yandihan.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.8rem',
+              padding: '0.4rem 0.8rem',
+              backgroundColor: 'var(--secondary-color)',
+              color: 'var(--primary-color)',
+              border: '1px solid var(--primary-color)',
+              borderRadius: '6px',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            <Download size={14} />
+            Unduh Dokumen Suket PP 55 (PDF)
+          </a>
+        </div>
+      </section>
+
       <section className="card">
         <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
           Riwayat Pembayaran Berhasil
