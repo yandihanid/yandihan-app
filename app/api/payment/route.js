@@ -74,7 +74,7 @@ export async function POST(req) {
       // Update order status ke gateway_error beserta code Xendit
       await service
         .from('subscription_orders')
-        .update({ status: 'gateway_error', xendit_error_code: xenditErrorCode, xendit_error_message: xenditErrorMessage, updated_at: new Date().toISOString() })
+        .update({ status: 'gateway_error', updated_at: new Date().toISOString() })
         .eq('order_id', orderId)
 
       // Maping error code Xendit ke pesan pengguna (opsional: bisa diperluas)
@@ -86,8 +86,7 @@ export async function POST(req) {
           code: xenditErrorCode,
           message: xenditErrorMessage,
         })
-        // Contoh: code 400 = bad request, code 401 = unauthorized, dll
-        userMessage = 'Gagal membuat invoice di gateway. Kode error: ' + xenditErrorCode + '. Hubungi pengelola jika masalah berlanjut.'
+        userMessage = 'Gagal membuat invoice. Kode error: ' + xenditErrorCode + '. Hubungi pengelola jika masalah berlanjut.'
       }
 
       return NextResponse.json(

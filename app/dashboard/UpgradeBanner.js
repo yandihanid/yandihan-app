@@ -30,11 +30,6 @@ import { formatRupiah } from '@/lib/format'
 const ORDER_KEY = 'yandihan_pending_order'
 const STORE_KEY = 'yandihan_pending_store'
 
-// Referensi pembayaran sekarang menggunakan Xendit. Snap.js/Midtrans tidak lagi
-// dipanggil dari sini; alur pembayaran lurus ke /api/payment (Xendit) lalu
-// langsung terverifikasi via RPC consume_subscription_order.
-const SNAP_CLIENT_KEY = '' // not used anymore
-
 const listeners = new Set()
 
 function emitPendingOrderChange() {
@@ -95,6 +90,41 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
     pendingOrderServerSnapshot
   )
 
+  const handleUpgrade = async (planType = 'monthly') => {
+    setLoading(true)
+    setStatusMsg(null)
+    try {
+      console.log('[Xendit] Memulai pembayaran, planType:', planType, 'storeId:', storeId)
+      const res = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, planType })
+      })
+
+      const data = await res.json()
+      console.log('[Xendit] Response:', data)
+
+      if (!res.ok || !data.invoiceUrl) {
+        setStatusMsg({ type: 'error', text: data.error || 'Gagal membuat transaksi. Coba lagi.' })
+        return
+      }
+
+      // Store orderId for fallback verify
+      if (data.orderId) {
+        savePendingOrder(data.orderId, storeId)
+      }
+
+      // Redirect ke halaman pembayaran Xendit
+      console.log('[Xendit] Redirect ke:', data.invoiceUrl)
+      window.location.href = data.invoiceUrl
+    } catch (error) {
+      console.error('Gagal membuka pembayaran', { message: error?.message })
+      setStatusMsg({ type: 'error', text: 'Terjadi kesalahan saat membuka pembayaran. Coba lagi.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // === PRO tier: show expiry info instead ===
   if (subscriptionTier !== 'FREE') {
     if (!subscriptionEndDate) return null
@@ -129,7 +159,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
         {isExpiringSoon && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
-              onClick={() => window.location.href = '/dashboard/billing?payment=monthly'}
+              onClick={() => handleUpgrade('monthly')}
               disabled={loading}
               style={{
                 backgroundColor: '#d97706',
@@ -145,7 +175,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
               {loading ? '...' : '+1 Bulan'}
             </button>
             <button
-              onClick={() => window.location.href = '/dashboard/billing?payment=annual'}
+              onClick={() => handleUpgrade('annual')}
               disabled={loading}
               style={{
                 backgroundColor: '#b45309',
@@ -247,7 +277,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => window.location.href = '/dashboard/billing?payment=monthly'}
+            onClick={() => handleUpgrade('monthly')}
             disabled={loading}
             style={{
               backgroundColor: 'var(--secondary-color)',
@@ -268,7 +298,7 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
             {loading ? <span style={{ opacity: 0.7 }}>Memproses...</span> : `🚀 Bulanan (${formatRupiah(PRO_PRICE_IDR)}/bln)`}
           </button>
           <button
-            onClick={() => window.location.href = '/dashboard/billing?payment=annual'}
+            onClick={() => handleUpgrade('annual')}
             disabled={loading}
             style={{
               backgroundColor: '#fff',
