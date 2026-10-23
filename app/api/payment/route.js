@@ -66,19 +66,32 @@ export async function POST(req) {
 
     const xenditData = await xenditRes.json()
 
+    // Tangkap error kode Xendit untuk logging dan pesan yang lebih informatif
+    const xenditErrorCode = xenditData?.code
+    const xenditErrorMessage = xenditData?.message
+
     if (!xenditRes.ok || !xenditData?.id) {
+      // Update order status ke gateway_error beserta code Xendit
       await service
         .from('subscription_orders')
-        .update({ status: 'gateway_error', updated_at: new Date().toISOString() })
+        .update({ status: 'gateway_error', xendit_error_code: xenditErrorCode, xendit_error_message: xenditErrorMessage, updated_at: new Date().toISOString() })
         .eq('order_id', orderId)
 
-      console.error('Xendit Invoice error', {
-        orderId,
-        status: xenditRes.status,
-        code: xenditData?.code,
-      })
+      // Maping error code Xendit ke pesan pengguna (opsional: bisa diperluas)
+      let userMessage = 'Gagal menghubungi gateway pembayaran. Coba lagi.'
+      if (xenditErrorCode) {
+        console.error('Xendit Invoice error', {
+          orderId,
+          status: xenditRes.status,
+          code: xenditErrorCode,
+          message: xenditErrorMessage,
+        })
+        // Contoh: code 400 = bad request, code 401 = unauthorized, dll
+        userMessage = 'Gagal membuat invoice di gateway. Kode error: ' + xenditErrorCode + '. Hubungi pengelola jika masalah berlanjut.'
+      }
+
       return NextResponse.json(
-        { error: 'Gagal menghubungi gateway pembayaran. Coba lagi.' },
+        { error: userMessage },
         { status: 502 }
       )
     }
