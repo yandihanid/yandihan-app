@@ -10,20 +10,17 @@ import { Calendar, CheckCircle2, Clock, Download, FileText, Info, ShieldCheck } 
 
 export const dynamic = 'force-dynamic'
 
-/** Ambil query param `payment` dari URL (mis. ?payment=monthly atau ?payment=annual) */
-const PAYMENT_QUERY = typeof window !== 'undefined'
-  ? new URLSearchParams(window.location.search).get('payment')
-  : null
-
 export const metadata = {
   title: 'Billing & Langganan',
 }
 
 /**
- * Jika datang dari UpgradeBanner dengan payment=monthly/annual,
- * tampilkan pesan ringkas dan tombol lanjut ke pembayaran Xendit.
- * Jika tidak, tampilkan halaman billing lengkap seperti semula.
+ * Halaman Billing: menampilkan riwayat tagihan + fitur langganan.
+ * - Diakses langsung /dashboard/billing -> tampilkan halaman lengkap
+ * - Dari UpgradeBanner redirect -> halaman ini tetap tampil lengkap
+ * - Tombol "Beli" di header akanarah ke halaman ini
  */
+
 export default async function BillingPage() {
   await verifySession('/dashboard/billing')
 
@@ -36,101 +33,6 @@ export default async function BillingPage() {
     )
   }
 
-  // === Jika ada query param payment=monthly/annual dari UpgradeBanner ===
-  if (PAYMENT_QUERY === 'monthly' || PAYMENT_QUERY === 'annual') {
-    const planName = PAYMENT_QUERY === 'monthly' ? 'Bulanan' : 'Tahunan'
-    const price = PAYMENT_QUERY === 'monthly' ? PRO_PRICE_IDR : PRO_ANNUAL_PRICE_IDR
-    const days = PAYMENT_QUERY === 'monthly' ? 30 : 365
-
-    return (
-      <div className="animate-fade-in flex flex-col gap-5">
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.25rem' }}>
-            Pembayaran {planName}
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', margin: 0 }}>
-            Pemilihan paket {planName.toLowerCase()}. Silakan lanjutkan pembayaran di bawah.
-          </p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
-          <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Paket Saat Ini</h3>
-              <span
-                style={{
-                  fontSize: '0.8125rem',
-                  fontWeight: 700,
-                  backgroundColor: isPro(store) ? 'var(--secondary-color)' : 'var(--border-color)',
-                  color: isPro(store) ? 'var(--primary-color)' : 'var(--text-muted)',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '99px',
-                }}
-              >
-                {isPro(store) ? 'YANDIHAN PRO' : 'GRATIS'}
-              </span>
-            </div>
-
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={16} color="var(--primary-color)" />
-                <span>
-                  <strong>
-                    {isPro(store)
-                      ? expiryDate
-                        ? expiryDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-                        : 'Aktif Permanen'
-                      : 'Selamanya'}
-                  </strong>
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CheckCircle2 size={16} color="var(--success-color)" />
-                <span>Slot Kasir: <strong>{isPro(store) ? 'Tanpa Batas (Unlimited)' : '1 Kasir'}</strong></span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CheckCircle2 size={16} color="var(--success-color)" />
-                <span>Fitur Loyalitas: <strong>{isPro(store) ? 'Aktif' : 'Terkunci'}</strong></span>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
-              <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                Pilihan Paket Langganan:
-                <br />
-                • Bulanan: <strong>{formatRupiah(price)} / bulan</strong>
-                <br />
-                • Tahunan: <strong>{formatRupiah(PRO_ANNUAL_PRICE_IDR)} / tahun</strong> (Hemat 17%, setara Rp 65.000/bln)
-              </p>
-            </div>
-          </section>
-        </div>
-
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <button
-            onClick={() => window.location.href = '/dashboard/billing'}
-            style={{
-              backgroundColor: 'var(--primary-color)',
-              color: 'white',
-              border: 'none',
-              padding: '0.875rem 1.5rem',
-              borderRadius: '99px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '1rem',
-            }}
-          >
-            Kembali ke Ringkasan Tagihan
-          </button>
-          <p style={{ margin: '0.5rem 0 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-            Redirect ke halaman pembayaran Xendit...
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // === Halaman billing lengkap (tanpa query param payment) ===
   const tier = planTier(store)
   const activePro = isPro(store)
   const expiryDate = store.subscription_end_date ? new Date(store.subscription_end_date) : null
