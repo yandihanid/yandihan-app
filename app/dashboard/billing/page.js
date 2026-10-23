@@ -10,10 +10,20 @@ import { Calendar, CheckCircle2, Clock, Download, FileText, Info, ShieldCheck } 
 
 export const dynamic = 'force-dynamic'
 
+/** Ambil query param `payment` dari URL (mis. ?payment=monthly atau ?payment=annual) */
+const PAYMENT_QUERY = typeof window !== 'undefined'
+  ? new URLSearchParams(window.location.search).get('payment')
+  : null
+
 export const metadata = {
   title: 'Billing & Langganan',
 }
 
+/**
+ * Jika datang dari UpgradeBanner dengan payment=monthly/annual,
+ * tampilkan pesan ringkas dan tombol lanjut ke pembayaran Xendit.
+ * Jika tidak, tampilkan halaman billing lengkap seperti semula.
+ */
 export default async function BillingPage() {
   await verifySession('/dashboard/billing')
 
@@ -26,9 +36,109 @@ export default async function BillingPage() {
     )
   }
 
+  // === Jika ada query param payment=monthly/annual dari UpgradeBanner ===
+  if (PAYMENT_QUERY === 'monthly' || PAYMENT_QUERY === 'annual') {
+    const planName = PAYMENT_QUERY === 'monthly' ? 'Bulanan' : 'Tahunan'
+    const price = PAYMENT_QUERY === 'monthly' ? PRO_PRICE_IDR : PRO_ANNUAL_PRICE_IDR
+    const days = PAYMENT_QUERY === 'monthly' ? 30 : 365
+
+    return (
+      <div className="animate-fade-in flex flex-col gap-5">
+        <div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.25rem' }}>
+            Pembayaran {planName}
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', margin: 0 }}>
+            Pemilihan paket {planName.toLowerCase()}. Silakan lanjutkan pembayaran di bawah.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
+          <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Paket Saat Ini</h3>
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 700,
+                  backgroundColor: isPro(store) ? 'var(--secondary-color)' : 'var(--border-color)',
+                  color: isPro(store) ? 'var(--primary-color)' : 'var(--text-muted)',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '99px',
+                }}
+              >
+                {isPro(store) ? 'YANDIHAN PRO' : 'GRATIS'}
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={16} color="var(--primary-color)" />
+                <span>
+                  <strong>
+                    {isPro(store)
+                      ? expiryDate
+                        ? expiryDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'Aktif Permanen'
+                      : 'Selamanya'}
+                  </strong>
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 size={16} color="var(--success-color)" />
+                <span>Slot Kasir: <strong>{isPro(store) ? 'Tanpa Batas (Unlimited)' : '1 Kasir'}</strong></span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 size={16} color="var(--success-color)" />
+                <span>Fitur Loyalitas: <strong>{isPro(store) ? 'Aktif' : 'Terkunci'}</strong></span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                Pilihan Paket Langganan:
+                <br />
+                • Bulanan: <strong>{formatRupiah(price)} / bulan</strong>
+                <br />
+                • Tahunan: <strong>{formatRupiah(PRO_ANNUAL_PRICE_IDR)} / tahun</strong> (Hemat 17%, setara Rp 65.000/bln)
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <button
+            onClick={() => window.location.href = '/dashboard/billing'}
+            style={{
+              backgroundColor: 'var(--primary-color)',
+              color: 'white',
+              border: 'none',
+              padding: '0.875rem 1.5rem',
+              borderRadius: '99px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            Kembali ke Ringkasan Tagihan
+          </button>
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            Redirect ke halaman pembayaran Xendit...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // === Halaman billing lengkap (tanpa query param payment) ===
   const tier = planTier(store)
   const activePro = isPro(store)
   const expiryDate = store.subscription_end_date ? new Date(store.subscription_end_date) : null
+
+  // Bersihkan order pending yang sudah kedaluwarsa SEBELUM daftar dibaca,
+  // supaya riwayat tidak menampilkan "menunggu" untuk pembayaran yang sudah
+  // tidak mungkin diselesaikan.
+  await expireStaleSubscriptionOrders()
 
   // Ambil riwayat order langganan toko (hanya yang sudah lunas)
   const supabase = await createClient()
@@ -51,16 +161,13 @@ export default async function BillingPage() {
         </p>
       </div>
 
-      {/* Banner / Upgrade Selector */}
       <UpgradeBanner
         storeId={store.id}
         subscriptionTier={tier}
         subscriptionEndDate={store.subscription_end_date}
-/>
+      />
 
-      {/* Grid Informasi Paket & Kredensial Pajak */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
-        {/* Status Paket Saat Ini */}
         <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Paket Saat Ini</h3>
@@ -82,7 +189,6 @@ export default async function BillingPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Clock size={16} color="var(--primary-color)" />
               <span>
-                Masa Berlaku:{' '}
                 <strong>
                   {expiryDate
                     ? expiryDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -94,15 +200,11 @@ export default async function BillingPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CheckCircle2 size={16} color="var(--success-color)" />
-              <span>
-                Slot Kasir: <strong>{activePro ? 'Tanpa Batas (Unlimited)' : '1 Kasir'}</strong>
-              </span>
+              <span>Slot Kasir: <strong>{activePro ? 'Tanpa Batas (Unlimited)' : '1 Kasir'}</strong></span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CheckCircle2 size={16} color="var(--success-color)" />
-              <span>
-                Fitur Loyalitas: <strong>{activePro ? 'Aktif' : 'Terkunci'}</strong>
-              </span>
+              <span>Fitur Loyalitas: <strong>{activePro ? 'Aktif' : 'Terkunci'}</strong></span>
             </div>
           </div>
 
@@ -116,84 +218,8 @@ export default async function BillingPage() {
             </p>
           </div>
         </section>
-
-        {/* Informasi Kredensial Pajak (Suket PP 55 / 2022) */}
-        <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ShieldCheck size={20} color="var(--primary-color)" />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>
-              Legalitas & Bukti Perpajakan
-            </h3>
-          </div>
-
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: 'var(--bg-color)',
-              borderRadius: 'var(--border-radius-sm)',
-              border: '1px solid var(--border-color)',
-              fontSize: '0.85rem',
-              lineHeight: 1.6,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Status Wajib Pajak:</span>
-              <strong style={{ color: 'var(--success-color)' }}>PP 55 / 2022 (PPh Final UMKM 0,5%)</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Nomor Suket:</span>
-              <strong style={{ fontFamily: 'monospace' }}>{TAX_INFO.suketNumber}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Wajib Pajak:</span>
-              <span>{TAX_INFO.taxpayerName}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>NPWP:</span>
-              <span style={{ fontFamily: 'monospace' }}>{TAX_INFO.npwp}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>KPP Terdaftar:</span>
-              <span>{TAX_INFO.kpp}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Badan Usaha / Operator:</span>
-              <span>{LEGAL_ENTITY}</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginTop: 'auto' }}>
-            <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5, flex: '1 1 200px' }}>
-              <Info size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-              Transaksi sah dan mematuhi perpajakan RI (PP 55 Tahun 2022).
-            </p>
-            <a
-              href="/suket-pp-55-2022.pdf"
-              download="Suket-PP-55-Yandihan.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                fontSize: '0.8rem',
-                padding: '0.4rem 0.8rem',
-                backgroundColor: 'var(--secondary-color)',
-                color: 'var(--primary-color)',
-                border: '1px solid var(--primary-color)',
-                borderRadius: '6px',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              <Download size={14} />
-              Unduh Dokumen Suket PP 55 (PDF)
-            </a>
-          </div>
-        </section>
       </div>
 
-      {/* Riwayat Order Pembayaran */}
       <section className="card">
         <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
           Riwayat Pembayaran Berhasil
@@ -213,44 +239,46 @@ export default async function BillingPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((ord) => (
-                  <tr key={ord.order_id}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{ord.order_id}</td>
-                    <td>
-                      {ord.plan === 'PRO_ANNUAL' || Number(ord.amount) >= 700000
-                        ? 'PRO Tahunan (1 Tahun)'
-                        : 'PRO Bulanan (30 Hari)'}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{formatRupiah(ord.amount)}</td>
-                    <td>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '99px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          backgroundColor: '#dcfce7',
-                          color: '#15803d',
-                        }}
-                      >
-                        Lunas
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      {new Date(ord.created_at).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <OrderActionRow order={ord} storeId={store.id} />
-                    </td>
-                  </tr>
-                ))}
+                {orders.map((ord) => {
+                  return (
+                    <tr key={ord.order_id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{ord.order_id}</td>
+                      <td>
+                        {ord.plan === 'PRO_ANNUAL' || Number(ord.amount) >= 700000
+                          ? 'PRO Tahunan (1 Tahun)'
+                          : 'PRO Bulanan (30 Hari)'}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{formatRupiah(ord.amount)}</td>
+                      <td>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '99px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                          }}
+                        >
+                          Lunas
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        {new Date(ord.created_at).toLocaleDateString('id-ID', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <OrderActionRow order={ord} storeId={store.id} />
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
