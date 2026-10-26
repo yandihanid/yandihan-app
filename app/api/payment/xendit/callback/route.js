@@ -33,11 +33,45 @@ export async function POST(req) {
   const service = createServiceClient()
   const { data: order } = await service
     .from('subscription_orders')
-    .select('plan, amount')
+    .select('plan, amount, store_id')
     .eq('order_id', body.external_id)
     .maybeSingle()
 
   const days = order?.plan === 'PRO_ANNUAL' || Number(order?.amount) >= 700000 ? 365 : 30
+  const isOnTableAddon =
+    /on.?table|addon/i.test(String(order?.plan || '')) ||
+    Number(order?.amount) === 50000
+
+  if (isOnTableAddon) {
+    // Add-on tidak mengubah masa langganan; cukup tandai lunas dan aktifkan fitur.
+    if (Number(body.amount) !== Number(order?.amount)) {
+      await service
+        .from('subscription_orders')
+        .update({ status: 'amount_mismatch', updated_at: new Date().toISOString() })
+        .eq('order_id', body.external_id)
+      return NextResponse.json({ message: 'Jumlah tidak cocok' }, { status: 200 })
+    }
+
+    await service
+      .from('subscription_orders')
+      .update({
+        status: 'paid',
+        consumed_at: new Date().toISOString(),
+        xendit_invoice_id: body.id ?? null,
+        midtrans_payload: body,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('order_id', body.external_id)
+
+    if (order?.store_id) {
+      await service
+        .from('stores')
+        .update({ on_table_enabled: true, updated_at: new Date().toISOString() })
+        .eq('id', order.store_id)
+    }
+
+    return NextResponse.json({ message: 'Add-on diaktifkan' }, { status: 200 })
+  }
 
   const { data, error } = await service.rpc('consume_subscription_order', {
     p_order_id: body.external_id,

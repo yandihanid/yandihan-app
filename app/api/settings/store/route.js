@@ -29,6 +29,7 @@ const ALLOWED_FIELDS = [
   'receipt_required',
   'require_customer_name',
   'waiting_list_enabled',
+  'on_table_enabled',
 ]
 
 export async function PATCH(req) {

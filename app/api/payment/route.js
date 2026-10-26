@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireStoreOwnership } from '@/lib/dal'
-import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
+import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR, ON_TABLE_ADDON_PRICE_IDR } from '@/lib/plan'
 import { createXenditInvoice, isXenditProduction } from '@/lib/xendit'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
   try {
-    const { storeId, planType = 'monthly' } = await req.json()
+    const { storeId, planType = 'monthly', addOn } = await req.json()
 
     const { store, user, error: ownErr } = await requireStoreOwnership(storeId)
     if (ownErr) return NextResponse.json({ error: ownErr }, { status: 403 })
@@ -17,12 +17,28 @@ export async function POST(req) {
     if (!rate.allowed) return tooManyRequests(rate.retryAfter)
 
     const isAnnual = planType === 'annual'
-    const grossAmount = isAnnual ? PRO_ANNUAL_PRICE_IDR : PRO_PRICE_IDR
+    const isOnTableAddon =
+      planType === 'on_table_addon' ||
+      planType === 'on_table' ||
+      planType === 'addon' ||
+      planType === 'add_on' ||
+      planType === 'on-table' ||
+      addOn === 'on_table' ||
+      addOn === 'addon' ||
+      addOn === true
+    const grossAmount = isOnTableAddon
+      ? ON_TABLE_ADDON_PRICE_IDR
+      : isAnnual
+      ? PRO_ANNUAL_PRICE_IDR
+      : PRO_PRICE_IDR
     const planDurationDays = isAnnual ? 365 : 30
-    const planItemName = isAnnual
+    const planValue = isOnTableAddon ? 'ON_TABLE_ADDON' : isAnnual ? 'PRO_ANNUAL' : 'PRO'
+    const planItemName = isOnTableAddon
+      ? 'Yandihan Kasir - Add-on On the Table'
+      : isAnnual
       ? 'Yandihan Kasir PRO - 1 tahun (Tahunan)'
       : 'Yandihan Kasir PRO - 1 bulan'
-    const planItemId = isAnnual ? 'PRO-1Y' : 'PRO-1M'
+    const planItemId = isOnTableAddon ? 'ON-TABLE' : isAnnual ? 'PRO-1Y' : 'PRO-1M'
 
     // order_id dengan prefix PRO- + UUID tanpa dash
     const orderId = `PRO-${randomUUID().replace(/-/g, '')}`
@@ -35,7 +51,7 @@ export async function POST(req) {
       store_id: store.id,
       user_id: user.id,
       amount: grossAmount,
-      plan: isAnnual ? 'PRO_ANNUAL' : 'PRO',
+      plan: planValue,
       status: 'pending',
     })
 

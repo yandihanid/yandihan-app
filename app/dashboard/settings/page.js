@@ -40,6 +40,13 @@ const TOGGLES = [
       'Transaksi mendapat nomor antrean harian WIB. Link kasir menampilkan menu Belum selesai dan Selesai.',
     fallback: false,
   },
+  {
+    field: 'on_table_enabled',
+    title: 'Fitur On the Table',
+    description:
+      'Pelanggan scan QR meja, memesan, dan membayar via Xendit. Membutuhkan add-on PRO.',
+    fallback: false,
+  },
 ]
 
 export default async function SettingsPage() {

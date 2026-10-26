@@ -156,6 +156,24 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
             </p>
           </div>
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+          <button
+            onClick={() => handleUpgrade('on_table_addon')}
+            disabled={loading}
+            style={{
+              backgroundColor: '#7c3aed',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '99px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              fontSize: '0.85rem'
+            }}
+          >
+            {loading ? '...' : 'Aktifkan On the Table (+Rp 50.000)'}
+          </button>
+        </div>
         {isExpiringSoon && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
