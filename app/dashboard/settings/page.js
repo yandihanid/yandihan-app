@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { verifySession, getMyStore } from '@/lib/dal'
-import { isPro, maxCashiers } from '@/lib/plan'
+import { isPro, maxCashiers, hasOnTableFeature } from '@/lib/plan'
 import Alert from '@/components/ui/Alert'
 import Button from '@/components/ui/Button'
 import AddCashierForm from './AddCashierForm'
@@ -95,7 +95,9 @@ export default async function SettingsPage() {
             menyimpan" untuk setiap pengguna baru (temuan D5). */}
         {store ? (
           <div className="settings-toggles">
-            {TOGGLES.map(({ field, title, description, fallback }) => (
+            {TOGGLES.filter(
+              (t) => t.field !== 'on_table_enabled' || hasOnTableFeature(store)
+            ).map(({ field, title, description, fallback }) => (
               <SettingToggle
                 key={field}
                 storeId={store.id}

@@ -49,7 +49,7 @@ const csp = [
   // stylesheet maupun file font yang diambil dari domain pihak ketiga.
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  `img-src 'self' data: blob: ${supabase[0]} https://*.midtrans.com`,
+  `img-src 'self' data: blob: ${supabase[0]} https://*.midtrans.com https://api.qrserver.com`,
   `connect-src 'self' ${supabase.join(' ')} ${MIDTRANS.join(' ')} ${MIDTRANS_API.join(' ')}`,
   `frame-src 'self' ${MIDTRANS.join(' ')}`,
   "worker-src 'self'",

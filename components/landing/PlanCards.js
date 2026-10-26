@@ -1,7 +1,12 @@
 import Link from 'next/link'
 import { CheckCircle2 } from 'lucide-react'
-import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
-import { FREE_FEATURES, PRO_FEATURES } from '@/lib/plans.content'
+import {
+  PRO_PRICE_IDR,
+  PRO_ANNUAL_PRICE_IDR,
+  ON_TABLE_ADDON_PRICE_IDR,
+  PRO_ON_TABLE_MONTHLY_PRICE_IDR,
+} from '@/lib/plan'
+import { FREE_FEATURES, ON_TABLE_ADDON_FEATURES, PRO_FEATURES } from '@/lib/plans.content'
 import { formatRupiah } from '@/lib/format'
 
 /**
@@ -59,6 +64,33 @@ export default function PlanCards({ headingLevel: H = 'h3' }) {
         <p className="lp-plan-note">
           Pembayaran dilakukan dari dashboard setelah Anda masuk. Belum punya akun?{' '}
           <Link href="/signup">Daftar gratis dulu</Link> — upgrade bisa kapan saja.
+        </p>
+      </article>
+
+      <article className="lp-plan">
+        <span className="lp-plan-tag">ADD-ON</span>
+        <H className="lp-plan-price">
+          {formatRupiah(ON_TABLE_ADDON_PRICE_IDR)} <span className="lp-plan-period">/ bulan</span>
+        </H>
+        <p style={{ margin: '-0.25rem 0 0.5rem', fontSize: '0.875rem', color: 'var(--primary-color)', fontWeight: 600 }}>
+          Total PRO + On the Table {formatRupiah(PRO_ON_TABLE_MONTHLY_PRICE_IDR)} / bulan
+        </p>
+        <p className="lp-plan-desc">
+          Tambahan untuk toko F&B yang ingin pelanggan memesan langsung dari meja. Hanya tersedia
+          jika langganan PRO aktif.
+        </p>
+
+        <ul className="lp-plan-list">
+          {ON_TABLE_ADDON_FEATURES.map((f) => (
+            <FeatureItem key={f.label} feature={f} color="var(--primary-color)" />
+          ))}
+        </ul>
+
+        <Link href="/login?next=/dashboard/billing" className="btn btn-secondary lp-plan-cta">
+          Aktifkan Add-on
+        </Link>
+        <p className="lp-plan-note">
+          Add-on dibeli terpisah dari dashboard dan mengikuti masa aktif langganan PRO.
         </p>
       </article>
     </div>

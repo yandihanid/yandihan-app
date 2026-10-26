@@ -2664,7 +2664,7 @@ tr:hover td {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2rem;
-  max-width: 900px;
+  max-width: 1180px;
   margin: 0 auto;
   /* Kartu PRO punya pita yang menonjol 12px ke atas. Tanpa padding-top di
      induknya, pita itu terpotong section di atasnya. */

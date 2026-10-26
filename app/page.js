@@ -3,8 +3,11 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
+  ChefHat,
   Clock3,
+  MonitorSmartphone,
   PackageCheck,
+  QrCode,
   Receipt,
   Send,
   ShieldCheck,
@@ -114,6 +117,24 @@ const STEPS = [
 
 const FEATURES = [
   {
+    icon: QrCode,
+    tone: 'lp-icon-purple',
+    title: 'On the Table: pesan dari meja',
+    desc: 'Pelanggan scan QR meja, melihat menu bergambar, memesan, lalu membayar lewat Xendit. Pesanan langsung masuk antrean kasir. Tersedia sebagai add-on PRO.',
+  },
+  {
+    icon: ChefHat,
+    tone: 'lp-icon-amber',
+    title: 'Kitchen Display System',
+    desc: 'Layar dapur menampilkan pesanan baru secara realtime lengkap dengan notifikasi suara. Bisa dibuka owner maupun karyawan yang login.',
+  },
+  {
+    icon: MonitorSmartphone,
+    tone: 'lp-icon-green',
+    title: 'Satu dashboard, banyak peran',
+    desc: 'Owner memantau omzet dan meja, kasir mencatat transaksi, dapur melihat pesanan. Semua dari browser tanpa instalasi.',
+  },
+  {
     icon: Smartphone,
     tone: 'lp-icon-blue',
     title: 'Tanpa pasang aplikasi',
@@ -184,6 +205,14 @@ const FAQ_ITEMS = [
     a: 'Bisa. Hubungkan bot ke toko Anda dengan mengirim /start diikuti kode toko, lalu laporkan penjualan dengan mengetik jumlah dan nama produknya. Harganya diambil dari daftar produk Anda, stok tetap berkurang, dan struknya tetap dibuat: persis seperti jalur web. Satu catatan jujur, saat ini botnya menerima laporan dan belum mengirim ringkasan omzet.',
   },
   {
+    q: 'Apa itu On the Table dan berapa biayanya?',
+    a: 'On the Table adalah add-on untuk paket PRO. Pelanggan scan QR yang ditempel di meja, memesan menu bergambar, lalu membayar lewat Xendit. Pesanan masuk ke antrean kasir dan layar Kitchen Display System. Biayanya Rp 50.000 per bulan, sehingga total PRO + On the Table menjadi Rp 128.000 per bulan. Add-on hanya bisa dipakai selama langganan PRO aktif.',
+  },
+  {
+    q: 'Apakah karyawan bisa membuka Kitchen Display System?',
+    a: 'Bisa. Owner dapat membukanya dari dashboard, dan karyawan bisa membuka KDS lewat tautan kasir setelah login. Keduanya menampilkan pesanan baru secara realtime dengan notifikasi.',
+  },
+  {
     q: 'Seaman apa data penjualan saya?',
     a: 'Data setiap toko dipisahkan di tingkat database, bukan hanya disembunyikan di tampilan, jadi akun lain tidak bisa membaca transaksi Anda meski menebak-nebak alamatnya. Setiap link kasir juga terikat ke satu perangkat, sehingga tautan yang tersebar tidak otomatis bisa dipakai orang lain.',
   },
@@ -216,8 +245,9 @@ export default function Home() {
               </h1>
 
               <p className="lp-hero-sub">
-                Kasir mencatat penjualan dari HP lewat satu tautan. Anda memantau omzet, stok,
-                antrean, dan struk digital dari dashboard yang sama—secara realtime.
+                Kasir mencatat penjualan dari HP lewat satu tautan. Pelanggan bisa scan QR meja
+                untuk memesan dan membayar sendiri. Anda memantau omzet, stok, antrean, dan
+                pesanan dapur dari dashboard yang sama secara realtime.
               </p>
 
               <div className="lp-hero-cta">
