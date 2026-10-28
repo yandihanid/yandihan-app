@@ -92,6 +92,16 @@ export default function CashierForm({
   const [syncing, setSyncing] = useState(false)
   const [retryVersion, setRetryVersion] = useState(0)
 
+  // Hasil pratinjau loyalitas dari /api/cashier/loyalty. Disimpan bersama
+  // nomor HP-nya supaya hasil untuk nomor lama tidak terpakai saat kasir
+  // mengetik nomor lain (lihat `loyaltyFor` di bawah).
+  const [loyalty, setLoyalty] = useState(null)
+
+  // Nomor yang dipakai untuk lookup & payload. normalizePhone() mengembalikan
+  // null untuk nomor yang belum valid, sehingga input setengah jadi tidak
+  // pernah dikirim ke server.
+  const phoneNormalized = useMemo(() => normalizePhone(customerPhone), [customerPhone])
+
   const isOnline = useSyncExternalStore(subscribeOnline, getOnline, getOnlineServer)
   const queue = useSyncExternalStore(
     subscribeQueue,
