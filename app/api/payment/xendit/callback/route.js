@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { verifyXenditSignature, isXenditPaidStatus } from '@/lib/xendit'
+import { verifyXenditCallbackToken, isXenditPaidStatus } from '@/lib/xendit'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
@@ -16,11 +16,10 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Body tidak valid' }, { status: 400 })
   }
 
-  // Verifikasi signature Xendit
-  const callbackToken = process.env.XENDIT_CALLBACK_TOKEN
-  const signature = req.headers.get('x-callback-token') || req.headers.get('x-xendit-signature')
+  // Invoice callback mengirim token statis di header `x-callback-token`.
+  const callbackToken = req.headers.get('x-callback-token')
 
-  if (!verifyXenditSignature(callbackToken, body, signature)) {
+  if (!verifyXenditCallbackToken(callbackToken)) {
     return NextResponse.json({ error: 'Signature tidak valid' }, { status: 401 })
   }
 

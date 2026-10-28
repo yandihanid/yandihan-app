@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireStoreOwnership } from '@/lib/dal'
 import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR, ON_TABLE_ADDON_PRICE_IDR } from '@/lib/plan'
-import { createXenditInvoice, isXenditProduction } from '@/lib/xendit'
+import { createXenditInvoice } from '@/lib/xendit'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
+import { resolveBaseUrl } from '@/lib/site'
 
 export async function POST(req) {
   try {
@@ -60,7 +61,7 @@ export async function POST(req) {
     }
 
     // Buat invoice Xendit
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = resolveBaseUrl(req)
     const xenditRes = await createXenditInvoice({
       externalId: orderId,
       amount: grossAmount,
@@ -77,13 +78,13 @@ export async function POST(req) {
       ],
       successRedirectUrl: `${baseUrl}/dashboard/billing?payment=success`,
       failureRedirectUrl: `${baseUrl}/dashboard/billing?payment=failed`,
-      callbackUrl: `${baseUrl}/api/payment/xendit/callback`,
     })
 
     const xenditData = await xenditRes.json()
 
-    // Tangkap error kode Xendit untuk logging dan pesan yang lebih informatif
-    const xenditErrorCode = xenditData?.code
+    // Xendit mengembalikan `error_code` (bukan `code`). Dulu field yang dibaca
+    // salah, sehingga penyebab kegagalan tidak pernah muncul di log/UI.
+    const xenditErrorCode = xenditData?.error_code || xenditData?.code
     const xenditErrorMessage = xenditData?.message
 
     if (!xenditRes.ok || !xenditData?.id) {
@@ -93,22 +94,20 @@ export async function POST(req) {
         .update({ status: 'gateway_error', updated_at: new Date().toISOString() })
         .eq('order_id', orderId)
 
-      // Maping error code Xendit ke pesan pengguna (opsional: bisa diperluas)
-      let userMessage = 'Gagal menghubungi gateway pembayaran. Coba lagi.'
-      if (xenditErrorCode) {
-        console.error('Xendit Invoice error', {
-          orderId,
-          status: xenditRes.status,
-          code: xenditErrorCode,
-          message: xenditErrorMessage,
-        })
-        userMessage = 'Gagal membuat invoice. Kode error: ' + xenditErrorCode + '. Hubungi pengelola jika masalah berlanjut.'
-      }
+      console.error('Xendit Invoice error', {
+        orderId,
+        status: xenditRes.status,
+        code: xenditErrorCode,
+        message: xenditErrorMessage,
+      })
 
-      return NextResponse.json(
-        { error: userMessage },
-        { status: 502 }
-      )
+      const userMessage = xenditErrorCode
+        ? `Gagal membuat invoice (${xenditErrorCode}). ${
+            xenditErrorMessage || 'Hubungi pengelola jika masalah berlanjut.'
+          }`
+        : 'Gagal menghubungi gateway pembayaran. Coba lagi.'
+
+      return NextResponse.json({ error: userMessage }, { status: 502 })
     }
 
     // Simpan invoice_id Xendit ke order untuk referensi

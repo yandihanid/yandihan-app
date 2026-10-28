@@ -4,6 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { createXenditInvoice } from '@/lib/xendit'
 import { normalizeItems } from '@/lib/transactionValidation'
 import { submitTransactionRpc } from '@/lib/transaction'
+import { resolveBaseUrl } from '@/lib/site'
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
 
@@ -85,7 +86,7 @@ export async function POST(req) {
   const invoiceAmount = total + serviceFee
   const orderId = `TABLE-${clientTxId}`
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = resolveBaseUrl(req)
   const xenditRes = await createXenditInvoice({
     externalId: orderId,
     amount: invoiceAmount,
@@ -94,7 +95,6 @@ export async function POST(req) {
     items: [...invoiceItems, { name: 'Biaya layanan pemesanan', quantity: 1, price: serviceFee }],
     successRedirectUrl: `${baseUrl}/t/${storeId}/${tableNumber}?payment=success`,
     failureRedirectUrl: `${baseUrl}/t/${storeId}/${tableNumber}?payment=failed`,
-    callbackUrl: `${baseUrl}/api/payment/xendit/callback`,
   })
 
   const xenditData = await xenditRes.json()
