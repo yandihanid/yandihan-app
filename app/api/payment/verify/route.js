@@ -2,18 +2,19 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireUser } from '@/lib/dal'
 import { checkRateLimit, tooManyRequests } from '@/lib/rateLimit'
-import { getXenditInvoice, isXenditPaidStatus } from '@/lib/xendit'
+import { getXenditInvoice } from '@/lib/xendit'
+import { applyPaidInvoice } from '@/lib/subscriptionOrders'
 
 /**
- * Jalur cadangan kalau webhook Xendit belum datang (mis. localhost, atau
- * notifikasi tertunda): client memanggil ini setelah pembayaran selesai.
+ * Jalur cadangan kalau webhook Xendit belum datang (mis. localhost, URL webhook
+ * salah pasang, atau notifikasi tertunda): client memanggil ini setelah
+ * pembayaran selesai.
  *
- * Versi sebelumnya langsung memakai `order.amount` dari database sebagai
- * "jumlah yang dibayar", sehingga endpoint ini bisa mengaktifkan PRO tanpa
- * pembayaran sama sekali. Sekarang status dan nominal dibaca dari Xendit dulu.
+ * Status dan nominal dibaca dari Xendit, bukan dari body request, sehingga
+ * endpoint ini tidak bisa dipakai mengaktifkan PRO tanpa membayar.
  *
- * Perpanjangan tetap lewat RPC yang sama dengan webhook, jadi memanggil
- * endpoint ini berulang kali tidak bisa menambah masa aktif berkali-kali.
+ * Logika penerapannya sama dengan webhook (lib/subscriptionOrders.js), jadi
+ * kedua jalur tidak bisa berbeda perilaku.
  */
 
 export async function POST(req) {
@@ -63,72 +64,42 @@ export async function POST(req) {
       )
     }
 
-    if (invoice.external_id !== order.order_id) {
+    if (invoice.external_id && invoice.external_id !== order.order_id) {
       return NextResponse.json(
         { paid: false, error: 'Invoice tidak cocok dengan order.' },
         { status: 409 }
       )
     }
 
-    if (!isXenditPaidStatus(invoice)) {
+    if (invoice.status !== 'PAID' && invoice.status !== 'SETTLED') {
       return NextResponse.json({ paid: false, status: invoice.status ?? 'PENDING' })
     }
 
-    if (Number(invoice.amount) !== Number(order.amount)) {
+    const result = await applyPaidInvoice(service, order, invoice)
+
+    if (result.reason === 'amount_mismatch') {
       return NextResponse.json(
         { paid: false, error: 'Jumlah pembayaran tidak cocok dengan order.' },
         { status: 409 }
       )
     }
 
-    const isOnTableAddon =
-      /on.?table|addon/i.test(String(order.plan || '')) || Number(order.amount) === 50000
-
-    if (isOnTableAddon) {
-      // Add-on tidak mengubah masa langganan; cukup tandai lunas dan aktifkan fitur.
-      await service
-        .from('subscription_orders')
-        .update({
-          status: 'paid',
-          consumed_at: new Date().toISOString(),
-          xendit_invoice_id: invoice.id ?? order.xendit_invoice_id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('order_id', order.order_id)
-
-      await service
-        .from('stores')
-        .update({ on_table_enabled: true, updated_at: new Date().toISOString() })
-        .eq('id', order.store_id)
-
-      return NextResponse.json({ paid: true, expiresAt: null })
-    }
-
-    const { data, error } = await service.rpc('consume_subscription_order', {
-      p_order_id: order.order_id,
-      p_gross_amount: Number(invoice.amount),
-      p_xendit_invoice_id: invoice.id ?? order.xendit_invoice_id,
-      p_payload: invoice,
-      p_days: order.plan === 'PRO_ANNUAL' || Number(order.amount) >= 700000 ? 365 : 30,
-    })
-
-    if (error) {
-      console.error('consume_subscription_order gagal (verify)', { orderId, code: error.code })
+    if (result.reason === 'rpc_error' || result.reason === 'db_error') {
       return NextResponse.json({ error: 'Gagal memperbarui langganan' }, { status: 500 })
     }
 
-    const result = Array.isArray(data) ? data[0] : data
-
-    if (result?.reason === 'order_not_found') {
-      return NextResponse.json({ paid: false, error: 'Order tidak ditemukan di database' }, { status: 404 })
-    }
-
-    if (result?.reason === 'amount_mismatch') {
-      return NextResponse.json({ paid: false, error: 'Jumlah pembayaran tidak cocok dengan order.' }, { status: 409 })
-    }
-
     // applied maupun already_consumed sama-sama berarti sudah lunas.
-    const expiresAt = result?.subscription_end_date ?? null
+    let expiresAt = result.expiresAt ?? null
+
+    if (!expiresAt) {
+      const { data: store } = await service
+        .from('stores')
+        .select('subscription_end_date')
+        .eq('id', order.store_id)
+        .maybeSingle()
+      expiresAt = store?.subscription_end_date ?? null
+    }
+
     return NextResponse.json({ paid: true, expiresAt })
   } catch (error) {
     console.error('Verify error', { message: error?.message })

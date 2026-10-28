@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useRouter } from 'next/navigation'
 import { PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR } from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
 
@@ -71,7 +72,13 @@ function clearPendingOrder() {
  *  browser sebelum store terbaca. */
 const pendingOrderServerSnapshot = () => null
 
-export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionEndDate }) {
+export default function UpgradeBanner({
+  storeId,
+  subscriptionTier,
+  subscriptionEndDate,
+  onTableEnabled = false,
+}) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState(null)
 
@@ -125,91 +132,218 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
     }
   }
 
+  // Tombol "Cek Status". Sebelumnya tombol ini hanya memindahkan halaman ke
+  // /dashboard/billing tanpa benar-benar bertanya ke Xendit, dan hanya muncul
+  // untuk paket GRATIS -- padahal pembelian add-on dilakukan justru saat PRO
+  // sudah aktif, sehingga pembeli tidak punya cara memicu verifikasi.
+  const handleVerify = async () => {
+    if (!pendingOrderId) return
+    setLoading(true)
+    setStatusMsg(null)
+    try {
+      const res = await fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: pendingOrderId }),
+      })
+      const data = await res.json()
+
+      if (data?.paid) {
+        clearPendingOrder()
+        setStatusMsg({ type: 'success', text: 'Pembayaran terkonfirmasi. Paket Anda sudah diperbarui.' })
+        router.refresh()
+        return
+      }
+
+      setStatusMsg({
+        type: 'error',
+        text:
+          data?.error ||
+          `Pembayaran belum lunas (status: ${data?.status || 'PENDING'}). Selesaikan dulu di halaman Xendit.`,
+      })
+    } catch (error) {
+      console.error('Cek status pembayaran gagal', { message: error?.message })
+      setStatusMsg({ type: 'error', text: 'Gagal memeriksa status pembayaran. Coba lagi.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const statusMessage = statusMsg ? (
+    <div style={{
+      padding: '0.875rem 1rem',
+      borderRadius: '10px',
+      backgroundColor: statusMsg.type === 'success' ? '#dcfce7' : statusMsg.type === 'error' ? '#fee2e2' : '#fef3c7',
+      color: statusMsg.type === 'success' ? '#15803d' : statusMsg.type === 'error' ? '#b91c1c' : '#92400e',
+      fontSize: '0.9rem',
+      fontWeight: '500'
+    }}>
+      {statusMsg.text}
+    </div>
+  ) : null
+
+  // Ditampilkan untuk SEMUA paket. Dulu syaratnya `subscriptionTier === 'FREE'`,
+  // padahal pembelian add-on dilakukan saat PRO sudah aktif -- jadi pembeli
+  // add-on tidak pernah melihat tombol "Cek Status" sama sekali.
+  const pendingNotice = pendingOrderId ? (
+    <div style={{
+      padding: '0.875rem 1rem',
+      borderRadius: '10px',
+      backgroundColor: '#fef3c7',
+      border: '1px solid #fcd34d',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: '0.75rem'
+    }}>
+      <div>
+        <p style={{ margin: 0, fontWeight: '700', color: '#92400e', fontSize: '0.9rem' }}>
+          ⏳ Ada pembayaran yang belum selesai
+        </p>
+        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#b45309' }}>
+          Jika Anda sudah membayar, klik &quot;Cek Status&quot; untuk memeriksa langsung ke Xendit.
+        </p>
+      </div>
+      <button
+        onClick={handleVerify}
+        disabled={loading}
+        style={{
+          backgroundColor: '#d97706',
+          color: 'white',
+          border: 'none',
+          padding: '0.5rem 1rem',
+          borderRadius: '99px',
+          fontWeight: '700',
+          cursor: 'pointer',
+          fontSize: '0.85rem',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {loading ? '...' : '🔍 Cek Status'}
+      </button>
+    </div>
+  ) : null
+
   // === PRO tier: show expiry info instead ===
   if (subscriptionTier !== 'FREE') {
-    if (!subscriptionEndDate) return null
+    const addonControl = onTableEnabled ? (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.35rem',
+        backgroundColor: '#dcfce7',
+        color: '#15803d',
+        border: '1px solid #86efac',
+        padding: '0.4rem 0.9rem',
+        borderRadius: '99px',
+        fontWeight: '700',
+        fontSize: '0.8rem'
+      }}>
+        ✓ On the Table aktif
+      </span>
+    ) : (
+      <button
+        onClick={() => handleUpgrade('on_table_addon')}
+        disabled={loading}
+        style={{
+          backgroundColor: '#7c3aed',
+          color: 'white',
+          border: 'none',
+          padding: '0.5rem 1rem',
+          borderRadius: '99px',
+          fontWeight: '700',
+          cursor: 'pointer',
+          fontSize: '0.85rem'
+        }}
+      >
+        {loading ? '...' : 'Aktifkan On the Table (+Rp 50.000)'}
+      </button>
+    )
+
+    if (!subscriptionEndDate) {
+      // PRO permanen (diberikan manual): tidak ada tanggal berakhir, tapi
+      // status add-on dan pesan pembayaran tetap perlu tampil.
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {statusMessage}
+          {pendingNotice}
+        </div>
+      )
+    }
+
     const expiry = new Date(subscriptionEndDate)
     const now = new Date()
     const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
     const isExpiringSoon = daysLeft <= 7
 
     return (
-      <div style={{
-        padding: '1rem 1.5rem',
-        backgroundColor: isExpiringSoon ? '#fef3c7' : '#f0fdf4',
-        borderRadius: '12px',
-        border: `1px solid ${isExpiringSoon ? '#fcd34d' : '#86efac'}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>{isExpiringSoon ? '⚠️' : '✨'}</span>
-          <div>
-            <p style={{ margin: 0, fontWeight: '700', color: isExpiringSoon ? '#92400e' : '#15803d' }}>
-              Paket PRO Aktif
-            </p>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: isExpiringSoon ? '#b45309' : '#166534' }}>
-              Berlaku hingga: <strong>{expiry.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({daysLeft > 0 ? daysLeft + ' hari lagi' : 'Sudah berakhir'})</strong>
-            </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {statusMessage}
+        {pendingNotice}
+
+        <div style={{
+          padding: '1rem 1.5rem',
+          backgroundColor: isExpiringSoon ? '#fef3c7' : '#f0fdf4',
+          borderRadius: '12px',
+          border: `1px solid ${isExpiringSoon ? '#fcd34d' : '#86efac'}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>{isExpiringSoon ? '⚠️' : '✨'}</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: '700', color: isExpiringSoon ? '#92400e' : '#15803d' }}>
+                Paket PRO Aktif
+              </p>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: isExpiringSoon ? '#b45309' : '#166534' }}>
+                Berlaku hingga: <strong>{expiry.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({daysLeft > 0 ? daysLeft + ' hari lagi' : 'Sudah berakhir'})</strong>
+              </p>
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-          <button
-            onClick={() => handleUpgrade('on_table_addon')}
-            disabled={loading}
-            style={{
-              backgroundColor: '#7c3aed',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '99px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '0.85rem'
-            }}
-          >
-            {loading ? '...' : 'Aktifkan On the Table (+Rp 50.000)'}
-          </button>
-        </div>
-        {isExpiringSoon && (
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => handleUpgrade('monthly')}
-              disabled={loading}
-              style={{
-                backgroundColor: '#d97706',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '99px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                fontSize: '0.85rem'
-              }}
-            >
-              {loading ? '...' : '+1 Bulan'}
-            </button>
-            <button
-              onClick={() => handleUpgrade('annual')}
-              disabled={loading}
-              style={{
-                backgroundColor: '#b45309',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '99px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                fontSize: '0.85rem'
-              }}
-            >
-              {loading ? '...' : '+1 Tahun (Hemat 17%)'}
-            </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+            {addonControl}
           </div>
-        )}
+          {isExpiringSoon && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => handleUpgrade('monthly')}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#d97706',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '99px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                {loading ? '...' : '+1 Bulan'}
+              </button>
+              <button
+                onClick={() => handleUpgrade('annual')}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#b45309',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '99px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                {loading ? '...' : '+1 Tahun (Hemat 17%)'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -217,60 +351,8 @@ export default function UpgradeBanner({ storeId, subscriptionTier, subscriptionE
   // === FREE tier: show upgrade banner ===
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {/* Status message */}
-      {statusMsg && (
-        <div style={{
-          padding: '0.875rem 1rem',
-          borderRadius: '10px',
-          backgroundColor: statusMsg.type === 'success' ? '#dcfce7' : statusMsg.type === 'error' ? '#fee2e2' : '#fef3c7',
-          color: statusMsg.type === 'success' ? '#15803d' : statusMsg.type === 'error' ? '#b91c1c' : '#92400e',
-          fontSize: '0.9rem',
-          fontWeight: '500'
-        }}>
-          {statusMsg.text}
-        </div>
-      )}
-
-      {/* Pending order reminder */}
-      {pendingOrderId && subscriptionTier === 'FREE' && (
-        <div style={{
-          padding: '0.875rem 1rem',
-          borderRadius: '10px',
-          backgroundColor: '#fef3c7',
-          border: '1px solid #fcd34d',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}>
-          <div>
-            <p style={{ margin: 0, fontWeight: '700', color: '#92400e', fontSize: '0.9rem' }}>
-              ⏳ Ada pembayaran yang belum selesai
-            </p>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#b45309' }}>
-              Jika Anda sudah membayar, klik tombol "Cek Status" untuk mengaktifkan PRO.
-            </p>
-          </div>
-          <button
-            onClick={() => window.location.href = '/dashboard/billing'}
-            disabled={loading}
-            style={{
-              backgroundColor: '#d97706',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '99px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {loading ? '...' : '🔍 Cek Status'}
-          </button>
-        </div>
-      )}
+      {statusMessage}
+      {pendingNotice}
 
       {/* Main upgrade banner */}
       <div style={{

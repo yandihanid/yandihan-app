@@ -1,8 +1,15 @@
 import { createClient } from '@/utils/supabase/server'
 import { verifySession, getMyStore } from '@/lib/dal'
-import { planTier, isPro, PRO_PRICE_IDR, PRO_ANNUAL_PRICE_IDR, SUBSCRIPTION_PLANS } from '@/lib/plan'
+import {
+  planTier,
+  isPro,
+  hasOnTableFeature,
+  PRO_PRICE_IDR,
+  PRO_ANNUAL_PRICE_IDR,
+  SUBSCRIPTION_PLANS,
+} from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
-import { expireStaleSubscriptionOrders } from '@/lib/subscriptionOrders'
+import { expireStaleSubscriptionOrders, reconcilePendingOrders } from '@/lib/subscriptionOrders'
 import { TAX_INFO, LEGAL_ENTITY, PAYMENT_GATEWAY } from '@/lib/site'
 import OnboardingChecklist from '../OnboardingChecklist'
 import UpgradeBanner from '../UpgradeBanner'
@@ -38,6 +45,12 @@ export default async function BillingPage() {
   const activePro = isPro(store)
   const expiryDate = store.subscription_end_date ? new Date(store.subscription_end_date) : null
 
+  // Periksa sendiri order yang masih pending ke Xendit SEBELUM daftar dibaca.
+  // Webhook adalah jalur utama, tapi kalau notifikasinya tidak datang (mode
+  // test, URL webhook salah, atau APP_URL belum diisi) pembeli yang sudah
+  // membayar tidak boleh terjebak melihat tombol "beli" lagi.
+  await reconcilePendingOrders(store.id)
+
   // Bersihkan order pending yang sudah kedaluwarsa SEBELUM daftar dibaca,
   // supaya riwayat tidak menampilkan "menunggu" untuk pembayaran yang sudah
   // tidak mungkin diselesaikan.
@@ -68,6 +81,7 @@ export default async function BillingPage() {
         storeId={store.id}
         subscriptionTier={tier}
         subscriptionEndDate={store.subscription_end_date}
+        onTableEnabled={hasOnTableFeature(store)}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
