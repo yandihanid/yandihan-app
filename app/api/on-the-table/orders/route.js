@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { createXenditInvoice } from '@/lib/xendit'
+import { createXenditInvoice, isValidXenditSubAccountId, normalizeXenditSubAccountId } from '@/lib/xendit'
 import { normalizeItems } from '@/lib/transactionValidation'
 import { resolveBaseUrl } from '@/lib/site'
 import {
@@ -44,7 +44,7 @@ export async function POST(req) {
 
   const { data: store } = await supabase
     .from('stores')
-    .select('id, name, on_table_enabled')
+    .select('id, name, on_table_enabled, xendit_sub_account_id')
     .eq('id', storeId)
     .maybeSingle()
 
@@ -198,11 +198,19 @@ export async function POST(req) {
   const baseUrl = resolveBaseUrl(req)
   const externalId = tableInvoiceExternalId(order.id)
 
+  // Kalau toko punya sub-account Xendit, invoice dibuat atas nama akun itu
+  // sehingga dana pelanggan masuk ke rekening toko, bukan akun utama platform.
+  // Tanpa sub-account, perilakunya sama seperti sebelumnya (akun utama).
+  const forUserId = isValidXenditSubAccountId(store.xendit_sub_account_id)
+    ? normalizeXenditSubAccountId(store.xendit_sub_account_id)
+    : null
+
   const xenditRes = await createXenditInvoice({
     externalId,
     amount,
     description: `Pesanan Meja ${table} - ${store.name}`,
     customerName: store.name,
+    forUserId,
     items: [
       ...snapshot.map((item) => ({
         name: item.name,
@@ -231,25 +239,42 @@ export async function POST(req) {
 
     console.error('Gagal membuat invoice pesanan meja', {
       orderId: order.id,
+      storeId,
+      forUserId,
       status: xenditRes.status,
       code: xenditData?.error_code || xenditData?.code,
       message: xenditData?.message,
     })
 
     return NextResponse.json(
-      { error: 'Gagal membuat pembayaran. Coba lagi.' },
+      {
+        error: forUserId
+          ? 'Gagal membuat pembayaran. Periksa rekening Xendit toko di Pengaturan > On the Table.'
+          : 'Gagal membuat pembayaran. Coba lagi.',
+      },
       { status: 502, headers: NO_STORE }
     )
   }
 
-  await supabase
+  const { error: invoiceSaveError } = await supabase
     .from('table_orders')
     .update({
       xendit_invoice_id: xenditData.id,
       invoice_url: xenditData.invoice_url ?? null,
+      xendit_for_user_id: forUserId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', order.id)
+
+  if (invoiceSaveError) {
+    // Pembayaran tetap bisa diselesaikan lewat webhook (external_id), tetapi
+    // rekonsiliasi dari halaman status tidak akan menemukan invoice ini.
+    console.error('Gagal menyimpan id invoice pesanan meja', {
+      orderId: order.id,
+      code: invoiceSaveError.code,
+      message: invoiceSaveError.message,
+    })
+  }
 
   return NextResponse.json(
     {

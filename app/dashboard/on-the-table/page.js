@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { verifySession, getMyStore } from '@/lib/dal'
+import { createClient } from '@/utils/supabase/server'
 import { hasOnTableFeature, ON_TABLE_ADDON_PRICE_IDR } from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
+import { SITE_URL } from '@/lib/site'
 import OnTheTableManager from './OnTheTableManager'
+import XenditPayoutCard from './XenditPayoutCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,5 +44,24 @@ export default async function OnTheTablePage() {
     )
   }
 
-  return <OnTheTableManager storeId={store.id} storeName={store.name} />
+  // Dibaca terpisah, bukan lewat getMyStore(), supaya kolom rekening tidak ikut
+  // ter-serialize ke komponen dashboard lain yang memakai STORE_COLUMNS.
+  const supabase = await createClient()
+  const { data: payout } = await supabase
+    .from('stores')
+    .select('xendit_sub_account_id')
+    .eq('id', store.id)
+    .maybeSingle()
+
+  return (
+    <div className="animate-fade-in">
+      <XenditPayoutCard
+        storeId={store.id}
+        initialSubAccountId={payout?.xendit_sub_account_id ?? null}
+        splitEnabled={Boolean(process.env.XENDIT_SPLIT_RULE_ID)}
+        callbackUrl={`${SITE_URL}/api/payment/xendit/callback`}
+      />
+      <OnTheTableManager storeId={store.id} storeName={store.name} />
+    </div>
+  )
 }
