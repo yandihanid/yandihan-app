@@ -26,5 +26,5 @@ export default async function CashierKitchenPage({ params }) {
     return <LoginForm token={token} storeName={store.name} />
   }
 
-  return <KitchenDisplay storeId={store.id} storeName={store.name} />
+  return <KitchenDisplay storeId={store.id} storeName={store.name} token={token} />
 }

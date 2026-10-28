@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { verifyXenditCallbackToken, isXenditPaidStatus } from '@/lib/xendit'
 import { applyPaidInvoice } from '@/lib/subscriptionOrders'
+import {
+  settleTableOrder,
+  isTableInvoiceExternalId,
+  tableOrderIdFromInvoice,
+} from '@/lib/tableOrderFlow'
 import { checkRateLimit, tooManyRequests, clientIp } from '@/lib/rateLimit'
 
 export async function POST(req) {
@@ -37,6 +42,35 @@ export async function POST(req) {
   }
 
   const service = createServiceClient()
+
+  // Pesanan dari QR meja punya external_id "TABLE-<table_orders.id>".
+  if (isTableInvoiceExternalId(body.external_id)) {
+    const orderId = tableOrderIdFromInvoice(body.external_id)
+
+    const { data: tableOrder } = await service
+      .from('table_orders')
+      .select('id, store_id, table_number, items, subtotal, service_fee, amount, status, queue_number, transaction_id, xendit_invoice_id')
+      .eq('id', orderId)
+      .maybeSingle()
+
+    if (!tableOrder) {
+      console.warn('Notifikasi Xendit untuk pesanan meja yang tidak dikenal', { orderId })
+      return NextResponse.json({ message: 'Pesanan tidak dikenal' }, { status: 200 })
+    }
+
+    const result = await settleTableOrder(service, tableOrder, body)
+
+    return NextResponse.json(
+      {
+        message:
+          result.status === 'paid'
+            ? 'Pesanan meja diteruskan ke dapur'
+            : 'Pesanan meja belum bisa diproses',
+      },
+      { status: 200 }
+    )
+  }
+
   const { data: order } = await service
     .from('subscription_orders')
     .select('order_id, plan, amount, store_id, consumed_at, xendit_invoice_id')

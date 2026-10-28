@@ -101,15 +101,17 @@ describe('cashier waiting-list route (session-based)', () => {
     expect(supabase.from).not.toHaveBeenCalled()
   })
 
-  it('returns an empty disabled response without querying transactions', async () => {
-    const { supabase } = getSupabase()
+  it('still returns pending tickets when the waiting list feature is disabled', async () => {
+    // Pesanan On the Table sengaja berstatus 'pending' agar tetap masuk antrean
+    // kasir walau fitur waiting list toko dimatikan.
+    const { supabase, query } = getSupabase()
     authorizeWith(supabase, false)
 
     const response = await GET(request())
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ tickets: [], enabled: false })
-    expect(supabase.from).not.toHaveBeenCalled()
+    expect(await response.json()).toMatchObject({ enabled: false, tickets: [{ id: 'ticket-1' }] })
+    expect(query.eq).toHaveBeenCalledWith('status', 'pending')
   })
 
   it('marks only a pending ticket from the authorized store and WIB day as done', async () => {
@@ -139,14 +141,14 @@ describe('cashier waiting-list route (session-based)', () => {
     expect(await response.json()).toEqual({ error: 'Tiket tidak ditemukan' })
   })
 
-  it('rejects updates while waiting list is disabled', async () => {
-    const { supabase } = patchSupabase()
+  it('allows completing a ticket while the waiting list feature is disabled', async () => {
+    const { supabase, query } = patchSupabase()
     authorizeWith(supabase, false)
 
     const response = await PATCH(patchRequest())
 
-    expect(response.status).toBe(403)
-    expect(supabase.from).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(query.update).toHaveBeenCalledWith({ status: 'done' })
   })
 
   it('rejects request without session cookie', async () => {

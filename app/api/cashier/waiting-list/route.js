@@ -43,16 +43,19 @@ async function authorize(req, { limit, windowSeconds }) {
   }
   const { cashier, supabase } = auth
 
-  // Fitur dimatikan pemilik toko: tiap handler memutuskan sendiri jawabannya.
-  if (!cashier.stores?.waiting_list_enabled) return { disabled: true }
+  // Fitur waiting list bisa dimatikan pemilik toko. Dulu handler langsung
+  // berhenti di sini, dan itu ikut menyembunyikan pesanan On the Table -- yang
+  // statusnya sengaja tetap 'pending' agar masuk antrean kasir. Sekarang flag
+  // ini hanya informasi untuk UI; transaksi kasir biasa tetap berstatus
+  // 'completed' saat fitur mati, jadi tidak ikut muncul.
+  const enabled = Boolean(cashier.stores?.waiting_list_enabled)
 
-  return { cashier, supabase }
+  return { cashier, supabase, enabled }
 }
 
 export async function GET(req) {
-  const { response, disabled, cashier, supabase } = await authorize(req, { limit: 90, windowSeconds: 60 })
+  const { response, enabled, cashier, supabase } = await authorize(req, { limit: 90, windowSeconds: 60 })
   if (response) return response
-  if (disabled) return NextResponse.json({ tickets: [], enabled: false }, { headers: NO_STORE })
 
   const status = normalizeQueueStatus(new URL(req.url).searchParams.get('status') || 'pending')
   if (!status) {
@@ -75,15 +78,12 @@ export async function GET(req) {
     return NextResponse.json({ error: 'Gagal memuat daftar' }, { status: 500, headers: NO_STORE })
   }
 
-  return NextResponse.json({ tickets: data ?? [], enabled: true }, { headers: NO_STORE })
+  return NextResponse.json({ tickets: data ?? [], enabled }, { headers: NO_STORE })
 }
 
 export async function PATCH(req) {
-  const { response, disabled, cashier, supabase } = await authorize(req, { limit: 60, windowSeconds: 60 })
+  const { response, cashier, supabase } = await authorize(req, { limit: 60, windowSeconds: 60 })
   if (response) return response
-  if (disabled) {
-    return NextResponse.json({ error: 'Waiting list tidak aktif' }, { status: 403, headers: NO_STORE })
-  }
 
   let body
   try {

@@ -1,0 +1,263 @@
+/* Kitchen Display System. Dibaca dari jauh (layar dapur), jadi kontras tinggi
+   dan kartu besar. */
+
+.screen {
+  min-height: 100dvh;
+  background: #0b1220;
+  color: #e2e8f0;
+  padding: 1rem;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.titleGroup {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.5);
+  color: #bfdbfe;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.iconBtn {
+  border: 1px solid #1e293b;
+  background: #111c2f;
+  color: #cbd5e1;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: #16233a;
+}
+
+.errorBar {
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  border: 1px solid #7f1d1d;
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .board {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.columnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.columnTitle {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  background: #111c2f;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 0.95rem;
+  box-shadow: 0 10px 24px -18px rgba(0, 0, 0, 0.9);
+}
+
+.cardNew {
+  border-color: rgba(59, 130, 246, 0.75);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35), 0 10px 30px -16px rgba(37, 99, 235, 0.7);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.queue {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.queueLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.queueNumber {
+  font-size: 2.1rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #93c5fd;
+  letter-spacing: -0.03em;
+}
+
+.tableBadge {
+  flex-shrink: 0;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.items {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #f1f5f9;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.amount {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.doneBtn {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.doneBtn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.doneBtn:disabled {
+  background: #334155;
+  cursor: not-allowed;
+}
+
+.doneList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.doneRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: #0f1a2b;
+  border: 1px solid #1b2740;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.doneRow strong {
+  color: #6ee7b7;
+}
+
+.doneRow span {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.empty {
+  border: 1px dashed #1e293b;
+  border-radius: 16px;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.emptyIcon {
+  font-size: 1.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.loading {
+  color: #64748b;
+  font-size: 0.85rem;
+  padding: 1rem 0;
+}
