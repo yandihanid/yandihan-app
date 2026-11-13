@@ -3,6 +3,7 @@
 // PII pelanggan tidak pernah ikut terbaca atau ter-serialize ke HTML.
 import { createServiceClient } from '@/utils/supabase/service'
 import { formatDateTimeWib, formatRupiah, shortTxNumber } from '@/lib/format'
+import { withColumnFallback } from '@/lib/supabaseFallback'
 import PrintButton from './PrintButton'
 import styles from './receipt.module.css'
 
@@ -20,10 +21,51 @@ const RECEIPT_FIELDS = `
   change_amount,
   queue_number,
   created_at,
+  stores(name, address, phone, logo_url),
+  cashiers(name),
+  transaction_items(name, unit_price, qty, line_total, parent_item_id, line_index, sub_index)
+`
+
+// Bentuk lama, tanpa kolom logo. Dipakai hanya kalau select di atas gagal
+// karena database belum menjalankan migrasi 0020 (kolom logo_url belum ada).
+// Tanpa fallback ini, satu migrasi yang belum dijalankan membuat SEMUA struk
+// terbaca sebagai "Struk Tidak Ditemukan" — halaman publik yang dipakai
+// pelanggan dan kasir.
+const RECEIPT_FIELDS_WITHOUT_LOGO = `
+  id,
+  amount,
+  original_amount,
+  discount_percent,
+  product_name,
+  payment_method,
+  receipt_url,
+  cash_received,
+  change_amount,
+  queue_number,
+  created_at,
   stores(name, address, phone),
   cashiers(name),
   transaction_items(name, unit_price, qty, line_total, parent_item_id, line_index, sub_index)
 `
+
+/**
+ * Ambil struk. Kalau select utama gagal, ulangi sekali dengan daftar kolom
+ * tanpa logo_url.
+ *
+ * Alasannya sederhana: PostgREST menolak seluruh query kalau satu kolom yang
+ * diminta tidak ada. Jadi "logo belum ada" tidak boleh mengubah "struk ini
+ * tidak ada" menjadi "struk tidak bisa dimuat".
+ */
+async function loadReceipt(supabase, id) {
+  return withColumnFallback(
+    supabase.from('transactions').select(RECEIPT_FIELDS).eq('id', id).maybeSingle(),
+    supabase
+      .from('transactions')
+      .select(RECEIPT_FIELDS_WITHOUT_LOGO)
+      .eq('id', id)
+      .maybeSingle()
+  )
+}
 
 function sortItems(items = []) {
   return [...items].sort((a, b) => {
@@ -37,11 +79,7 @@ export default async function ReceiptPage({ params }) {
   const { id } = await params
   const supabase = createServiceClient()
 
-  const { data: tx, error: txError } = await supabase
-    .from('transactions')
-    .select(RECEIPT_FIELDS)
-    .eq('id', id)
-    .maybeSingle()
+  const { data: tx, error: txError } = await loadReceipt(supabase, id)
 
   if (txError || !tx) {
     return (
@@ -61,6 +99,14 @@ export default async function ReceiptPage({ params }) {
     <main className={styles.page}>
       <article className={styles.receipt}>
         <header className={styles.header}>
+          {tx.stores?.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              className={styles.storeLogo}
+              src={tx.stores.logo_url}
+              alt={tx.stores?.name ? `Logo ${tx.stores.name}` : 'Logo toko'}
+            />
+          )}
           <h1 className={styles.storeName}>{tx.stores?.name || 'Toko'}</h1>
           {tx.stores?.address && <p className={styles.storeDetail}>{tx.stores.address}</p>}
           {tx.stores?.phone && <p className={styles.storeDetail}>{tx.stores.phone}</p>}

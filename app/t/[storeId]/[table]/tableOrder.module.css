@@ -32,6 +32,19 @@
   min-width: 0;
 }
 
+/* Logo toko di kepala halaman pesan. object-fit: contain supaya logo
+   landscape tidak terpotong, dan ukuran tetap 40px supaya tidak memakan
+   ruang di layar HP yang sempit. */
+.brandLogo {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border-color);
+}
+
 .brand {
   margin: 0;
   font-size: 1.0625rem;
@@ -781,6 +794,64 @@
   border-color: var(--primary-color);
   color: #fff;
   box-shadow: var(--shadow-glow);
+}
+
+/* Logo toko di kepala halaman status. */
+.statusLogo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 0.5rem;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border-color);
+}
+
+/* Tautan rating kecil di bawah langkah status: tetap ada setelah pop up
+   ditutup, jadi pelanggan yang mau memberi rating tetap bisa. */
+.reviewInline {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.85rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  color: var(--primary-color);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.reviewInline:hover {
+  border-color: var(--primary-color);
+}
+
+/* Catatan hadiah dari pemilik toko, tampil di dalam pop up rating. */
+.reviewNote {
+  margin: 0.85rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--border-radius-sm);
+  background: var(--secondary-color);
+  border: 1px solid var(--primary-color);
+  color: var(--text-main);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Tombol rating di dalam dialog: .linkBtn dipakai untuk tombol full-width di
+   halaman, sedangkan di baris aksi dialog harus ikut tinggi tombol lain. */
+.reviewModalBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-decoration: none;
 }
 
 .notice {

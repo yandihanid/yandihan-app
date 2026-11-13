@@ -63,6 +63,10 @@ export default function CashierApp({ token, cashier, store, products }) {
   return (
     <div className="cashier-page">
       <header className="cashier-header">
+        {store.logo_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="cashier-logo" src={store.logo_url} alt={store.name} />
+        )}
         <div className="cashier-header-text">
           <h1>{store.name}</h1>
           <p>

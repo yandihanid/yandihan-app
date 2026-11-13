@@ -83,6 +83,11 @@ Migrasi `0007` menambah jenis katalog dan antrean F&B. Migrasi forward-only `000
 
 Saat Mode antrean F&B aktif, transaksi mendapat nomor urut per toko yang reset setiap pergantian tanggal WIB. Link kasir menyediakan menu **Antrean** dengan tab **Belum selesai** dan **Selesai**. Transaksi offline belum memiliki nomor sampai sinkronisasi server berhasil; aplikasi tidak membuat nomor lokal agar tidak bentrok.
 
+Migrasi `0020_store_logo_and_gmaps_review.sql` menambah tiga kolom pada tabel `stores`: `logo_url`, `gmaps_review_url`, dan `gmaps_review_note`. Jalankan migrasi ini lewat SQL Editor. Sampai migrasi dijalankan, struk, halaman pesan meja, dan layar kasir tetap jalan normal (query-nya punya jalur cadangan) tetapi logo dan pop up rating belum muncul.
+
+- **Logo usaha** diisi di Dashboard → Pengaturan → Logo Usaha (unggah file atau tempel URL). Logo yang sama muncul di struk digital, di kepala layar kasir, dan di halaman pesan meja. File diunggah dikompres di browser dan disimpan sebagai data URL, jadi tidak butuh bucket Storage baru.
+- **Rating Google Maps** diisi di Dashboard → Pengaturan → Rating Google Maps: link rating (harus tautan Google Maps) dan catatan opsional untuk pelanggan, misalnya hadiah setelah memberi rating. Kalau linknya kosong, pop up rating tidak pernah muncul. Kalau linknya terisi, pelanggan yang pesan lewat On the Table dan sudah membayar melihat pop up rating di halaman ringkasan, dan tautannya tetap bisa dibuka dari kartu ringkasan bila pop up ditutup.
+
 ## Storage bukti pembayaran
 
 Buat bucket Supabase Storage bernama `receipts`. Implementasi saat ini menyimpan URL publik melalui `getPublicUrl()`, sehingga bucket harus **public** agar struk/dashboard dapat membuka bukti.

@@ -15,6 +15,7 @@ import { maxCashiers, planTier } from '@/lib/plan'
 import { hashPassword } from '@/lib/password'
 import { normalizeUsername, validatePassword, validateUsername } from '@/lib/cashierAccount'
 import { deleteCashierSessionsForStore } from '@/lib/cashierAuth'
+import { parseLogoInput, parseReviewNote, parseReviewUrl } from '@/lib/storeBrand'
 
 /**
  * Simpan nama toko — buat kalau belum ada, ubah kalau sudah.
@@ -103,6 +104,75 @@ export async function updateStore(formData) {
 // 24 byte = 192 bit, base64url supaya aman dipakai sebagai segmen URL /c/<token>.
 function generateCashierToken() {
   return randomBytes(24).toString('base64url')
+}
+
+/**
+ * Simpan logo usaha.
+ *
+ * Logo dikirim dari browser sebagai data URL (hasil kompres, supaya file
+ * asli 3-8 MB tidak ikut masuk) atau sebagai URL http/https kalau pemilik
+ * sudah punya file yang di-host di luar. String kosong berarti "hapus logo",
+ * jadi kolomnya jadi NULL dan bukan '' yang nanti terbaca sebagai "logo ada".
+ *
+ * Warnanya sama seperti updateStore: UPDATE yang tidak mengenai satu baris
+ * pun dijawab sukses oleh PostgREST, jadi baris yang cocok harus dibuktikan
+ * dengan .select('id') + maybeSingle().
+ */
+export async function updateStoreLogo(formData) {
+  const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
+  if (ownErr) return { error: ownErr }
+
+  const { logoUrl, error: logoErr } = parseLogoInput(formData.get('logoUrl'))
+  if (logoErr) return { error: logoErr }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('stores')
+    .update({ logo_url: logoUrl })
+    .eq('id', store.id)
+    .eq('user_id', store.user_id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { error: 'Gagal menyimpan logo' }
+  if (!data) return { error: 'Logo tidak tersimpan. Coba muat ulang halaman.' }
+
+  revalidatePath('/dashboard/settings')
+  return { success: true }
+}
+
+/**
+ * Simpan setelan rating Google Maps.
+ *
+ * `reviewUrl` kosong berarti fitur dimatikan: halaman status pesanan tidak
+ * menampilkan pop up rating sama sekali. Karena itu link kosong bukan error --
+ * pemilik boleh menyimpan catatan saja lebih dulu atau mematikan fitur kapan
+ * saja tanpa perlu menghapus catektaan.
+ */
+export async function updateStoreReview(formData) {
+  const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
+  if (ownErr) return { error: ownErr }
+
+  const { url, error: urlErr } = parseReviewUrl(formData.get('reviewUrl'))
+  if (urlErr) return { error: urlErr }
+
+  const { note, error: noteErr } = parseReviewNote(formData.get('reviewNote'))
+  if (noteErr) return { error: noteErr }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('stores')
+    .update({ gmaps_review_url: url, gmaps_review_note: note })
+    .eq('id', store.id)
+    .eq('user_id', store.user_id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { error: 'Gagal menyimpan pengaturan rating' }
+  if (!data) return { error: 'Pengaturan tidak tersimpan. Coba muat ulang halaman.' }
+
+  revalidatePath('/dashboard/settings')
+  return { success: true }
 }
 
 function isDuplicateUsername(error) {

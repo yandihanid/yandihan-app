@@ -61,6 +61,7 @@ export default async function CashierPage({ params }) {
     pelanggan_enabled: store.pelanggan_enabled,
     visit_threshold: store.visit_threshold,
     discount_percent: store.discount_percent,
+    logo_url: store.logo_url,
   }
 
   return (

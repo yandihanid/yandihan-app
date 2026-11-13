@@ -31,6 +31,17 @@
   font-weight: 700;
 }
 
+/* Logo toko: 64px supaya masih muat di kertas thermal 80 mm.
+   object-fit: contain supaya logo yang lebih lebar dari tinggi
+   tetap utuh, bukan terpotong. */
+.storeLogo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 0.6rem;
+  object-fit: contain;
+}
+
 .storeDetail,
 .headerLine,
 .footerText,

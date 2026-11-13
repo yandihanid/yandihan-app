@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Clock, RefreshCw, UtensilsCrossed } from 'lucide-react'
+import { CheckCircle2, Clock, RefreshCw, Star, UtensilsCrossed } from 'lucide-react'
 import { formatDateTimeWib, formatRupiah } from '@/lib/format'
+import ReviewPrompt from './ReviewPrompt'
 import styles from './tableOrder.module.css'
 
 const POLL_MS = 3000
@@ -38,7 +39,16 @@ function itemSubtotal(item) {
   return price * qty + subsTotal
 }
 
-export default function TableOrderStatus({ orderId, storeId, tableNumber, storeName, initialStatus }) {
+export default function TableOrderStatus({
+  orderId,
+  storeId,
+  tableNumber,
+  storeName,
+  logoUrl,
+  reviewUrl,
+  reviewNote,
+  initialStatus,
+}) {
   const [order, setOrder] = useState(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -109,6 +119,10 @@ export default function TableOrderStatus({ orderId, storeId, tableNumber, storeN
     <div className={styles.statusPage}>
       <div className={styles.statusShell}>
         <header style={{ textAlign: 'center' }}>
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className={styles.statusLogo} src={logoUrl} alt={storeName || 'Logo toko'} />
+          )}
           <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
             {storeName || order?.storeName || 'Pesanan Anda'}
           </p>
@@ -143,6 +157,20 @@ export default function TableOrderStatus({ orderId, storeId, tableNumber, storeN
                     <div className={`${styles.step} ${styles.stepActive}`}>Disiapkan dapur</div>
                     <div className={styles.step}>Disajikan</div>
                   </div>
+
+                  {/* Tautan rating tetap ada setelah pop up ditutup, jadi
+                      pelanggan yang mau memberi rating tetap bisa. */}
+                  {reviewUrl && (
+                    <a
+                      className={styles.reviewInline}
+                      href={reviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Star size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} />
+                      Beri rating di Google Maps
+                    </a>
+                  )}
                 </>
               ) : (
                 <>
@@ -268,6 +296,16 @@ export default function TableOrderStatus({ orderId, storeId, tableNumber, storeN
             </Link>
           </>
         )}
+
+        {/* Pop up rating hanya muncul setelah pesanan lunas, dan hanya kalau
+            toko mengisi link rating di dashboard. */}
+        <ReviewPrompt
+          orderId={orderId}
+          reviewUrl={reviewUrl}
+          reviewNote={reviewNote}
+          storeName={storeName}
+          paid={paid}
+        />
       </div>
     </div>
   )

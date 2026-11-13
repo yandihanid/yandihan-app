@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { TABLE_SERVICE_FEE_IDR } from '@/lib/tableOrderFlow'
+import { withColumnFallback } from '@/lib/supabaseFallback'
 import TableOrderClient from './TableOrderClient'
 import TableOrderStatus from './TableOrderStatus'
 import styles from './tableOrder.module.css'
@@ -7,6 +8,16 @@ import styles from './tableOrder.module.css'
 export const dynamic = 'force-dynamic'
 
 const PRODUCT_FIELDS = 'id, name, price, stock, is_sub_product, image_url'
+
+const STORE_FIELDS =
+  'id, name, address, phone, on_table_enabled, logo_url, gmaps_review_url, gmaps_review_note'
+
+// Bentuk lama, tanpa kolom branding. Dipakai hanya kalau select utama gagal
+// karena database belum menjalankan migrasi 0020. Tanpa fallback ini, satu
+// migrasi yang belum dijalankan membuat seluruh halaman pesan meja ikut
+// gagal — padahal_logo dan pop up rating memang fitur tambahan, bukan syarat
+// halaman ini bisa dipakai.
+const STORE_FIELDS_WITHOUT_BRANDING = 'id, name, address, phone, on_table_enabled'
 
 function Notice({ title, message }) {
   return (
@@ -29,6 +40,25 @@ export async function generateMetadata({ params }) {
   }
 }
 
+/**
+ * Ambil data toko untuk halaman pelanggan.
+ *
+ * Kalau select utama gagal, ulangi sekali dengan daftar kolom tanpa
+ * branding: PostgREST menolak seluruh query kalau satu kolom yang diminta
+ * belum ada di database (mis. migrasi 0020 belum dijalankan). Toko tetap
+ * terbaca, hanya logo dan setelan rating yang belum dipakai.
+ */
+async function loadStore(supabase, storeId) {
+  return withColumnFallback(
+    supabase.from('stores').select(STORE_FIELDS).eq('id', storeId).maybeSingle(),
+    supabase
+      .from('stores')
+      .select(STORE_FIELDS_WITHOUT_BRANDING)
+      .eq('id', storeId)
+      .maybeSingle()
+  )
+}
+
 export default async function TableOrderPage({ params, searchParams }) {
   const { storeId, table } = await params
   const query = await searchParams
@@ -36,11 +66,7 @@ export default async function TableOrderPage({ params, searchParams }) {
 
   const supabase = createServiceClient()
 
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id, name, address, phone, on_table_enabled')
-    .eq('id', storeId)
-    .maybeSingle()
+  const { data: store } = await loadStore(supabase, storeId)
 
   if (!store) {
     return <Notice title="Toko tidak ditemukan" message="Periksa kembali tautan atau QR yang Anda pindai." />
@@ -73,6 +99,9 @@ export default async function TableOrderPage({ params, searchParams }) {
         storeId={store.id}
         tableNumber={tableNumber}
         storeName={store.name}
+        logoUrl={store.logo_url || null}
+        reviewUrl={store.gmaps_review_url || null}
+        reviewNote={store.gmaps_review_note || null}
         initialStatus="pending"
       />
     )
@@ -95,7 +124,7 @@ export default async function TableOrderPage({ params, searchParams }) {
 
   return (
     <TableOrderClient
-      store={{ id: store.id, name: store.name, address: store.address }}
+      store={{ id: store.id, name: store.name, address: store.address, logoUrl: store.logo_url || null }}
       tableNumber={tableNumber}
       tableLabel={tableRow?.label || tableRow?.note || null}
       products={products || []}

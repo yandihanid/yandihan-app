@@ -8,6 +8,8 @@ import CashierRow from './CashierRow'
 import SettingToggle from './SettingToggle'
 import SettingsForm from './SettingsForm'
 import StoreCashierLink from './StoreCashierLink'
+import StoreLogoForm from './StoreLogoForm'
+import StoreReviewForm from './StoreReviewForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +113,33 @@ export default async function SettingsPage() {
         ) : (
           <Alert variant="info" live={false} className="settings-hint">
             Simpan nama toko dulu, setelah itu pengaturan lain bisa diatur di sini.
+          </Alert>
+        )}
+      </section>
+
+      <section className="card">
+        <h3>Logo Usaha</h3>
+        {/* Logo dipakai di struk digital, di kepala layar kasir, dan di
+            halaman pesan meja. Semua tempat itu membaca kolom logo_url
+            yang sama, jadi cukup diisi sekali di sini. */}
+        {store ? (
+          <StoreLogoForm store={store} />
+        ) : (
+          <Alert variant="info" live={false}>
+            Simpan nama toko dulu, setelah itu logo bisa diunggah di sini.
+          </Alert>
+        )}
+      </section>
+
+      <section className="card">
+        <h3>Rating Google Maps</h3>
+        {/* Dipakai di halaman ringkasan/paid On the Table. Link kosong =
+            tidak ada pop up rating sama sekali. */}
+        {store ? (
+          <StoreReviewForm store={store} />
+        ) : (
+          <Alert variant="info" live={false}>
+            Simpan nama toko dulu, setelah itu pengaturan rating bisa diisi di sini.
           </Alert>
         )}
       </section>

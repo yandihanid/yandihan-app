@@ -118,6 +118,10 @@ export default function TableOrderClient({
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.headerInner}>
+          {store.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className={styles.brandLogo} src={store.logoUrl} alt={store.name} />
+          )}
           <div className={styles.brandBlock}>
             <h1 className={styles.brand}>{store.name}</h1>
             <p className={styles.brandSub}>
