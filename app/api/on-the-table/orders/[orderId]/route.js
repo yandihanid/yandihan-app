@@ -18,7 +18,6 @@ const ORDER_FIELDS = `
   queue_number,
   xendit_invoice_id,
   invoice_url,
-  xendit_for_user_id,
   transaction_id,
   failure_reason,
   paid_at,
@@ -56,11 +55,9 @@ export async function GET(req, { params }) {
   }
 
   if (order.status === 'pending' && order.xendit_invoice_id) {
-    // Invoice sub-account hanya bisa dibaca dengan header for-user-id yang sama
-    // seperti saat dibuat, jadi nilai yang tersimpan di pesanan dipakai lagi.
-    const invoice = await getXenditInvoice(order.xendit_invoice_id, {
-      forUserId: order.xendit_for_user_id ?? null,
-    })
+    // Invoice dibuat dengan akun Xendit platform, jadi cukup ditanyakan
+    // tanpa header apa pun.
+    const invoice = await getXenditInvoice(order.xendit_invoice_id)
 
     if (invoice && isXenditPaidStatus(invoice)) {
       const result = await settleTableOrder(supabase, order, invoice)

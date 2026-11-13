@@ -728,7 +728,7 @@ export default function PelangganClient({ store: initialStore }) {
           <p style={{ color: 'var(--text-muted)' }}>Memuat promo...</p>
         )}
         {!promosLoading && promos.length === 0 && (
-          <p style={{ color: 'var(--text-muted)' }}>Belum ada promo. Klik "Tambah Promo Baru" untuk membuat.</p>
+          <p style={{ color: 'var(--text-muted)' }}>Belum ada promo. Klik &quot;Tambah Promo Baru&quot; untuk membuat.</p>
         )}
         {!promosLoading && promos.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

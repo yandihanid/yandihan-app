@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { verifySession, getMyStore } from '@/lib/dal'
-import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { hasOnTableFeature, ON_TABLE_ADDON_PRICE_IDR } from '@/lib/plan'
 import { formatRupiah } from '@/lib/format'
-import { SITE_URL } from '@/lib/site'
+import { getStoreBalance, summarizeBalance } from '@/lib/storePayout'
 import OnTheTableManager from './OnTheTableManager'
-import XenditPayoutCard from './XenditPayoutCard'
+import StorePayoutCard from './StorePayoutCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,24 +44,77 @@ export default async function OnTheTablePage() {
     )
   }
 
-  // Dibaca terpisah, bukan lewat getMyStore(), supaya kolom rekening tidak ikut
-  // ter-serialize ke komponen dashboard lain yang memakai STORE_COLUMNS.
-  const supabase = await createClient()
-  const { data: payout } = await supabase
-    .from('stores')
-    .select('xendit_sub_account_id')
-    .eq('id', store.id)
-    .maybeSingle()
+  // Setelan pencairan dibaca terpisah dari getMyStore() supaya kolom ini tidak
+  // ikut ter-serialize ke komponen dashboard lain yang memakai STORE_COLUMNS.
+  // Tabel `table_orders` dan `store_payouts` tidak punya policy RLS untuk
+  // pengguna, jadi keduanya dibaca lewat service role.
+  const service = createServiceClient()
+  const [{ data: payout }, balance, { data: history }] = await Promise.all([
+    service
+      .from('stores')
+      .select('payout_enabled, payout_bank_code, payout_account_number, payout_account_name, payout_minimum_idr')
+      .eq('id', store.id)
+      .maybeSingle(),
+    getStoreBalance(service, store.id),
+    service
+      .from('store_payouts')
+      .select('id, amount, gross_amount, fee_amount, status, bank_code, account_number, created_at, paid_at')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ])
+
+  const summary = summarizeBalance(store, balance)
 
   return (
     <div className="animate-fade-in">
-      <XenditPayoutCard
+      <StorePayoutCard
         storeId={store.id}
-        initialSubAccountId={payout?.xendit_sub_account_id ?? null}
-        splitEnabled={Boolean(process.env.XENDIT_SPLIT_RULE_ID)}
-        callbackUrl={`${SITE_URL}/api/payment/xendit/callback`}
+        payout={payout}
+        balance={{
+          amountFormatted: formatRupiah(summary.amount),
+          orderCount: summary.orderCount,
+        }}
       />
+
+      {history && history.length > 0 && (
+        <section className="card" style={{ marginTop: '1rem' }}>
+          <h3 style={{ marginTop: 0 }}>Riwayat Pencairan</h3>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Omzet</th>
+                  <th>Potongan</th>
+                  <th>Dicairkan</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((row) => (
+                  <tr key={row.id}>
+                    <td>{new Date(row.created_at).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                    <td>{formatRupiah(row.gross_amount)}</td>
+                    <td>-{formatRupiah(row.fee_amount)}</td>
+                    <td>{formatRupiah(row.amount)}</td>
+                    <td>{payoutStatusLabel(row.status)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <OnTheTableManager storeId={store.id} storeName={store.name} />
     </div>
   )
+}
+
+function payoutStatusLabel(status) {
+  if (status === 'paid') return 'Sudah masuk rekening'
+  if (status === 'submitted') return 'Diproses bank'
+  if (status === 'failed') return 'Gagal'
+  return 'Menunggu'
 }

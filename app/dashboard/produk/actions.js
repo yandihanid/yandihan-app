@@ -37,14 +37,18 @@ export async function addProduct(formData) {
   if (isNaN(stockNum) || stockNum < 0) return { error: 'Stok harus angka nol atau lebih' }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('products').insert({
-    store_id: store.id,
-    name,
-    price: priceNum,
-    stock: stockNum,
-    is_sub_product: type === 'sub',
-    image_url: imageUrl,
-  })
+  const { data: created, error } = await supabase
+    .from('products')
+    .insert({
+      store_id: store.id,
+      name,
+      price: priceNum,
+      stock: stockNum,
+      is_sub_product: type === 'sub',
+      image_url: imageUrl,
+    })
+    .select('id')
+    .single()
 
   if (error) {
     // 23505 = unique_violation. Index unik products(store_id, lower(name))
@@ -53,7 +57,9 @@ export async function addProduct(formData) {
     return { error: 'Gagal menambahkan produk' }
   }
   revalidatePath('/dashboard/produk')
-  return { success: true }
+  // id produk dikembalikan supaya form bisa memakainya sebagai key: begitu
+  // produk tersimpan, pratinjau foto me-mount ulang dan ikut terbersihkan.
+  return { success: true, id: created?.id ?? null }
 }
 
 export async function updateStock(formData) {

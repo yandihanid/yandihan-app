@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { LogOut } from 'lucide-react'
 import { verifySession } from '@/lib/dal'
 import { SITE_NAME } from '@/lib/site'
+import { isPlatformAdmin } from '@/lib/platform'
 import { ToastProvider } from '@/components/ui/Toast'
 import DashboardNav from './DashboardNav'
 
@@ -33,7 +34,11 @@ import DashboardNav from './DashboardNav'
  * perlu ikut memuat provider-nya.
  */
 export default async function DashboardLayout({ children }) {
-  await verifySession('/dashboard')
+  const user = await verifySession('/dashboard')
+
+  // Menu "Pencairan" hanya untuk pengelola platform. Halamannya sendiri
+  // juga menolak selain pengelola platform, jadi menu ini hanya kenyamanan.
+  const isAdmin = isPlatformAdmin(user)
 
   return (
     <ToastProvider>
@@ -59,7 +64,7 @@ export default async function DashboardLayout({ children }) {
         </header>
 
         <div className="container dashboard-container">
-          <DashboardNav />
+          <DashboardNav isAdmin={isAdmin} />
           <main id="konten" className="dashboard-main">
             {children}
           </main>

@@ -2,7 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, CreditCard, LayoutDashboard, Package, QrCode, Settings, Users } from 'lucide-react'
+import {
+  BarChart3,
+  CreditCard,
+  LayoutDashboard,
+  Package,
+  QrCode,
+  Settings,
+  Users,
+  Wallet,
+} from 'lucide-react'
 
 /**
  * Navigasi dashboard. Satu-satunya alasan komponen ini client: `usePathname()`.
@@ -34,12 +43,23 @@ function isActive(pathname, { href, exact }) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export default function DashboardNav() {
+export default function DashboardNav({ isAdmin }) {
   const pathname = usePathname()
+
+  const menus = isAdmin
+    ? [
+        ...MENU,
+        {
+          href: '/dashboard/pencairan',
+          label: 'Pencairan',
+          icon: Wallet,
+        },
+      ]
+    : MENU
 
   return (
     <nav className="dashboard-sidebar" aria-label="Menu dashboard">
-      {MENU.map((item) => {
+      {menus.map((item) => {
         const { href, label, icon: Icon } = item
         const active = isActive(pathname, item)
         return (

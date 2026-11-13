@@ -3,66 +3,74 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { requireStoreOwnership } from '@/lib/dal'
-import { hasOnTableFeature } from '@/lib/plan'
-import { isValidXenditSubAccountId, normalizeXenditSubAccountId } from '@/lib/xendit'
+import { parseBankDetails } from '@/lib/storePayout'
 
 /**
- * Simpan Business ID sub-account Xendit milik toko.
+ * Simpan rekening pencairan milik toko.
  *
- * Tanpa nilai ini, invoice On the Table dibuat dengan akun Xendit utama
- * platform. Dengan nilai ini, invoice memakai header `for-user-id` sehingga
- * dana pelanggan masuk ke saldo sub-account toko.
+ * Rekening ini dipakai pengelola platform untuk mengirim uangnya ke toko
+ * lewat API Disbursement Xendit (lihat lib/storePayout.js). Jadi isinya
+ * harus benar: kalau rekening salah, uangnya ditolak bank dan uang toko
+ * tertahan di saldo platform sampai dicoba ulang.
  *
- * Kepemilikan diperiksa lewat DAL (bukan hanya RLS), dan penulisan memakai
- * `.select('id')` supaya UPDATE yang tidak mengenai baris apa pun tidak
- * dilaporkan sebagai berhasil.
+ * Potongan platform (`payout_fee_percent`) TIDAK bisa diubah dari sini.
+ * Itu hak pengelola platform, bukan hak pemilik toko -- kalau bisa diubah
+ * toko, pemotongan fee bisa dibuat nol tanpa sepengetahuan platform.
  */
-export async function updateXenditPayout(formData) {
+export async function updateStorePayoutSettings(formData) {
   const storeId = String(formData.get('storeId') || '').trim()
-  const raw = String(formData.get('xenditSubAccountId') || '').trim()
-
   if (!storeId) return { error: 'Toko tidak ditemukan. Muat ulang halaman.' }
-
-  if (raw && !isValidXenditSubAccountId(raw)) {
-    return {
-      error:
-        'Business ID sub-account tidak valid. Biasanya berupa 24 karakter huruf dan angka dari Dashboard Xendit.',
-    }
-  }
 
   const { store, error: ownErr } = await requireStoreOwnership(storeId)
   if (ownErr) return { error: ownErr }
 
-  if (!hasOnTableFeature(store)) {
-    return { error: 'Fitur On the Table belum aktif untuk toko ini.' }
+  const details = parseBankDetails({
+    bankCode: formData.get('bankCode'),
+    accountNumber: formData.get('accountNumber'),
+    accountName: formData.get('accountName'),
+  })
+  if (details.error) return { error: details.error }
+
+  const minimum = Number.parseInt(String(formData.get('payoutMinimum') || ''), 10)
+  if (!Number.isFinite(minimum) || minimum < 0) {
+    return { error: 'Minimum pencairan tidak valid' }
+  }
+  if (minimum > 100_000_000) {
+    return { error: 'Minimum pencairan terlalu besar (maks Rp100.000.000)' }
   }
 
-  const subAccountId = normalizeXenditSubAccountId(raw)
+  const enabled = formData.get('payoutEnabled') === 'true' || formData.get('payoutEnabled') === 'on'
 
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('stores')
-    .update({ xendit_sub_account_id: subAccountId })
+    .update({
+      payout_bank_code: details.bankCode,
+      payout_account_number: details.accountNumber,
+      payout_account_name: details.accountName,
+      payout_minimum_idr: minimum,
+      payout_enabled: enabled,
+    })
     .eq('id', store.id)
     .eq('user_id', store.user_id)
     .select('id')
     .maybeSingle()
 
   if (error) {
-    console.error('Gagal menyimpan sub-account Xendit', {
+    console.error('Gagal menyimpan rekening pencairan', {
       storeId: store.id,
       code: error.code,
       message: error.message,
     })
     return {
-      error: /xendit_sub_account_id/.test(error.message || '')
-        ? 'Kolom rekening Xendit belum terpasang. Jalankan migrasi 0019.'
-        : 'Gagal menyimpan rekening Xendit. Coba lagi.',
+      error: /payout_/.test(error.message || '')
+        ? 'Kolom rekening pencairan belum terpasang. Jalankan migrasi 0022_store_payouts.sql.'
+        : 'Gagal menyimpan rekening pencairan. Coba lagi.',
     }
   }
 
   if (!data) return { error: 'Perubahan tidak tersimpan. Coba muat ulang halaman.' }
 
   revalidatePath('/dashboard/on-the-table')
-  return { success: true, subAccountId }
+  return { success: true }
 }
