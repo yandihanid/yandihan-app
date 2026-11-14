@@ -16,6 +16,8 @@ import { hashPassword } from '@/lib/password'
 import { normalizeUsername, validatePassword, validateUsername } from '@/lib/cashierAccount'
 import { deleteCashierSessionsForStore } from '@/lib/cashierAuth'
 import { parseLogoInput, parseReviewNote, parseReviewUrl } from '@/lib/storeBrand'
+import { normalizeTheme } from '@/lib/storeTheme'
+import { normalizeReceiptPrinter } from '@/lib/receiptPrinter'
 
 /**
  * Simpan nama toko — buat kalau belum ada, ubah kalau sudah.
@@ -169,6 +171,64 @@ export async function updateStoreReview(formData) {
     .maybeSingle()
 
   if (error) return { error: 'Gagal menyimpan pengaturan rating' }
+  if (!data) return { error: 'Pengaturan tidak tersimpan. Coba muat ulang halaman.' }
+
+  revalidatePath('/dashboard/settings')
+  return { success: true }
+}
+
+/**
+ * Simpan warna dasar toko.
+ *
+ * Warna ini dipakai di dashboard, link kasir, dan halaman pesan meja. Nilai
+ * yang tidak dikenal dinormalisasi ke tema bawaan (biru) supaya halaman
+ * tidak pernah kehilangan warna.
+ */
+export async function updateStoreTheme(formData) {
+  const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
+  if (ownErr) return { error: ownErr }
+
+  const theme = normalizeTheme(formData.get('themeColor'))
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('stores')
+    .update({ theme_color: theme })
+    .eq('id', store.id)
+    .eq('user_id', store.user_id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { error: 'Gagal menyimpan warna toko' }
+  if (!data) return { error: 'Warna tidak tersimpan. Coba muat ulang halaman.' }
+
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+/**
+ * Simpan lebar kertas struk (58 mm atau 80 mm).
+ *
+ * Nilai ini menentukan ukuran @page saat struk dicetak, supaya struk tidak
+ * perlu diperkecil lagi di dialog cetak browser.
+ */
+export async function updateStorePrinter(formData) {
+  const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
+  if (ownErr) return { error: ownErr }
+
+  const printer = normalizeReceiptPrinter(formData.get('receiptPrinter'))
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('stores')
+    .update({ receipt_printer: printer })
+    .eq('id', store.id)
+    .eq('user_id', store.user_id)
+    .select('id')
+    .maybeSingle()
+
+  if (error) return { error: 'Gagal menyimpan ukuran kertas struk' }
   if (!data) return { error: 'Pengaturan tidak tersimpan. Coba muat ulang halaman.' }
 
   revalidatePath('/dashboard/settings')

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
+import { Search } from 'lucide-react'
 import { compressImage, dataUrlToFile, readFileAsDataUrl } from './imageUtils'
 import {
   dropReceiptBlob,
@@ -17,7 +18,7 @@ import {
 } from './offlineQueue'
 import { formatDateTimeWib, formatRupiah, normalizePhone, parseRupiah } from '@/lib/format'
 import { discountAmount } from '@/lib/loyalty'
-import { splitProducts } from '@/lib/catalog'
+import { categoryOf, groupProductsByCategory } from '@/lib/catalog'
 
 // Layar yang paling sering dipakai di produk ini, dan sebelumnya yang paling
 // banyak rusaknya. Yang berubah di pass ini:
@@ -42,6 +43,10 @@ import { splitProducts } from '@/lib/catalog'
 // Payload ke server sekarang terstruktur: items = [{ product_id, qty, subs }].
 // Server membaca harga dari products.price berdasarkan id (temuan C1) dan tidak
 // pernah lagi mem-parse string tampilan untuk tahu apa yang terjual (C2).
+//
+// Produk dikelompokkan per kategori (bukan per jenis utama/sub-produk): kasir
+// mencari "Es Teh" di antara ratusan tombol lebih cepat kalau menu tersusun
+// per kategori, dan kolom pencarian menyaring nama produk sekaligus kategorinya.
 
 const QUICK_CASH = [2000, 5000, 10000, 20000, 50000, 100000]
 const RETRY_MS = 12000
@@ -78,7 +83,7 @@ export default function CashierForm({
   const syncingRef = useRef(false)
 
   const [lines, setLines] = useState([])
-  const [openSubPicker, setOpenSubPicker] = useState(null)
+  const [search, setSearch] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [cashReceived, setCashReceived] = useState('')
   const [buyerName, setBuyerName] = useState('')
@@ -109,9 +114,23 @@ export default function CashierForm({
     serverQueue
   )
 
-  const { main: mainProducts, sub: subProducts } = useMemo(
-    () => splitProducts(products),
-    [products]
+  // Semua produk bisa langsung dijual. Klasifikasi produk utama / sub-produk
+  // dihapus; yang mengelompokkan menu sekarang kategori (Makanan, Minuman,
+  // ...), supaya kasir tidak perlu menggulir ratusan tombol untuk menemukan
+  // satu menu.
+  const visibleProducts = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return products
+    return products.filter((product) => {
+      const name = String(product?.name ?? '').toLowerCase()
+      const category = categoryOf(product).toLowerCase()
+      return name.includes(query) || category.includes(query)
+    })
+  }, [products, search])
+
+  const productGroups = useMemo(
+    () => groupProductsByCategory(visibleProducts),
+    [visibleProducts]
   )
 
   const byId = useMemo(() => {
@@ -126,7 +145,6 @@ export default function CashierForm({
     let sum = 0
     for (const line of lines) {
       sum += priceOf(line.productId) * line.qty
-      for (const sub of line.subs) sum += priceOf(sub.productId) * sub.qty
     }
     return Math.round(sum)
   }, [lines, priceOf])
@@ -167,7 +185,6 @@ export default function CashierForm({
     const counts = new Map()
     for (const line of lines) {
       counts.set(line.productId, (counts.get(line.productId) || 0) + line.qty)
-      for (const sub of line.subs) counts.set(sub.productId, (counts.get(sub.productId) || 0) + sub.qty)
     }
     return counts
   }, [lines])
@@ -202,13 +219,13 @@ export default function CashierForm({
   function addProduct(product) {
     setMessage(null)
     setLines((current) => {
-      const index = current.findIndex((line) => line.productId === product.id && line.subs.length === 0)
+      const index = current.findIndex((line) => line.productId === product.id)
       if (index >= 0) {
         const next = [...current]
         next[index] = { ...next[index], qty: next[index].qty + 1 }
         return next
       }
-      return [...current, { key: nextKey(), productId: product.id, qty: 1, subs: [] }]
+      return [...current, { key: nextKey(), productId: product.id, qty: 1 }]
     })
   }
 
@@ -226,44 +243,6 @@ export default function CashierForm({
 
   function removeLine(key) {
     setLines((current) => current.filter((line) => line.key !== key))
-    setOpenSubPicker((current) => (current === key ? null : current))
-  }
-
-  function addSub(lineKey, productId) {
-    if (!productId) return
-    setOpenSubPicker(null)
-    setLines((current) =>
-      current.map((line) => {
-        if (line.key !== lineKey) return line
-        const index = line.subs.findIndex((sub) => sub.productId === productId)
-        if (index >= 0) {
-          const subs = [...line.subs]
-          subs[index] = { ...subs[index], qty: Math.min(999, subs[index].qty + 1) }
-          return { ...line, subs }
-        }
-        return { ...line, subs: [...line.subs, { key: nextKey(), productId, qty: 1 }] }
-      })
-    )
-  }
-
-  function changeSubQty(lineKey, subKey, delta) {
-    setLines((current) =>
-      current.map((line) => {
-        if (line.key !== lineKey) return line
-        const subs = line.subs
-          .map((sub) => (sub.key === subKey ? { ...sub, qty: Math.min(999, sub.qty + delta) } : sub))
-          .filter((sub) => sub.qty > 0)
-        return { ...line, subs }
-      })
-    )
-  }
-
-  function removeSub(lineKey, subKey) {
-    setLines((current) =>
-      current.map((line) =>
-        line.key === lineKey ? { ...line, subs: line.subs.filter((sub) => sub.key !== subKey) } : line
-      )
-    )
   }
 
   async function handleFileChange(event) {
@@ -287,7 +266,6 @@ export default function CashierForm({
 
   function resetForm() {
     setLines([])
-    setOpenSubPicker(null)
     setCashReceived('')
     setBuyerName('')
     setCustomerPhone('')
@@ -300,7 +278,9 @@ export default function CashierForm({
       list.map((line) => ({
         product_id: line.productId,
         qty: line.qty,
-        subs: line.subs.map((sub) => ({ product_id: sub.productId, qty: sub.qty })),
+        // `subs` tetap dikirim (kosong) supaya bentuk payload sama dengan
+        // yang dibaca normalizeItems di server.
+        subs: [],
       }))
     )
   }
@@ -533,14 +513,14 @@ export default function CashierForm({
     </div>
   )
 
-  if (mainProducts.length === 0) {
+  if (products.length === 0) {
     return (
       <div className="pos">
         <div className="pos-empty">
-          <strong>Belum ada produk utama</strong>
+          <strong>Belum ada produk</strong>
           <p style={{ margin: 0 }}>
-            Produk tambahan tidak dapat dijual sendiri. Minta pemilik toko menambahkan atau mengubah
-            minimal satu produk menjadi <strong>Produk utama</strong>.
+            Minta pemilik toko menambahkan produk di Dashboard → Gudang Produk. Produk bisa
+            dikelompokkan per kategori supaya mudah dicari.
           </p>
         </div>
       </div>
@@ -583,40 +563,78 @@ export default function CashierForm({
         <legend className="label" style={{ padding: 0, marginBottom: 8 }}>
           Pilih Produk
         </legend>
-        <div className="pos-grid">
-          {mainProducts.map((product) => {
-            const inCart = qtyInCart.get(product.id) || 0
-            const soldOut = Number(product.stock) <= 0
-            return (
-              <button
-                key={product.id}
-                type="button"
-                className="pos-product"
-                onClick={() => addProduct(product)}
-                disabled={soldOut}
-                aria-pressed={inCart > 0}
-                aria-label={`${product.name}, ${formatRupiah(product.price)}${soldOut ? ', stok habis' : ''}`}
-              >
-                {product.image_url && (
-                  <div className="pos-product-img-wrap">
-                    <img
-                      src={product.image_url}
-                      alt=""
-                      className="pos-product-img"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-                <span className="pos-product-title">{product.name}</span>
-                <span className="pos-product-price">{formatRupiah(product.price)}</span>
-                <span className="pos-product-stock">
-                  {soldOut ? 'Stok habis' : `Stok ${product.stock}`}
-                </span>
-                {inCart > 0 && <span className="pos-badge">{inCart}</span>}
-              </button>
-            )
-          })}
+
+        {/* Pencarian: menyaring nama produk DAN nama kategorinya. */}
+        <div className="pos-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari produk atau kategori..."
+            aria-label="Cari produk"
+          />
+          {search && (
+            <button
+              type="button"
+              className="pos-search-clear"
+              onClick={() => setSearch('')}
+              aria-label="Bersihkan pencarian"
+            >
+              &times;
+            </button>
+          )}
         </div>
+
+        {productGroups.length === 0 ? (
+          <div className="pos-empty">
+            <strong>Produk tidak ditemukan</strong>
+            <p style={{ margin: 0 }}>Coba kata kunci lain.</p>
+          </div>
+        ) : (
+          productGroups.map((group) => (
+            <section key={group.category} className="pos-category">
+              <h3 className="pos-category-title">
+                {group.category}
+                <span className="pos-category-count">{group.products.length}</span>
+              </h3>
+              <div className="pos-grid">
+                {group.products.map((product) => {
+                  const inCart = qtyInCart.get(product.id) || 0
+                  const soldOut = Number(product.stock) <= 0
+                  return (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="pos-product"
+                      onClick={() => addProduct(product)}
+                      disabled={soldOut}
+                      aria-pressed={inCart > 0}
+                      aria-label={`${product.name}, ${formatRupiah(product.price)}${soldOut ? ', stok habis' : ''}`}
+                    >
+                      {product.image_url && (
+                        <div className="pos-product-img-wrap">
+                          <img
+                            src={product.image_url}
+                            alt=""
+                            className="pos-product-img"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                      <span className="pos-product-title">{product.name}</span>
+                      <span className="pos-product-price">{formatRupiah(product.price)}</span>
+                      <span className="pos-product-stock">
+                        {soldOut ? 'Stok habis' : `Stok ${product.stock}`}
+                      </span>
+                      {inCart > 0 && <span className="pos-badge">{inCart}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          ))
+        )}
       </fieldset>
 
       {lines.length > 0 && (
@@ -670,115 +688,6 @@ export default function CashierForm({
                   </button>
                 </div>
 
-                {line.subs.map((sub) => (
-                  <div key={sub.key} className="pos-line-sub">
-                    <span className="pos-line-sub-thumb" aria-hidden="true">
-                      {byId.get(sub.productId)?.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={byId.get(sub.productId).image_url} alt="" loading="lazy" />
-                      ) : (
-                        <span>{(byId.get(sub.productId)?.name || '?').slice(0, 1).toUpperCase()}</span>
-                      )}
-                    </span>
-                    <span className="pos-line-name">
-                      {byId.get(sub.productId)?.name || 'Produk terhapus'}{' '}
-                      <span className="pos-product-price">
-                        {formatRupiah(priceOf(sub.productId))}
-                      </span>
-                    </span>
-                    <div className="qty-stepper">
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        onClick={() => changeSubQty(line.key, sub.key, -1)}
-                        aria-label="Kurangi sub-produk"
-                      >
-                        &minus;
-                      </button>
-                      <span className="qty-input" style={{ lineHeight: '44px' }}>
-                        {sub.qty}
-                      </span>
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        onClick={() => changeSubQty(line.key, sub.key, 1)}
-                        aria-label="Tambah sub-produk"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      onClick={() => removeSub(line.key, sub.key)}
-                      aria-label="Hapus sub-produk"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-
-                {subProducts.length > 0 && (
-                  <div className="pos-sub-actions">
-                    {openSubPicker === line.key ? (
-                      <div
-                        id={`sub-product-${line.key}`}
-                        className="pos-sub-picker"
-                        role="group"
-                        aria-label={`Pilih subproduk untuk ${product?.name || 'item'}`}
-                      >
-                        <div className="pos-sub-grid">
-                          {subProducts.map((subProduct) => {
-                            const soldOut = Number(subProduct.stock) <= 0
-                            return (
-                              <button
-                                key={subProduct.id}
-                                type="button"
-                                className="pos-sub-option"
-                                onClick={() => addSub(line.key, subProduct.id)}
-                                disabled={soldOut}
-                                aria-label={`${subProduct.name}, ${formatRupiah(subProduct.price)}${soldOut ? ', stok habis' : ''}`}
-                              >
-                                <span className="pos-sub-option-img" aria-hidden="true">
-                                  {subProduct.image_url ? (
-                                    // URL dari Supabase Storage; ukurannya kecil dan
-                                    // sudah dikompresi sebelum diunggah.
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={subProduct.image_url} alt="" loading="lazy" />
-                                  ) : (
-                                    <span>{(subProduct.name || '?').slice(0, 1).toUpperCase()}</span>
-                                  )}
-                                </span>
-                                <span className="pos-sub-option-body">
-                                  <strong>{subProduct.name}</strong>
-                                  <span>{formatRupiah(subProduct.price)}</span>
-                                  <small>{soldOut ? 'Stok habis' : `Stok ${subProduct.stock}`}</small>
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                        <button
-                          type="button"
-                          className="pos-text-btn"
-                          onClick={() => setOpenSubPicker(null)}
-                        >
-                          Batal
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="pos-text-btn pos-add-sub"
-                        onClick={() => setOpenSubPicker(line.key)}
-                        aria-expanded={openSubPicker === line.key}
-                        aria-controls={`sub-product-${line.key}`}
-                      >
-                        + Subproduk
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             )
           })}

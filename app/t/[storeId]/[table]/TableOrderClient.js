@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, X, Plus, Minus, ShoppingBag } from 'lucide-react'
 import { formatRupiah } from '@/lib/format'
+import { categoryOf, groupProductsByCategory } from '@/lib/catalog'
 import styles from './tableOrder.module.css'
 
 function initials(name) {
@@ -36,11 +37,24 @@ export default function TableOrderClient({
 
   const stockOf = (product) => Math.max(0, Number(product?.stock ?? 0))
 
-  const visible = useMemo(() => {
+  // Pencarian menyaring nama produk DAN nama kategorinya, dan hasilnya
+  // dikelompokkan per kategori supaya menu tetap rapi.
+  const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return menu
-    return menu.filter((p) => String(p.name).toLowerCase().includes(q))
+    const filtered = q
+      ? menu.filter((product) => {
+          const name = String(product?.name ?? '').toLowerCase()
+          const category = categoryOf(product).toLowerCase()
+          return name.includes(q) || category.includes(q)
+        })
+      : menu
+    return groupProductsByCategory(filtered)
   }, [menu, query])
+
+  const visibleCount = useMemo(
+    () => groups.reduce((total, group) => total + group.products.length, 0),
+    [groups]
+  )
 
   const lines = useMemo(() => {
     return Object.entries(cart)
@@ -99,14 +113,16 @@ export default function TableOrderClient({
 
       const data = await res.json().catch(() => null)
 
-      if (!res.ok || !data?.invoiceUrl) {
+      if (!res.ok || !data?.orderId) {
         setError(data?.error || 'Gagal membuat pembayaran. Coba lagi.')
         // Stok berubah di server: muat ulang katalog supaya angka di layar benar.
         if (res.status === 409) router.refresh()
         return
       }
 
-      window.location.assign(data.invoiceUrl)
+      // Ke halaman bayar sendiri, bukan langsung ke Xendit: di sana nama dan
+      // logo usaha tampil sesuai yang diisi pemilik di Dashboard -> Pengaturan.
+      window.location.assign(`/pay/${data.orderId}`)
     } catch {
       setError('Koneksi terputus. Periksa internet lalu coba lagi.')
     } finally {
@@ -151,10 +167,12 @@ export default function TableOrderClient({
 
         <h2 className={styles.sectionTitle}>
           Menu
-          <span className={styles.sectionHint}>{menu.length} pilihan</span>
+          <span className={styles.sectionHint}>
+            {query.trim() ? `${visibleCount} dari ${menu.length} pilihan` : `${menu.length} pilihan`}
+          </span>
         </h2>
 
-        {visible.length === 0 ? (
+        {visibleCount === 0 ? (
           <div className={styles.empty}>
             <div className={styles.emptyIcon} aria-hidden="true">
               🍽️
@@ -165,91 +183,99 @@ export default function TableOrderClient({
             </p>
           </div>
         ) : (
-          <div className={styles.grid}>
-            {visible.map((product) => {
-              const stock = stockOf(product)
-              const soldOut = stock <= 0
-              const qty = cart[product.id] || 0
-              const lowStock = !soldOut && stock <= 3
+          groups.map((group) => (
+            <section key={group.category} className={styles.group}>
+              <h3 className={styles.groupTitle}>
+                {group.category}
+                <span className={styles.groupCount}>{group.products.length}</span>
+              </h3>
+              <div className={styles.grid}>
+                {group.products.map((product) => {
+                  const stock = stockOf(product)
+                  const soldOut = stock <= 0
+                  const qty = cart[product.id] || 0
+                  const lowStock = !soldOut && stock <= 3
 
-              return (
-                <article
-                  key={product.id}
-                  className={`${styles.card}${soldOut ? ` ${styles.cardSoldOut}` : ''}`}
-                >
-                  <div className={styles.imageWrap}>
-                    {product.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        className={styles.image}
-                        src={product.image_url}
-                        alt={product.name}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className={styles.placeholder} aria-hidden="true">
-                        {initials(product.name)}
-                      </div>
-                    )}
+                  return (
+                    <article
+                      key={product.id}
+                      className={`${styles.card}${soldOut ? ` ${styles.cardSoldOut}` : ''}`}
+                    >
+                      <div className={styles.imageWrap}>
+                        {product.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className={styles.image}
+                            src={product.image_url}
+                            alt={product.name}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className={styles.placeholder} aria-hidden="true">
+                            {initials(product.name)}
+                          </div>
+                        )}
 
-                    {soldOut ? (
-                      <div className={styles.soldOutOverlay}>Habis</div>
-                    ) : (
-                      <span
-                        className={`${styles.stockChip}${lowStock ? ` ${styles.stockChipLow}` : ''}`}
-                      >
-                        Stok {stock}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={styles.cardBody}>
-                    <h3 className={styles.name}>{product.name}</h3>
-                    <p className={styles.price}>{formatRupiah(product.price)}</p>
-
-                    <div className={styles.cardFooter}>
-                      {soldOut ? (
-                        <button type="button" className={styles.addBtn} disabled>
-                          Stok habis
-                        </button>
-                      ) : qty === 0 ? (
-                        <button
-                          type="button"
-                          className={styles.addBtn}
-                          onClick={() => add(product)}
-                        >
-                          Tambah
-                        </button>
-                      ) : (
-                        <div className={styles.stepper}>
-                          <button
-                            type="button"
-                            className={styles.stepperBtn}
-                            onClick={() => remove(product)}
-                            aria-label={`Kurangi ${product.name}`}
+                        {soldOut ? (
+                          <div className={styles.soldOutOverlay}>Habis</div>
+                        ) : (
+                          <span
+                            className={`${styles.stockChip}${lowStock ? ` ${styles.stockChipLow}` : ''}`}
                           >
-                            <Minus size={14} />
-                          </button>
-                          <span className={styles.stepperValue} aria-live="polite">
-                            {qty}
+                            Stok {stock}
                           </span>
-                          <button
-                            type="button"
-                            className={styles.stepperBtn}
-                            onClick={() => add(product)}
-                            disabled={qty >= stock}
-                            aria-label={`Tambah ${product.name}`}
-                          >
-                            <Plus size={14} />
-                          </button>
+                        )}
+                      </div>
+
+                      <div className={styles.cardBody}>
+                        <h3 className={styles.name}>{product.name}</h3>
+                        <p className={styles.price}>{formatRupiah(product.price)}</p>
+
+                        <div className={styles.cardFooter}>
+                          {soldOut ? (
+                            <button type="button" className={styles.addBtn} disabled>
+                              Stok habis
+                            </button>
+                          ) : qty === 0 ? (
+                            <button
+                              type="button"
+                              className={styles.addBtn}
+                              onClick={() => add(product)}
+                            >
+                              Tambah
+                            </button>
+                          ) : (
+                            <div className={styles.stepper}>
+                              <button
+                                type="button"
+                                className={styles.stepperBtn}
+                                onClick={() => remove(product)}
+                                aria-label={`Kurangi ${product.name}`}
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <span className={styles.stepperValue} aria-live="polite">
+                                {qty}
+                              </span>
+                              <button
+                                type="button"
+                                className={styles.stepperBtn}
+                                onClick={() => add(product)}
+                                disabled={qty >= stock}
+                                aria-label={`Tambah ${product.name}`}
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          ))
         )}
       </main>
 

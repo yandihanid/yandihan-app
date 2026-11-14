@@ -8,10 +8,11 @@ import Button from '@/components/ui/Button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Money from '@/components/ui/Money'
 import { useToast } from '@/components/ui/Toast'
-import { deleteProduct, updateProductType, updateStock } from './actions'
+import { categoryOf } from '@/lib/catalog'
+import { deleteProduct, updateProductCategory, updateStock } from './actions'
 
 /**
- * Satu baris produk: ubah stok, hapus.
+ * Satu baris produk: ubah stok, ubah kategori, hapus.
  *
  * Dua hal yang sebelumnya hilang di sini, keduanya tentang hasil yang tidak
  * pernah sampai ke pengguna:
@@ -34,8 +35,11 @@ import { deleteProduct, updateProductType, updateStock } from './actions'
  * Nilai stok dibiarkan uncontrolled (defaultValue + FormData): tidak ada yang
  * perlu dihitung dari nilainya selama diketik, jadi menyimpannya di state hanya
  * berarti satu render per ketukan tombol.
+ *
+ * Kolom "jenis produk" (utama / sub-produk) dihapus. Sekarang kategori yang
+ * mengelompokkan menu, dan semua produk boleh langsung dijual.
  */
-export default function ProductRow({ product }) {
+export default function ProductRow({ product, categories = [] }) {
   const router = useRouter()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
@@ -59,22 +63,20 @@ export default function ProductRow({ product }) {
     router.refresh()
   }
 
-  const handleType = async (event) => {
-    const nextType = event.target.value
-    const formData = new FormData()
+  const handleCategory = async (event) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
     formData.append('productId', product.id)
-    formData.append('productType', nextType)
 
     setBusy(true)
-    const res = await updateProductType(formData)
+    const res = await updateProductCategory(formData)
     setBusy(false)
 
     if (res.error) {
       toast.error(res.error)
-      event.target.value = product.is_sub_product ? 'sub' : 'main'
       return
     }
-    toast.success(`Jenis "${product.name}" diperbarui.`)
+    toast.success(`Kategori "${product.name}" diperbarui.`)
     router.refresh()
   }
 
@@ -135,24 +137,33 @@ export default function ProductRow({ product }) {
         </div>
       </td>
       <td>
-        <div className="product-type-cell">
-          <Badge variant={product.is_sub_product ? 'warning' : 'info'}>
-            {product.is_sub_product ? 'Sub-produk' : 'Utama'}
-          </Badge>
-          <label className="sr-only" htmlFor={`type-${product.id}`}>
-            Jenis produk {product.name}
+        <form onSubmit={handleCategory} className="produk-category-form">
+          <label htmlFor={`category-${product.id}`} className="sr-only">
+            Kategori untuk {product.name}
           </label>
-          <select
-            id={`type-${product.id}`}
-            className="input product-type-select"
-            defaultValue={product.is_sub_product ? 'sub' : 'main'}
-            onChange={handleType}
-            disabled={busy}
-          >
-            <option value="main">Produk utama</option>
-            <option value="sub">Sub-produk / tambahan</option>
-          </select>
-        </div>
+          <input
+            id={`category-${product.id}`}
+            name="category"
+            list={`product-category-options-${product.id}`}
+            defaultValue={product.category || ''}
+            placeholder={categoryOf(product)}
+            maxLength={60}
+            className="produk-category-input"
+          />
+          <datalist id={`product-category-options-${product.id}`}>
+            {categories.map((category) => (
+              <option key={category} value={category} />
+            ))}
+          </datalist>
+          <Button type="submit" variant="secondary" size="sm" disabled={busy}>
+            Simpan
+          </Button>
+        </form>
+        {!product.category && (
+          <Badge variant="neutral" className="produk-category-badge">
+            Umum
+          </Badge>
+        )}
       </td>
       <td>
         <Money value={product.price} />

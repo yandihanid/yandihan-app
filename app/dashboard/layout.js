@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { LogOut } from 'lucide-react'
-import { verifySession } from '@/lib/dal'
+import { getMyStore, verifySession } from '@/lib/dal'
 import { SITE_NAME } from '@/lib/site'
 import { isPlatformAdmin } from '@/lib/platform'
+import { normalizeTheme } from '@/lib/storeTheme'
 import { ToastProvider } from '@/components/ui/Toast'
 import DashboardNav from './DashboardNav'
 
@@ -40,34 +41,42 @@ export default async function DashboardLayout({ children }) {
   // juga menolak selain pengelola platform, jadi menu ini hanya kenyamanan.
   const isAdmin = isPlatformAdmin(user)
 
+  // Warna dasar toko. Dashboard memakai warna yang sama dengan link kasir dan
+  // halaman pesan meja, jadi pemilik melihat hasilnya persis seperti
+  // pelanggan.
+  const store = await getMyStore()
+  const theme = normalizeTheme(store?.theme_color)
+
   return (
     <ToastProvider>
-      <div className="flex flex-col min-h-screen">
-        {/* Lompat ke konten: pengguna keyboard tidak harus melewati lima
-            tautan menu di setiap halaman sebelum sampai ke isinya. */}
-        <a href="#konten" className="skip-link">
-          Lompat ke konten
-        </a>
+      <div className="store-theme" data-store-theme={theme}>
+        <div className="flex flex-col min-h-screen">
+          {/* Lompat ke konten: pengguna keyboard tidak harus melewati lima
+              tautan menu di setiap halaman sebelum sampai ke isinya. */}
+          <a href="#konten" className="skip-link">
+            Lompat ke konten
+          </a>
 
-        <header className="dashboard-header">
-          <div className="container flex justify-between items-center">
-            <Link href="/dashboard" className="dashboard-brand">
-              {SITE_NAME}
-            </Link>
-            <form action="/auth/signout" method="post">
-              <button type="submit" className="dashboard-signout">
-                <LogOut size={20} aria-hidden="true" />
-                <span className="dashboard-signout-label">Keluar</span>
-              </button>
-            </form>
+          <header className="dashboard-header">
+            <div className="container flex justify-between items-center">
+              <Link href="/dashboard" className="dashboard-brand">
+                {SITE_NAME}
+              </Link>
+              <form action="/auth/signout" method="post">
+                <button type="submit" className="dashboard-signout">
+                  <LogOut size={20} aria-hidden="true" />
+                  <span className="dashboard-signout-label">Keluar</span>
+                </button>
+              </form>
+            </div>
+          </header>
+
+          <div className="container dashboard-container">
+            <DashboardNav isAdmin={isAdmin} />
+            <main id="konten" className="dashboard-main">
+              {children}
+            </main>
           </div>
-        </header>
-
-        <div className="container dashboard-container">
-          <DashboardNav isAdmin={isAdmin} />
-          <main id="konten" className="dashboard-main">
-            {children}
-          </main>
         </div>
       </div>
     </ToastProvider>

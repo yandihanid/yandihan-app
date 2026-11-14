@@ -7,7 +7,10 @@ Yandihan Kasir adalah POS multi-tenant untuk warung dan UMKM Indonesia. Pemilik 
 - Transaksi CASH dan QRIS/Transfer dengan pengurangan stok atomik.
 - Antrean offline PWA, sinkronisasi idempoten, dan bukti transfer.
 - Struk publik thermal dengan rincian item, diskon, uang diterima, dan kembalian.
+- Struk bisa dicetak dari menu Antrean kasir (58 mm atau 80 mm, label "COPY" untuk cetakan kedua).
 - Realtime dashboard, loyalitas pelanggan untuk PRO aktif, serta antrean F&B harian.
+- Kategori produk untuk mengelompokkan menu di link kasir dan On the Table, plus pencarian produk.
+- Warna dasar toko bisa dipilih sendiri dan dipakai di dashboard, link kasir, dan On the Table.
 - Laporan dasar untuk FREE dan laporan produk/kasir/metode/tren untuk PRO.
 - Pembelian PRO Rp78.000 untuk 30 hari melalui Midtrans Snap. Tidak ada recurring otomatis.
 - FREE tetap mendapat transaksi tanpa batas dan satu slot kasir total (web atau Telegram).
@@ -74,6 +77,18 @@ Jalankan migrasi secara manual melalui **Supabase SQL Editor** dalam urutan beri
 6. `supabase/migrations/0006_report_rpcs.sql`
 7. `supabase/migrations/0007_product_types_and_fnb_queue.sql`
 8. `supabase/migrations/0008_reconcile_transaction_rpc.sql`
+9. `supabase/migrations/0009_queue_done_and_optional_subproducts.sql`
+10. `supabase/migrations/0010_product_image_url.sql`
+11. `supabase/migrations/0012_cashier_accounts_single_link.sql`
+12. `supabase/migrations/0013_transaction_rpc_cashier_id.sql`
+13. `supabase/migrations/0014_xendit_invoice_id.sql`
+14. `supabase/migrations/0015_promos.sql`
+15. `supabase/migrations/0016_on_the_table_and_kds.sql`
+16. `supabase/migrations/0017_store_tables.sql`
+17. `supabase/migrations/0018_on_table_orders.sql`
+18. `supabase/migrations/0020_store_logo_and_gmaps_review.sql`
+19. `supabase/migrations/0022_store_payouts.sql`
+20. `supabase/migrations/0023_product_categories_theme_printer.sql`
 
 `add_loyalty_customers.sql` adalah migrasi lama; perubahan loyalitasnya sudah dicakup secara idempoten oleh baseline dan kebijakan/RPC saat ini. Untuk project baru, jalankan `0001`–`0008` berurutan. Database yang sudah berhasil menjalankan `0007` cukup melanjutkan dengan `0008`; jangan menjalankan ulang atau mengedit migrasi historis.
 
@@ -85,8 +100,15 @@ Saat Mode antrean F&B aktif, transaksi mendapat nomor urut per toko yang reset s
 
 Migrasi `0020_store_logo_and_gmaps_review.sql` menambah tiga kolom pada tabel `stores`: `logo_url`, `gmaps_review_url`, dan `gmaps_review_note`. Jalankan migrasi ini lewat SQL Editor. Sampai migrasi dijalankan, struk, halaman pesan meja, dan layar kasir tetap jalan normal (query-nya punya jalur cadangan) tetapi logo dan pop up rating belum muncul.
 
+Migrasi `0023_product_categories_theme_printer.sql` menambah kolom `products.category`, `stores.theme_color`, `stores.receipt_printer`, dan `transactions.receipt_print_count`, plus fungsi `bump_receipt_print_count()`. Jalankan lewat SQL Editor. Tanpa migrasi ini, halaman yang dipakai kasir dan pelanggan tetap jalan (query-nya punya jalur cadangan), tetapi kategori menu, warna toko, dan cetak struk dari menu Antrean belum aktif.
+
 - **Logo usaha** diisi di Dashboard → Pengaturan → Logo Usaha (unggah file atau tempel URL). Logo yang sama muncul di struk digital, di kepala layar kasir, dan di halaman pesan meja. File diunggah dikompres di browser dan disimpan sebagai data URL, jadi tidak butuh bucket Storage baru.
 - **Rating Google Maps** diisi di Dashboard → Pengaturan → Rating Google Maps: link rating (harus tautan Google Maps) dan catatan opsional untuk pelanggan, misalnya hadiah setelah memberi rating. Kalau linknya kosong, pop up rating tidak pernah muncul. Kalau linknya terisi, pelanggan yang pesan lewat On the Table dan sudah membayar melihat pop up rating di halaman ringkasan, dan tautannya tetap bisa dibuka dari kartu ringkasan bila pop up ditutup.
+- **Kategori produk** diisi di Dashboard → Gudang Produk. Kategori bebas (Makanan, Minuman, Snack, ...) dan mengelompokkan menu di link kasir maupun di halaman pesan meja. Produk tanpa kategori tetap tampil, dikelompokkan di bawah "Umum". Klasifikasi produk utama / sub-produk dihapus: semua produk boleh langsung dijual.
+- **Warna toko** diisi di Dashboard → Pengaturan → Warna Toko. Nilai ini dipakai di dashboard, link kasir, dan halaman pesan meja. Daftar warnanya ada di `lib/storeTheme.js`.
+- **Lebar kertas struk** diisi di Dashboard → Pengaturan → Cetak Struk (58 mm atau 80 mm). Struk memakai ukuran `@page` sesuai pilihan itu, jadi printer 58 mm tidak lagi perlu dikecilkan 50% di dialog cetak browser -- yang membuat tulisannya buram.
+- **Cetak struk dari menu Antrean**: kasir menekan "Cetak struk" pada tiket (baik pesanan On the Table maupun transaksi langsung). Server yang menentukan label "COPY": pesanan On the Table belum pernah dicetak jadi cetakan pertama masih struk asli, sedangkan transaksi langsung sudah memberi struk asli ke pembeli begitu transaksinya berhasil sehingga cetakannya selalu "COPY".
+- **Halaman bayar** (`/pay/<id pesanan>`) menampilkan logo dan nama usaha dari Dashboard → Pengaturan sebelum mengarahkan pelanggan ke invoice Xendit. Halaman Xendit sendiri menampilkan nama akun platform, bukan nama toko.
 
 ## Storage bukti pembayaran
 

@@ -12,6 +12,15 @@
   --primary-hover: #1D4ED8;
   --primary-light: #DBEAFE;
   --secondary-color: #EFF6FF;
+  /* Turunan warna utama. Semuanya ditulis sebagai variabel (bukan hex
+     langsung) supaya satu tema toko cukup menimpa daftar ini. */
+  --primary-gradient-from: #1D4ED8;
+  --primary-gradient-to: #2563EB;
+  --primary-shadow: rgba(37, 99, 235, 0.35);
+  --primary-shadow-hover: rgba(37, 99, 235, 0.45);
+  --primary-ring: rgba(37, 99, 235, 0.12);
+  --primary-soft: rgba(37, 99, 235, 0.25);
+  --primary-tint: rgba(37, 99, 235, 0.15);
 
   /* Surfaces */
   --bg-color: #F8FAFC;
@@ -73,6 +82,132 @@
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+
+/* ──────────────────────────────────────────────────────────
+   Tema warna toko
+
+   Nilai warna dasar toko disimpan di kolom `stores.theme_color` dan
+   diteruskan ke halaman lewat atribut `data-store-theme` pada elemen
+   pembungkus. Karena variabel CSS mewarisi (inherit), seluruh halaman di
+   bawahnya ikut berubah: dashboard, link kasir, dan halaman pesan meja.
+
+   Daftar warna di lib/storeTheme.js adalah sumber kebenaran; blok di bawah
+   hanya menerjemahkannya ke variabel CSS.
+   ────────────────────────────────────────────────────────── */
+
+[data-store-theme='green'] {
+  --primary-color: #15803D;
+  --primary-hover: #166534;
+  --primary-light: #DCFCE7;
+  --secondary-color: #F0FDF4;
+  --primary-gradient-from: #166534;
+  --primary-gradient-to: #15803D;
+  --primary-shadow: rgba(21, 128, 61, 0.32);
+  --primary-shadow-hover: rgba(21, 128, 61, 0.42);
+  --primary-ring: rgba(21, 128, 61, 0.14);
+  --primary-soft: rgba(21, 128, 61, 0.25);
+  --primary-tint: rgba(21, 128, 61, 0.15);
+  --shadow-glow: 0 0 25px rgba(21, 128, 61, 0.25);
+}
+
+[data-store-theme='red'] {
+  --primary-color: #B91C1C;
+  --primary-hover: #991B1B;
+  --primary-light: #FEE2E2;
+  --secondary-color: #FEF2F2;
+  --primary-gradient-from: #991B1B;
+  --primary-gradient-to: #B91C1C;
+  --primary-shadow: rgba(185, 28, 28, 0.3);
+  --primary-shadow-hover: rgba(185, 28, 28, 0.4);
+  --primary-ring: rgba(185, 28, 28, 0.14);
+  --primary-soft: rgba(185, 28, 28, 0.25);
+  --primary-tint: rgba(185, 28, 28, 0.15);
+  --shadow-glow: 0 0 25px rgba(185, 28, 28, 0.25);
+}
+
+[data-store-theme='orange'] {
+  --primary-color: #C2410C;
+  --primary-hover: #9A3412;
+  --primary-light: #FFEDD5;
+  --secondary-color: #FFF7ED;
+  --primary-gradient-from: #9A3412;
+  --primary-gradient-to: #C2410C;
+  --primary-shadow: rgba(194, 65, 12, 0.3);
+  --primary-shadow-hover: rgba(194, 65, 12, 0.4);
+  --primary-ring: rgba(194, 65, 12, 0.14);
+  --primary-soft: rgba(194, 65, 12, 0.25);
+  --primary-tint: rgba(194, 65, 12, 0.15);
+  --shadow-glow: 0 0 25px rgba(194, 65, 12, 0.25);
+}
+
+[data-store-theme='purple'] {
+  --primary-color: #6D28D9;
+  --primary-hover: #5B21B6;
+  --primary-light: #EDE9FE;
+  --secondary-color: #F5F3FF;
+  --primary-gradient-from: #5B21B6;
+  --primary-gradient-to: #6D28D9;
+  --primary-shadow: rgba(109, 40, 217, 0.3);
+  --primary-shadow-hover: rgba(109, 40, 217, 0.4);
+  --primary-ring: rgba(109, 40, 217, 0.14);
+  --primary-soft: rgba(109, 40, 217, 0.25);
+  --primary-tint: rgba(109, 40, 217, 0.15);
+  --shadow-glow: 0 0 25px rgba(109, 40, 217, 0.25);
+}
+
+[data-store-theme='teal'] {
+  --primary-color: #0F766E;
+  --primary-hover: #115E59;
+  --primary-light: #CCFBF1;
+  --secondary-color: #F0FDFA;
+  --primary-gradient-from: #115E59;
+  --primary-gradient-to: #0F766E;
+  --primary-shadow: rgba(15, 118, 110, 0.3);
+  --primary-shadow-hover: rgba(15, 118, 110, 0.4);
+  --primary-ring: rgba(15, 118, 110, 0.14);
+  --primary-soft: rgba(15, 118, 110, 0.25);
+  --primary-tint: rgba(15, 118, 110, 0.15);
+  --shadow-glow: 0 0 25px rgba(15, 118, 110, 0.25);
+}
+
+[data-store-theme='pink'] {
+  --primary-color: #BE185D;
+  --primary-hover: #9D174D;
+  --primary-light: #FCE7F3;
+  --secondary-color: #FDF2F8;
+  --primary-gradient-from: #9D174D;
+  --primary-gradient-to: #BE185D;
+  --primary-shadow: rgba(190, 24, 93, 0.3);
+  --primary-shadow-hover: rgba(190, 24, 93, 0.4);
+  --primary-ring: rgba(190, 24, 93, 0.14);
+  --primary-soft: rgba(190, 24, 93, 0.25);
+  --primary-tint: rgba(190, 24, 93, 0.15);
+  --shadow-glow: 0 0 25px rgba(190, 24, 93, 0.25);
+}
+
+[data-store-theme='slate'] {
+  --primary-color: #334155;
+  --primary-hover: #1E293B;
+  --primary-light: #E2E8F0;
+  --secondary-color: #F1F5F9;
+  --primary-gradient-from: #1E293B;
+  --primary-gradient-to: #334155;
+  --primary-shadow: rgba(51, 65, 85, 0.3);
+  --primary-shadow-hover: rgba(51, 65, 85, 0.4);
+  --primary-ring: rgba(51, 65, 85, 0.16);
+  --primary-soft: rgba(51, 65, 85, 0.25);
+  --primary-tint: rgba(51, 65, 85, 0.15);
+  --shadow-glow: 0 0 25px rgba(51, 65, 85, 0.25);
+}
+
+
+/* Pembungkus halaman yang memakai warna toko. Variabel CSS diwarisi ke
+   semua turunannya, jadi satu atribut ini cukup untuk mengubah seluruh
+   tombol, tautan, dan penanda di halaman itu. */
+.store-theme {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
 
 /* ──────────────────────────────────────────────────────────
    Reset & Base
@@ -139,19 +274,19 @@ a:hover {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+  background: linear-gradient(135deg, var(--primary-gradient-from) 0%, var(--primary-gradient-to) 100%);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 14px 0 var(--primary-shadow);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 6px 20px var(--primary-shadow-hover);
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 2px 8px var(--primary-shadow);
 }
 
 .btn-primary:disabled {
@@ -227,7 +362,7 @@ a:hover {
 .input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .input:disabled {
@@ -457,7 +592,7 @@ tr:hover td {
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(37, 99, 235, 0.25);
+  border: 3px solid var(--primary-soft);
   border-radius: 50%;
   border-top-color: var(--primary-color);
   animation: spin 0.8s ease-in-out infinite;
@@ -489,7 +624,7 @@ tr:hover td {
   content: '';
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-color), #3B82F6);
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-gradient-to));
   border-radius: 0 2px 2px 0;
   animation: load 1.5s infinite;
 }
@@ -886,18 +1021,6 @@ tr:hover td {
   color: var(--warning-dark);
 }
 
-.product-type-cell {
-  display: grid;
-  gap: 6px;
-  min-width: 170px;
-}
-
-.product-type-select {
-  min-height: 38px;
-  padding-block: 6px;
-  font-size: 0.8125rem;
-}
-
 /* --- Navigasi dan antrean kasir F&B ------------------------------------ */
 .cashier-nav {
   display: grid;
@@ -999,6 +1122,18 @@ tr:hover td {
   border-radius: 12px;
 }
 
+/* Aksi pada satu tiket: cetak struk dan tandai selesai. Ditumpuk ke bawah
+   di layar sempit (lihat blok @media di bawah). */
+.queue-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.queue-actions .btn {
+  white-space: nowrap;
+}
+
 .queue-number {
   display: grid;
   place-items: center;
@@ -1038,9 +1173,13 @@ tr:hover td {
     grid-template-columns: 64px minmax(0, 1fr);
   }
 
-  .queue-card .btn {
+  .queue-actions {
     grid-column: 1 / -1;
-    width: 100%;
+    flex-direction: row;
+  }
+
+  .queue-actions .btn {
+    flex: 1;
   }
 }
 
@@ -1192,6 +1331,91 @@ tr:hover td {
   font-size: 0.75rem;
   font-weight: 700;
   text-align: center;
+}
+
+/* --- Pencarian & pengelompokan produk ------------------------------------
+   Kategori produk (Makanan, Minuman, ...) dikelompokkan supaya kasir tidak
+   perlu menggulir hundreds produk untuk menemukan satu menu. Pencarian
+   menyaring nama produk DAN nama kategorinya, jadi mengetik "minum" langsung
+   menemukan semua drink. */
+.pos-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 12px;
+  padding: 0 0.75rem;
+  min-height: var(--tap-target);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--card-bg);
+}
+
+.pos-search:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.pos-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.625rem 0;
+}
+
+.pos-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.pos-search-clear:hover {
+  background-color: var(--secondary-color);
+  color: var(--text-main);
+}
+
+.pos-category {
+  margin-bottom: 18px;
+}
+
+.pos-category-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pos-category-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--border-color);
+}
+
+.pos-category-count {
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  font-size: 0.6875rem;
+  letter-spacing: 0;
 }
 
 /* --- Baris keranjang + stepper qty ------------------------------------- */
@@ -1870,6 +2094,96 @@ tr:hover td {
   color: var(--text-muted);
 }
 
+/* --- Pilihan warna toko --------------------------------------------------
+   Warna dasar toko dipakai di dashboard, link kasir, dan halaman pesan meja.
+   Pilihan ditampilkan sebagai kotak warna dengan nama, bukan sebagai select:
+   yang dicari pemilik adalah warnanya, bukan namanya. */
+.theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: var(--tap-target);
+  padding: 0.625rem 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s var(--ease-out), background-color 0.15s var(--ease-out);
+}
+
+.theme-swatch:hover {
+  border-color: var(--primary-color);
+}
+
+.theme-swatch[aria-pressed='true'] {
+  border-color: var(--primary-color);
+  background-color: var(--secondary-color);
+}
+
+.theme-swatch-dot {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.theme-swatch-check {
+  margin-left: auto;
+  color: var(--primary-color);
+  font-weight: 800;
+}
+
+/* Baris setelan yang bukan toggle (mis. lebar kertas struk). */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 0;
+}
+
+.setting-row-text strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.setting-row-text span {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.setting-row .input {
+  width: auto;
+  min-width: 180px;
+}
+
 
 /* ──────────────────────────────────────────────────────────
    Halaman Gudang Produk
@@ -1922,6 +2236,28 @@ tr:hover td {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);
+}
+
+/* Form kategori: input + tombol simpan, digabung dalam satu baris supaya
+   tabel produk tidak melebar. */
+.produk-category-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.produk-category-input {
+  width: 140px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.produk-category-badge {
+  margin-top: 0.25rem;
 }
 
 /* --- Segmented filter --------------------------------------------------
@@ -2246,7 +2582,7 @@ tr:hover td {
   height: 32px;
   flex-shrink: 0;
   border-radius: var(--border-radius-sm);
-  background: linear-gradient(135deg, var(--primary-color) 0%, #3B82F6 100%);
+  background: linear-gradient(135deg, var(--primary-gradient-from) 0%, var(--primary-gradient-to) 100%);
   color: #FFFFFF;
   font-size: 1.15rem;
   font-weight: 900;
@@ -3469,7 +3805,7 @@ tr:hover td {
   min-height: 100dvh;
   padding: 1.25rem;
   background:
-    radial-gradient(circle at 15% 10%, rgba(37, 99, 235, 0.12), transparent 32rem),
+    radial-gradient(circle at 15% 10%, var(--primary-tint), transparent 32rem),
     var(--bg-color);
 }
 

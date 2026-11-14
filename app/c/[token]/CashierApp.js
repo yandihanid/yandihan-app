@@ -58,7 +58,11 @@ export default function CashierApp({ token, cashier, store, products }) {
     window.location.reload()
   }
 
-  const queueEnabled = store.waiting_list_enabled
+  // Menu Antrean muncul kalau toko memakai mode antrean F&B ATAU fitur On the
+  // Table. Pesanan meja selalu dibuat berstatus 'pending' supaya masuk antrean
+  // kasir, jadi tanpa menu ini struk pesanan meja tidak bisa dicetak dari
+  // layar kasir.
+  const queueEnabled = store.waiting_list_enabled || store.on_table_enabled
 
   return (
     <div className="cashier-page">

@@ -109,7 +109,7 @@ function ProductImageField({ disabled }) {
   )
 }
 
-export default function ProductForm({ storeId }) {
+export default function ProductForm({ storeId, categories = [] }) {
   const router = useRouter()
   const formRef = useRef(null)
 
@@ -138,12 +138,29 @@ export default function ProductForm({ storeId }) {
           )}
         </Field>
 
-        <Field id="product-type" label="Jenis Produk" required>
+        <Field
+          id="product-category"
+          label="Kategori"
+          hint="Opsional. Mengelompokkan menu di link kasir dan On the Table."
+        >
           {(props) => (
-            <select {...props} name="productType" className="input" defaultValue="main">
-              <option value="main">Produk utama</option>
-              <option value="sub">Sub-produk / tambahan</option>
-            </select>
+            <>
+              <Input
+                {...props}
+                name="category"
+                list="product-category-options"
+                maxLength={60}
+                placeholder="Misal: Makanan"
+              />
+              {/* Pilihan cepat: kategori yang sudah dipakai toko. Input tetap
+                  bebas supaya pemilik bisa membuat kategori baru tanpa harus
+                  menambah produk lebih dulu. */}
+              <datalist id="product-category-options">
+                {categories.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
+            </>
           )}
         </Field>
 

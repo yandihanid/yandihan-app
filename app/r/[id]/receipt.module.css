@@ -16,7 +16,9 @@
   color: #000;
   box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.875rem;
+  /* Ukuran huruf mengikuti setelan lebar kertas toko (58 mm / 80 mm). Nilai
+     bawaannya dipakai kalau variabelnya belum diisi. */
+  font-size: var(--receipt-font-size, 10pt);
   line-height: 1.4;
 }
 
@@ -27,17 +29,18 @@
 
 .storeName {
   margin: 0 0 0.35rem;
-  font-size: 1.4rem;
+  font-size: var(--receipt-title-size, 13pt);
   font-weight: 700;
 }
 
 /* Logo toko: 64px supaya masih muat di kertas thermal 80 mm.
    object-fit: contain supaya logo yang lebih lebar dari tinggi
-   tetap utuh, bukan terpotong. */
+   tetap utuh, bukan terpotong. Pada kertas 58 mm ukurannya dikecilkan
+   lewat variabel --receipt-logo-size. */
 .storeLogo {
   display: block;
-  width: 64px;
-  height: 64px;
+  width: var(--receipt-logo-size, 64px);
+  height: var(--receipt-logo-size, 64px);
   margin: 0 auto 0.6rem;
   object-fit: contain;
 }
@@ -53,8 +56,21 @@
   white-space: pre-line;
 }
 
+/* Label salinan. Struk yang dicetak kedua kali (atau lebih) dari menu
+   Antrean diberi label ini supaya kasir tahu itu bukan struk asli. */
+.copyBadge {
+  display: inline-block;
+  margin: 0.3rem 0;
+  padding: 0.1rem 0.5rem;
+  border: 2px solid #000;
+  border-radius: 4px;
+  font-size: var(--receipt-title-size, 13pt);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
 .divider {
-  margin: 1rem 0;
+  margin: var(--receipt-divider-margin, 1rem) 0;
   border: 0;
   border-top: 2px dashed #aaa;
 }
@@ -86,13 +102,13 @@
 
 .itemMeta {
   color: #555;
-  font-size: 0.75rem;
+  font-size: var(--receipt-meta-size, 8pt);
 }
 
 .total {
   padding-top: 0.5rem;
   border-top: 1px dashed #ccc;
-  font-size: 1.05rem;
+  font-size: var(--receipt-total-size, 11.5pt);
   font-weight: 700;
 }
 
@@ -102,13 +118,13 @@
 }
 
 .footer {
-  margin-top: 2rem;
+  margin-top: var(--receipt-footer-margin, 2rem);
   text-align: center;
 }
 
 .poweredBy {
   color: #666;
-  font-size: 0.75rem;
+  font-size: var(--receipt-meta-size, 8pt);
 }
 
 .notFound {
@@ -116,15 +132,9 @@
   text-align: center;
 }
 
-@page {
-  size: 80mm auto;
-  margin: 4mm;
-}
-
 @media print {
   :global(html),
   :global(body) {
-    width: 80mm;
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
@@ -145,6 +155,5 @@
     max-width: none;
     padding: 0;
     box-shadow: none;
-    font-size: 10pt;
   }
 }

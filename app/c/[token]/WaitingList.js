@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Printer } from 'lucide-react'
 import { formatRupiah } from '@/lib/format'
 import { wibTimeLabel } from '@/lib/time'
 
@@ -19,6 +20,7 @@ export default function WaitingList({ token, active = true }) {
   })
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [printingId, setPrintingId] = useState(null)
   const activeStatus = useRef(status)
   const requestSequence = useRef(0)
   const requestController = useRef(null)
@@ -129,6 +131,63 @@ export default function WaitingList({ token, active = true }) {
     }
   }
 
+  /**
+   * Cetak struk dari menu Antrean.
+   *
+   * Server yang menentukan apakah struk ini perlu berlabel "COPY":
+   * pesanan On the Table belum pernah dicetak (cetak pertama = asli),
+   * sedangkan transaksi langsung sudah memberi struk asli ke pembeli begitu
+   * transaksinya berhasil (jadi cetakan ini = COPY).
+   *
+   * Jendela struk dibuka dengan `print=1` supaya printer langsung keluar
+   * tanpa kasir harus menekan tombol cetak lagi.
+   */
+  const printReceipt = async (ticket) => {
+    if (!navigator.onLine) {
+      setError('Cetak struk butuh koneksi internet.')
+      return
+    }
+
+    // Jendela dibuka PADA SAAT tombol ditekan. Kalau dibuka setelah await,
+    // browser akan memblokirnya sebagai pop-up (tidak ada lagi "klik pengguna"
+    // yang meningovernya) -- jadi jendela kosong dibuka lebih dulu, lalu
+    // diisi setelah server memberi tahu struk ini COPY atau bukan.
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setError('Browser memblokir jendela cetak. Izinkan pop-up untuk situs ini.')
+      return
+    }
+
+    setPrintingId(ticket.id)
+    try {
+      const res = await fetch('/api/cashier/receipt-print', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cashier-token': token,
+        },
+        body: JSON.stringify({ id: ticket.id }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        printWindow.close()
+        setError(data?.error || 'Gagal menyiapkan struk.')
+        return
+      }
+
+      const params = new URLSearchParams({ print: '1' })
+      if (data?.copy) params.set('copy', '1')
+      printWindow.location.href = `/r/${ticket.id}?${params.toString()}`
+      setError('')
+    } catch {
+      printWindow.close()
+      setError('Koneksi terputus. Struk belum bisa dicetak.')
+    } finally {
+      setPrintingId(null)
+    }
+  }
+
   const current = snapshot.status === status ? snapshot.tickets : []
   const currentLoaded = snapshot.status === status && snapshot.loaded
 
@@ -179,18 +238,32 @@ export default function WaitingList({ token, active = true }) {
                 <div className="queue-detail">
                   <strong>{ticket.buyer_name || ticket.customer_name || 'Tanpa nama'}</strong>
                   <span>{ticket.product_name || 'Pesanan'}</span>
-                  <small>{wibTimeLabel(ticket.created_at)} · {formatRupiah(ticket.amount)}</small>
+                  <small>
+                    {ticket.table_number != null && `Meja ${ticket.table_number} · `}
+                    {wibTimeLabel(ticket.created_at)} · {formatRupiah(ticket.amount)}
+                  </small>
                 </div>
-                {status === 'pending' && (
+                <div className="queue-actions">
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    onClick={() => markDone(ticket.id)}
-                    disabled={busyId === ticket.id}
+                    className="btn btn-secondary"
+                    onClick={() => printReceipt(ticket)}
+                    disabled={printingId === ticket.id}
                   >
-                    {busyId === ticket.id ? 'Menyimpan...' : 'Tandai selesai'}
+                    <Printer size={15} aria-hidden="true" />
+                    {printingId === ticket.id ? 'Menyiapkan...' : 'Cetak struk'}
                   </button>
-                )}
+                  {status === 'pending' && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => markDone(ticket.id)}
+                      disabled={busyId === ticket.id}
+                    >
+                      {busyId === ticket.id ? 'Menyimpan...' : 'Tandai selesai'}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ol>

@@ -12,7 +12,7 @@ const POLL_MS = 3000
 const STATUS_COPY = {
   pending: {
     title: 'Menunggu pembayaran',
-    sub: 'Selesaikan pembayaran di halaman Xendit. Nomor antrean dan rincian pesanan muncul otomatis di sini setelah pembayaran diterima.',
+    sub: 'Selesaikan pembayaran di halaman pembayaran toko. Nomor antrean dan rincian pesanan muncul otomatis di sini setelah pembayaran diterima.',
   },
   expired: {
     title: 'Pembayaran kedaluwarsa',
@@ -207,7 +207,7 @@ export default function TableOrderStatus({
                     {order.invoiceUrl && status === 'pending' && (
                       <a
                         className={`${styles.linkBtn} ${styles.primaryLink}`}
-                        href={order.invoiceUrl}
+                        href={`/pay/${orderId}`}
                       >
                         Lanjutkan pembayaran
                       </a>

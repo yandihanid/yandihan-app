@@ -1,5 +1,6 @@
 import { Link2Off } from 'lucide-react'
 import { getCashierPageSession } from '@/lib/cashierAuth'
+import { normalizeTheme } from '@/lib/storeTheme'
 import CashierApp from './CashierApp'
 import LoginForm from './LoginForm'
 
@@ -38,13 +39,22 @@ export default async function CashierPage({ params }) {
     )
   }
 
+  // Warna dasar toko. Diteruskan lewat atribut data-store-theme pada
+  // elemen pembungkus: variabel CSS mewarisi, jadi seluruh isi halaman
+  // (login, layar kasir, antrean) ikut memakai warna toko.
+  const theme = normalizeTheme(store.theme_color)
+
   if (!cashier) {
-    return <LoginForm token={token} storeName={store.name} />
+    return (
+      <div className="store-theme" data-store-theme={theme}>
+        <LoginForm token={token} storeName={store.name} />
+      </div>
+    )
   }
 
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, price, stock, is_sub_product, image_url')
+    .select('id, name, price, stock, is_sub_product, image_url, category')
     .eq('store_id', store.id)
     .order('name', { ascending: true })
 
@@ -58,18 +68,22 @@ export default async function CashierPage({ params }) {
     receipt_required: store.receipt_required,
     require_customer_name: store.require_customer_name,
     waiting_list_enabled: store.waiting_list_enabled,
+    on_table_enabled: store.on_table_enabled,
     pelanggan_enabled: store.pelanggan_enabled,
     visit_threshold: store.visit_threshold,
     discount_percent: store.discount_percent,
     logo_url: store.logo_url,
+    theme_color: theme,
   }
 
   return (
-    <CashierApp
-      token={token}
-      cashier={{ id: cashier.id, name: cashier.name }}
-      store={publicStore}
-      products={products || []}
-    />
+    <div className="store-theme" data-store-theme={theme}>
+      <CashierApp
+        token={token}
+        cashier={{ id: cashier.id, name: cashier.name }}
+        store={publicStore}
+        products={products || []}
+      />
+    </div>
   )
 }

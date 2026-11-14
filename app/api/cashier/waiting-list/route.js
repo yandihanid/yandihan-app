@@ -66,7 +66,7 @@ export async function GET(req) {
 
   const { data, error } = await supabase
     .from('transactions')
-    .select('id, queue_number, buyer_name, customer_name, product_name, amount, created_at')
+    .select('id, queue_number, buyer_name, customer_name, product_name, amount, created_at, table_number')
     .eq('store_id', cashier.store_id)
     .eq('queue_date', day)
     .eq('status', status)

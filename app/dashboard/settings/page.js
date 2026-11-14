@@ -9,7 +9,9 @@ import SettingToggle from './SettingToggle'
 import SettingsForm from './SettingsForm'
 import StoreCashierLink from './StoreCashierLink'
 import StoreLogoForm from './StoreLogoForm'
+import StorePrinterForm from './StorePrinterForm'
 import StoreReviewForm from './StoreReviewForm'
+import StoreThemeForm from './StoreThemeForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,6 +129,33 @@ export default async function SettingsPage() {
         ) : (
           <Alert variant="info" live={false}>
             Simpan nama toko dulu, setelah itu logo bisa diunggah di sini.
+          </Alert>
+        )}
+      </section>
+
+      <section className="card">
+        <h3>Warna Toko</h3>
+        {/* Warna dasar toko dipakai di dashboard, link kasir, dan halaman
+            pesan meja. Dulu semuanya biru dan tidak bisa diubah. */}
+        {store ? (
+          <StoreThemeForm store={store} />
+        ) : (
+          <Alert variant="info" live={false}>
+            Simpan nama toko dulu, setelah itu warna toko bisa dipilih di sini.
+          </Alert>
+        )}
+      </section>
+
+      <section className="card">
+        <h3>Cetak Struk</h3>
+        {/* Lebar kertas printer thermal (58 mm atau 80 mm). Menentukan
+            ukuran struk saat dicetak supaya tidak perlu diperkecil lagi
+            di dialog cetak browser. */}
+        {store ? (
+          <StorePrinterForm store={store} />
+        ) : (
+          <Alert variant="info" live={false}>
+            Simpan nama toko dulu, setelah itu ukuran kertas struk bisa dipilih di sini.
           </Alert>
         )}
       </section>

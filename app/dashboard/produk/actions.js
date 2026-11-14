@@ -12,13 +12,13 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireStoreOwnership, requireProductOwnership } from '@/lib/dal'
-import { parseProductType } from '@/lib/catalog'
+import { parseCategory } from '@/lib/catalog'
 
 export async function addProduct(formData) {
   const name = String(formData.get('name') || '').trim()
   const price = formData.get('price')
   const stock = formData.get('stock')
-  const type = parseProductType(formData.get('productType'))
+  const { category, error: categoryError } = parseCategory(formData.get('category'))
   const rawImage = String(formData.get('imageUrl') || '').trim()
   const imageUrl = rawImage && (rawImage.startsWith('http://') || rawImage.startsWith('https://') || rawImage.startsWith('data:image/'))
     ? rawImage
@@ -27,7 +27,8 @@ export async function addProduct(formData) {
   const { store, error: ownErr } = await requireStoreOwnership(formData.get('storeId'))
   if (ownErr) return { error: ownErr }
 
-  if (!name || price === null || stock === null || !type) return { error: 'Data tidak lengkap' }
+  if (categoryError) return { error: categoryError }
+  if (!name || price === null || stock === null) return { error: 'Data tidak lengkap' }
   if (name.length > 120) return { error: 'Nama produk terlalu panjang (maks 120 karakter)' }
 
   const priceNum = parseInt(price, 10)
@@ -37,18 +38,35 @@ export async function addProduct(formData) {
   if (isNaN(stockNum) || stockNum < 0) return { error: 'Stok harus angka nol atau lebih' }
 
   const supabase = await createClient()
-  const { data: created, error } = await supabase
-    .from('products')
-    .insert({
-      store_id: store.id,
-      name,
-      price: priceNum,
-      stock: stockNum,
-      is_sub_product: type === 'sub',
-      image_url: imageUrl,
-    })
-    .select('id')
-    .single()
+  const insert = (row) =>
+    supabase
+      .from('products')
+      .insert(row)
+      .select('id')
+      .single()
+
+  const row = {
+    store_id: store.id,
+    name,
+    price: priceNum,
+    stock: stockNum,
+    // Semua produk boleh langsung dijual. Klasifikasi produk utama /
+    // sub-produk dihapus; kategori (bukan jenis) yang mengelompokkan menu.
+    is_sub_product: false,
+    category,
+    image_url: imageUrl,
+  }
+
+  let { data: created, error } = await insert(row)
+
+  // Kolom `category` belum ada sebelum migrasi 0023. Coba lagi tanpa kolom
+  // itu supaya produk tetap bisa masuk (kategori bisa diisi belakangan).
+  if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+    const { category: _ignored, ...rowWithoutCategory } = row
+    const retry = await insert(rowWithoutCategory)
+    created = retry.data
+    error = retry.error
+  }
 
   if (error) {
     // 23505 = unique_violation. Index unik products(store_id, lower(name))
@@ -91,9 +109,15 @@ export async function updateStock(formData) {
   return { success: true }
 }
 
-export async function updateProductType(formData) {
-  const type = parseProductType(formData.get('productType'))
-  if (!type) return { error: 'Jenis produk tidak valid' }
+/**
+ * Ubah kategori produk.
+ *
+ * Kategori kosong berarti "tanpa kategori": produknya tetap tampil, hanya
+ * dikelompokkan di bawah "Umum" di menu kasir.
+ */
+export async function updateProductCategory(formData) {
+  const { category, error: categoryError } = parseCategory(formData.get('category'))
+  if (categoryError) return { error: categoryError }
 
   const { product, error: ownErr } = await requireProductOwnership(formData.get('productId'))
   if (ownErr) return { error: ownErr }
@@ -101,11 +125,11 @@ export async function updateProductType(formData) {
   const supabase = await createClient()
   const { error } = await supabase
     .from('products')
-    .update({ is_sub_product: type === 'sub' })
+    .update({ category })
     .eq('id', product.id)
     .eq('store_id', product.store_id)
 
-  if (error) return { error: 'Gagal mengubah jenis produk' }
+  if (error) return { error: 'Gagal mengubah kategori' }
   revalidatePath('/dashboard/produk')
   return { success: true }
 }

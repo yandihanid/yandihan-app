@@ -48,11 +48,23 @@ export async function GET(req) {
 
   const { cashier, supabase } = auth
 
-  const { data: products } = await supabase
+  // Kolom `category` baru ada setelah migrasi 0023. Kalau belum ada, produknya
+  // tetap dikirim (tanpa kategori) supaya layar kasir tetap bisa dipakai.
+  const withCategory = await supabase
     .from('products')
-    .select('id, name, price, stock, is_sub_product, image_url')
+    .select('id, name, price, stock, is_sub_product, image_url, category')
     .eq('store_id', cashier.store_id)
     .order('name', { ascending: true })
+
+  let products = withCategory?.data || []
+  if (withCategory?.error) {
+    const fallback = await supabase
+      .from('products')
+      .select('id, name, price, stock, is_sub_product, image_url')
+      .eq('store_id', cashier.store_id)
+      .order('name', { ascending: true })
+    products = fallback?.data || []
+  }
 
   // device_id tidak perlu dikirim balik ke browser, dan token link memang tidak
   // pernah ada di select ini.

@@ -45,7 +45,9 @@ describe('Xendit library', () => {
     })
 
     it('mengembalikan false jika XENDIT_SECRET_KEY kosong', () => {
-      vi.unstubEnv('XENDIT_SECRET_KEY')
+      // stubEnv dengan string kosong, bukan unstubEnv: Node menulis nilai
+      // undefined menjadi teks "undefined", jadi variabelnya tetap terisi.
+      vi.stubEnv('XENDIT_SECRET_KEY', '')
       const result = isXenditConfigured()
       expect(result).toBe(false)
     })
@@ -149,14 +151,13 @@ describe('Xendit library', () => {
         successRedirectUrl: 'http://localhost:3000/success',
         failureRedirectUrl: 'http://localhost:3000/failed',
       })
-    )
+    })
 
     it('membuat invoice dan mengembalikan response ok', async () => {
       expect(fetchResult.ok).toBe(true)
     })
 
     it('invoice dibuat tanpa header for-user-id', async () => {
-      const calls = (await import('node:fetch')).default ? () => {} : fetchMock.mock.calls
       const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]
       if (lastCall) {
         const headers = lastCall[1]?.headers
@@ -207,7 +208,7 @@ describe('Xendit library', () => {
         accountHolderName: 'Budi Santoso',
         description: 'Pencairan uji',
       })
-    )
+    })
 
     it('membuat pencairan dan mengembalikan response ok', async () => {
       expect(fetchResult.ok).toBe(true)
@@ -217,7 +218,8 @@ describe('Xendit library', () => {
       const calls = fetchMock.mock.calls
       const lastCall = calls[calls.length - 1]
       if (lastCall) {
-        const body = JSON.parse(lastCall[2]?.body || '{}')
+        // fetch(url, init) -> body ada di argumen kedua.
+        const body = JSON.parse(lastCall[1]?.body || '{}')
         expect(body.channel_code).toBe('ID_BCA')
         expect(body.bank_code).toBe('BCA')
       }

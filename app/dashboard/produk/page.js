@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { Package } from 'lucide-react'
 import { verifySession, getMyStore } from '@/lib/dal'
+import { collectCategories } from '@/lib/catalog'
+import Alert from '@/components/ui/Alert'
 import EmptyState from '@/components/ui/EmptyState'
 import OnboardingChecklist from '../OnboardingChecklist'
 import ProductForm from './ProductForm'
@@ -49,38 +51,69 @@ export default async function GudangProduk() {
   }
 
   const supabase = await createClient()
-  const { data: products } = await supabase
+  const { data: products, error: productsError } = await supabase
     .from('products')
-    .select('id, name, price, stock, is_sub_product, image_url, created_at')
+    .select('id, name, price, stock, is_sub_product, image_url, category, created_at')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
+
+  // Kolom `category` baru ada setelah migrasi 0023. Kalau belum ada, produknya
+  // tetap ditampilkan (tanpa kategori) supaya pemilik bisa tetap berjualan --
+  // errornya diberitahukan supaya migrasi bisa dijalankan.
+  let productRows = products || []
+  let needsCategoryMigration = false
+
+  if (productsError) {
+    const fallback = await supabase
+      .from('products')
+      .select('id, name, price, stock, is_sub_product, image_url, created_at')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false })
+
+    if (!fallback.error) {
+      productRows = fallback.data || []
+      needsCategoryMigration = true
+    }
+  }
+
+  // Kategori yang sudah dipakai toko, dipakai sebagai pilihan cepat di form
+  // tambah produk dan di baris produk. Tidak perlu tabel kategori sendiri:
+  // kategori yang belum dipakai produk mana pun tidak berguna.
+  const categories = collectCategories(productRows)
 
   return (
     <div className="animate-fade-in flex flex-col gap-4">
       <h2>Gudang Produk</h2>
 
+      {needsCategoryMigration && (
+        <Alert variant="warning" live={false}>
+          Kolom kategori produk belum tersedia. Jalankan migrasi 0023 di Supabase untuk
+          mengelompokkan menu per kategori.
+        </Alert>
+      )}
+
       <section className="card">
         <h3>Tambah Produk Baru</h3>
-        <ProductForm storeId={store.id} />
+        <ProductForm storeId={store.id} categories={categories} />
       </section>
 
       <section className="card">
-        <h3>Daftar Produk ({products?.length ?? 0})</h3>
-        {products?.length ? (
+        <h3>Daftar Produk ({productRows.length})</h3>
+        {productRows.length ? (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
                   <th>Nama Produk</th>
-                  <th>Jenis</th>
+                  <th>Kategori</th>
                   <th>Harga Satuan</th>
                   <th>Stok</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((product) => (
-                  <ProductRow key={product.id} product={product} />
+                {productRows.map((product) => (
+                  <ProductRow key={product.id} product={product} categories={categories} />
                 ))}
               </tbody>
             </table>
