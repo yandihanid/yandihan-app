@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Alert from '@/components/ui/Alert'
 import Button from '@/components/ui/Button'
 import { RECEIPT_PRINTER_WIDTHS, normalizeReceiptPrinter } from '@/lib/receiptPrinter'
+import { isBluetoothSupported } from '@/lib/bluetoothPrinter'
 import { updateStorePrinter } from './actions'
 
 /**
@@ -67,6 +68,27 @@ export default function StorePrinterForm({ store }) {
           ))}
         </select>
       </div>
+
+      {isBluetoothSupported() && (
+        <div className="setting-row">
+          <div className="setting-row-text">
+            <strong>Printer Bluetooth (struk langsung)</strong>
+            <span>
+              Pilih printer thermal Bluetooth dari perangkat ini. Setelah dipilih, struk
+              bisa dicetak langsung dari halaman struk tanpa dialog cetak browser.
+            </span>
+          </div>
+          <div className="store-logo-actions">
+            <Button type="button" variant="secondary" size="sm" disabled={saving}>
+              Pilih / Pasang Printer Bluetooth
+            </Button>
+            <p style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Pairing dilakukan pada halaman struk ({store?.name}). Pilihan printer
+              disimpan di perangkat ini.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="store-logo-actions">
         <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={() => save(value)}>

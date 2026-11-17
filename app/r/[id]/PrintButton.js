@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
+import BluetoothPrinterSelector from '@/components/BluetoothPrinterSelector'
 
 const PREFIX = 'yandihan_cashier_meta_'
 
@@ -33,7 +34,7 @@ function readCashierToken() {
 
 const serverSnapshot = () => null
 
-export default function PrintButton() {
+export default function PrintButton({ storeId, receipt }) {
   const router = useRouter()
   const cashierToken = useSyncExternalStore(subscribe, readCashierToken, serverSnapshot)
 
@@ -46,6 +47,7 @@ export default function PrintButton() {
         marginTop: '2rem',
         flexWrap: 'wrap',
         justifyContent: 'center',
+        alignItems: 'center',
       }}
     >
       {cashierToken && (
@@ -74,6 +76,13 @@ export default function PrintButton() {
       >
         🖨️ Cetak Struk
       </button>
+      {storeId && (
+        <BluetoothPrinterSelector
+          storeId={storeId}
+          receipt={receipt}
+          className="bluetooth-print"
+        />
+      )}
     </div>
   )
 }

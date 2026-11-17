@@ -111,7 +111,7 @@ const PRINT_SIZES = {
     title: '11pt',
     meta: '7.5pt',
     total: '10pt',
-    logo: '44px',
+    logo: '90px',
     margin: '2mm',
     dividerMargin: '0.5rem',
     footerMargin: '1rem',
@@ -121,7 +121,7 @@ const PRINT_SIZES = {
     title: '13pt',
     meta: '8pt',
     total: '11.5pt',
-    logo: '64px',
+    logo: '130px',
     margin: '4mm',
     dividerMargin: '1rem',
     footerMargin: '2rem',
@@ -305,7 +305,25 @@ export default async function ReceiptPage({ params, searchParams }) {
           </footer>
         </article>
 
-        <PrintButton />
+        <PrintButton
+          storeId={tx.stores?.id ?? null}
+          receipt={{
+            storeName: tx.stores?.name || 'Toko',
+            address: tx.stores?.address || undefined,
+            phone: tx.stores?.phone || undefined,
+            items,
+            subtotal,
+            discount: discountAmount,
+            total: Number(tx.amount ?? 0),
+            paymentMethod: tx.payment_method,
+            cashReceived: tx.cash_received != null ? Number(tx.cash_received) : undefined,
+            change: tx.change_amount != null ? Number(tx.change_amount) : undefined,
+            dateTime: formatDateTimeWib(tx.created_at),
+            cashierName: tx.cashiers?.name || undefined,
+            queueNumber: tx.queue_number ?? undefined,
+            copy: isCopy,
+          }}
+        />
       </main>
 
       <AutoPrint enabled={autoPrint} />

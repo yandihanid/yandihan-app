@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Printer, Speaker, Volume2 } from 'lucide-react'
 import { formatRupiah } from '@/lib/format'
 import { wibTimeLabel } from '@/lib/time'
+import { playKitchenNotification, playKitchenDone } from '@/lib/kitchenSound'
 import styles from './kds.module.css'
 
-const POLL_MS = 8000
+const POLL_MS = 3000
 const FRESH_MS = 3 * 60 * 1000
 
 /**
@@ -21,9 +23,12 @@ export default function KitchenDisplay({ storeId, storeName, token = null }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [printingId, setPrintingId] = useState(null)
   const [now, setNow] = useState(() => Date.now())
+  const [muted, setMuted] = useState(false)
   const controllerRef = useRef(null)
   const sequenceRef = useRef(0)
+  const prevTicketIdsRef = useRef(new Set())
 
   const load = useCallback(async () => {
     if (!storeId) return
@@ -52,7 +57,19 @@ export default function KitchenDisplay({ storeId, storeName, token = null }) {
         return
       }
 
-      setTickets(Array.isArray(data?.tickets) ? data.tickets : [])
+      const next = Array.isArray(data?.tickets) ? data.tickets : []
+      const nextIds = new Set(next.map((t) => t.id))
+      const prevIds = prevTicketIdsRef.current
+
+      // Mainkan notif suara kalau ada pesanan baru yang belum pernah tampil.
+      // Lewati pada muatan pertama supaya tidak berdering saat halaman dibuka.
+      if (prevIds.size > 0 && !muted) {
+        const adaBaru = next.some((t) => !prevIds.has(t.id))
+        if (adaBaru) playKitchenNotification()
+      }
+      prevTicketIdsRef.current = nextIds
+
+      setTickets(next)
       setError('')
       setNow(Date.now())
     } catch (loadError) {
@@ -65,7 +82,7 @@ export default function KitchenDisplay({ storeId, storeName, token = null }) {
         setLoading(false)
       }
     }
-  }, [storeId, token])
+  }, [storeId, token, muted])
 
   useEffect(() => {
     const first = setTimeout(load, 0)
@@ -106,11 +123,31 @@ export default function KitchenDisplay({ storeId, storeName, token = null }) {
         prev.map((row) => (row.id === ticket.id ? { ...row, kitchen_status: 'done' } : row))
       )
       setError('')
+      if (!muted) playKitchenDone()
       await load()
     } catch {
       setError('Koneksi terputus. Pesanan belum ditandai selesai.')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  /** Buka halaman struk tiket ini dan cetak otomatis (print=1). */
+  const printReceipt = async (ticket) => {
+    setPrintingId(ticket.id)
+    try {
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        setError('Browser memblokir jendela cetak. Izinkan pop-up untuk situs ini.')
+        setPrintingId(null)
+        return
+      }
+      printWindow.location.href = `/r/${ticket.id}?print=1`
+      setError('')
+    } catch {
+      setError('Gagal membuka halaman cetak struk.')
+    } finally {
+      setPrintingId(null)
     }
   }
 
@@ -134,6 +171,19 @@ export default function KitchenDisplay({ storeId, storeName, token = null }) {
           <span className={styles.countPill}>
             {pending.length} pesanan menunggu
           </span>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => setMuted((prev) => !prev)}
+            aria-pressed={muted}
+            title={muted ? 'Nyalakan suara notifikasi' : 'Matikan suara notifikasi'}
+          >
+            {muted ? (
+              <Speaker size={14} aria-hidden="true" />
+            ) : (
+              <Volume2 size={14} aria-hidden="true" />
+            )}
+          </button>
           <button type="button" className={styles.iconBtn} onClick={load}>
             Muat ulang
           </button>
@@ -194,14 +244,26 @@ export default function KitchenDisplay({ storeId, storeName, token = null }) {
                       <span className={styles.amount}>{formatRupiah(ticket.amount)}</span>
                     </div>
 
-                    <button
-                      type="button"
-                      className={styles.doneBtn}
-                      onClick={() => markDone(ticket)}
-                      disabled={busyId === ticket.id}
-                    >
-                      {busyId === ticket.id ? 'Menyimpan...' : 'Selesai'}
-                    </button>
+                    <div className={styles.cardActions}>
+                      <button
+                        type="button"
+                        className={styles.printBtn}
+                        onClick={() => printReceipt(ticket)}
+                        disabled={printingId === ticket.id}
+                        title="Cetak struk"
+                      >
+                        <Printer size={13} aria-hidden="true" />
+                        {printingId === ticket.id ? '...' : 'Cetak'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.doneBtn}
+                        onClick={() => markDone(ticket)}
+                        disabled={busyId === ticket.id || printingId === ticket.id}
+                      >
+                        {busyId === ticket.id ? 'Menyimpan...' : 'Selesai'}
+                      </button>
+                    </div>
                   </article>
                 )
               })}

@@ -4,14 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Printer } from 'lucide-react'
 import { formatRupiah } from '@/lib/format'
 import { wibTimeLabel } from '@/lib/time'
+import BluetoothPrinterSelector from '@/components/BluetoothPrinterSelector'
 
-const POLL_MS = 15000
+const POLL_MS = 5000
 const TABS = [
   { status: 'pending', label: 'Belum selesai' },
   { status: 'done', label: 'Selesai' },
 ]
 
-export default function WaitingList({ token, active = true }) {
+export default function WaitingList({ token, storeId, active = true }) {
   const [status, setStatus] = useState('pending')
   const [snapshot, setSnapshot] = useState({
     status: 'pending',
@@ -198,6 +199,11 @@ export default function WaitingList({ token, active = true }) {
           <div>
             <h2>Antrean hari ini</h2>
             <p>Nomor antrean mengikuti hari operasional WIB.</p>
+          </div>
+          <div className="queue-bluetooth">
+            {storeId && (
+              <BluetoothPrinterSelector storeId={storeId} />
+            )}
           </div>
           <button type="button" className="pos-text-btn" onClick={load}>
             Muat ulang

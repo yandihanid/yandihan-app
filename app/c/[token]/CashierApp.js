@@ -88,6 +88,15 @@ export default function CashierApp({ token, cashier, store, products }) {
         </button>
       </header>
 
+      <div className="cashier-kds-link">
+        <a
+          href={`/c/${token}/kds`}
+          className="btn btn-ghost btn-sm"
+        >
+          👨‍🍳 Layar Dapur / KDS
+        </a>
+      </div>
+
       {queueEnabled && (
         <nav className="cashier-nav" aria-label="Menu kasir">
           <button
@@ -124,7 +133,7 @@ export default function CashierApp({ token, cashier, store, products }) {
         </main>
       ) : (
         <main className="cashier-main">
-          <WaitingList token={token} active={screen === 'queue'} />
+          <WaitingList token={token} storeId={store.id} active={screen === 'queue'} />
         </main>
       )}
     </div>
