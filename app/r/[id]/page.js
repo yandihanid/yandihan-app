@@ -23,7 +23,7 @@ const RECEIPT_FIELDS = `
   change_amount,
   queue_number,
   created_at,
-  stores(name, address, phone, logo_url, theme_color, receipt_printer),
+  stores(id, name, address, phone, logo_url, theme_color, receipt_printer),
   cashiers(name),
   transaction_items(name, unit_price, qty, line_total, parent_item_id, line_index, sub_index)
 `
@@ -45,7 +45,7 @@ const RECEIPT_FIELDS_WITHOUT_LOGO = `
   change_amount,
   queue_number,
   created_at,
-  stores(name, address, phone),
+  stores(id, name, address, phone),
   cashiers(name),
   transaction_items(name, unit_price, qty, line_total, parent_item_id, line_index, sub_index)
 `
@@ -64,7 +64,7 @@ const RECEIPT_FIELDS_WITHOUT_THEME = `
   change_amount,
   queue_number,
   created_at,
-  stores(name, address, phone, logo_url),
+  stores(id, name, address, phone, logo_url),
   cashiers(name),
   transaction_items(name, unit_price, qty, line_total, parent_item_id, line_index, sub_index)
 `

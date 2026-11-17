@@ -33,6 +33,7 @@ export default function BluetoothPrinterSelector({
   const { show, error: toastError } = useToast()
   const [selecting, setSelecting] = useState(false)
   const [printing, setPrinting] = useState(false)
+  const [scanStatus, setScanStatus] = useState('')
   const [connectedDeviceId, setConnectedDeviceId] = useState(() =>
     getStoredPrinterDeviceId(storeId),
   )
@@ -43,17 +44,20 @@ export default function BluetoothPrinterSelector({
   const selectPrinter = useCallback(async () => {
     if (!isBluetoothSupported()) {
       toastError(
-        'Web Bluetooth tidak didukung browser ini. Pakai Chrome/Edge atau cetak lewat browser.',
+        'Web Bluetooth tidak didukung browser ini. Pakai Chrome/Edge. Pastikan printer dalam mode pairing (BLE). Printer Bluetooth Classic (SPP) tidak bisa diakses dari browser.',
       )
       return
     }
     setSelecting(true)
+    setScanStatus('Mencari printer Bluetooth...')
     try {
       const result = await connectBluetoothPrinter()
       setConnectedDeviceId(result.device.id)
       setStoredPrinterDeviceId(storeId, result.device.id)
+      setScanStatus(`Terhubung: ${result.deviceName || result.deviceId}`)
       show(`Printer terhubung: ${result.deviceName || result.deviceId}`)
     } catch (err) {
+      setScanStatus('')
       toastError(err?.message || 'Gagal terhubung ke printer Bluetooth.')
     } finally {
       setSelecting(false)
@@ -133,6 +137,18 @@ export default function BluetoothPrinterSelector({
     >
       {hasDevice ? (
         <>
+          {scanStatus && (
+            <span
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+                marginBottom: '0.25rem',
+                display: 'block',
+              }}
+            >
+              {scanStatus}
+            </span>
+          )}
           {canPrint ? (
             <button
               type="button"
