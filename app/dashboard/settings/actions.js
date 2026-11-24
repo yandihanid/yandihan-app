@@ -15,6 +15,7 @@ import { maxCashiers, planTier } from '@/lib/plan'
 import { hashPassword } from '@/lib/password'
 import { normalizeUsername, validatePassword, validateUsername } from '@/lib/cashierAccount'
 import { deleteCashierSessionsForStore } from '@/lib/cashierAuth'
+import { auditLog } from '@/lib/audit'
 import { parseLogoInput, parseReviewNote, parseReviewUrl } from '@/lib/storeBrand'
 import { normalizeTheme } from '@/lib/storeTheme'
 import { normalizeReceiptPrinter } from '@/lib/receiptPrinter'
@@ -80,6 +81,15 @@ export async function updateStore(formData) {
     if (error) return { error: 'Gagal menyimpan profil toko' }
     if (!data) return { error: 'Perubahan tidak tersimpan. Coba muat ulang halaman.' }
 
+    await auditLog({
+      storeId: store.id,
+      userId: store.user_id,
+      action: 'update_store',
+      targetType: 'store',
+      targetId: store.id,
+      details: { name, address: address || null, phone: phone || null },
+    })
+
     revalidatePath('/dashboard/settings')
     return { success: true }
   }
@@ -94,6 +104,15 @@ export async function updateStore(formData) {
   })
 
   if (error) return { error: 'Gagal membuat toko' }
+
+  await auditLog({
+    storeId: null, // store ID belum diketahui saat insert; user_id sebagai penanda
+    userId: user.id,
+    action: 'create_store',
+    targetType: 'store',
+    targetId: null,
+    details: { name },
+  })
 
   // Checklist onboarding di /dashboard ikut berubah begitu toko pertama ada,
   // jadi dua path yang perlu di-revalidate, bukan satu.
@@ -291,6 +310,15 @@ export async function addCashier(formData) {
   }
   if (error) return { error: 'Gagal menambahkan kasir' }
 
+  await auditLog({
+    storeId: store.id,
+    userId: store.user_id,
+    action: 'add_cashier',
+    targetType: 'cashier',
+    targetId: null,
+    details: { name, username },
+  })
+
   revalidatePath('/dashboard/settings')
   return { success: true }
 }
@@ -336,6 +364,22 @@ export async function updateCashierAccount(formData) {
   if (error) return { error: 'Gagal menyimpan akun kasir' }
   if (!data) return { error: 'Perubahan tidak tersimpan. Coba muat ulang halaman.' }
 
+  // Ambil store untuk user_id pemilik (untuk audit log)
+  const { data: store } = await supabase
+    .from('stores')
+    .select('id, user_id')
+    .eq('id', cashier.store_id)
+    .maybeSingle()
+
+  await auditLog({
+    storeId: cashier.store_id,
+    userId: store?.user_id || null,
+    action: 'update_cashier_account',
+    targetType: 'cashier',
+    targetId: cashier.id,
+    details: { name, username, passwordChanged: Boolean(password) },
+  })
+
   revalidatePath('/dashboard/settings')
   return { success: true }
 }
@@ -352,6 +396,22 @@ export async function deleteCashier(formData) {
     .eq('store_id', cashier.store_id)
 
   if (error) return { error: 'Gagal menghapus kasir' }
+
+  // Ambil store untuk mendapatkan user_id pemilik (untuk audit log)
+  const { data: store } = await supabase
+    .from('stores')
+    .select('id, user_id')
+    .eq('id', cashier.store_id)
+    .maybeSingle()
+
+  await auditLog({
+    storeId: cashier.store_id,
+    userId: store?.user_id || null,
+    action: 'delete_cashier',
+    targetType: 'cashier',
+    targetId: cashier.id,
+    details: { name: cashier.name, username: cashier.username },
+  })
 
   revalidatePath('/dashboard/settings')
   return { success: true }
@@ -383,6 +443,15 @@ export async function rotateStoreCashierToken(storeId) {
   // sesi lewat service role.
   const service = createServiceClient()
   await deleteCashierSessionsForStore(service, store.id)
+
+  await auditLog({
+    storeId: store.id,
+    userId: store.user_id,
+    action: 'rotate_cashier_token',
+    targetType: 'store',
+    targetId: store.id,
+    details: { reason: 'owner_rotated' },
+  })
 
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard')

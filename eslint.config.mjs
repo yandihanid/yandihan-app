@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     // TypeScript yang tidak dipasang project ini -- sehingga `npm run lint`
     // selalu berakhir gagal karena sesuatu yang tidak bisa kita perbaiki.
     "android/**",
+    // Hasil laporan Playwright (dihasilkan oleh `npx playwright test`).
+    "playwright-report/**",
   ]),
 ]);
 

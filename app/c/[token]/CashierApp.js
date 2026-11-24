@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { LogOut, WifiOff, Wifi } from 'lucide-react'
 import CashierForm from './CashierForm'
 import WaitingList from './WaitingList'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { loyaltyEnabled, DEFAULT_VISIT_THRESHOLD } from '@/lib/loyalty'
 
 const PREFIX = 'yandihan_cashier_meta_'
@@ -19,10 +20,25 @@ const PREFIX = 'yandihan_cashier_meta_'
 export default function CashierApp({ token, cashier, store, products }) {
   const [screen, setScreen] = useState('transaction')
   const [loggingOut, setLoggingOut] = useState(false)
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' && navigator.onLine)
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
   }, [])
 
@@ -48,7 +64,12 @@ export default function CashierApp({ token, cashier, store, products }) {
     if (loggingOut) return
     setLoggingOut(true)
     try {
-      await fetch('/api/cashier/logout', { method: 'POST' })
+      await fetch('/api/cashier/logout', {
+        method: 'POST',
+        headers: {
+          'x-cashier-token': token,
+        },
+      })
     } catch {
       // Tetap muat ulang: halaman berikutnya akan meminta login lagi.
     }
@@ -77,10 +98,21 @@ export default function CashierApp({ token, cashier, store, products }) {
             Masuk sebagai <strong>{cashier.name}</strong>
           </p>
         </div>
+
+        {/* Indikator online/offline */}
+        <span
+          className={`cashier-status ${isOnline ? 'online' : 'offline'}`}
+          title={isOnline ? 'Online' : 'Offline — transaksi disimpan lokal'}
+          aria-label={isOnline ? 'Status: Online' : 'Status: Offline'}
+        >
+          {isOnline ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}
+          {isOnline ? ' Online' : ' Offline'}
+        </span>
+
         <button
           type="button"
           className="btn btn-ghost btn-sm cashier-logout"
-          onClick={handleLogout}
+          onClick={() => setConfirmingLogout(true)}
           disabled={loggingOut}
         >
           <LogOut size={16} aria-hidden="true" />
@@ -94,6 +126,14 @@ export default function CashierApp({ token, cashier, store, products }) {
           className="btn btn-ghost btn-sm"
         >
           👨‍🍳 Layar Dapur / KDS
+        </a>
+
+        <a
+          href="/dashboard"
+          className="btn btn-ghost btn-sm"
+          title="Buka dashboard pemilik toko (butuh login owner)"
+        >
+          🏠 Dashboard Pemilik
         </a>
       </div>
 
@@ -136,6 +176,22 @@ export default function CashierApp({ token, cashier, store, products }) {
           <WaitingList token={token} storeId={store.id} active={screen === 'queue'} />
         </main>
       )}
+
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Yakin ingin keluar?"
+        description={
+          'Anda akan keluar dari layar kasir dan harus login kembali untuk ' +
+          'mencatat transaksi. Transaksi yang belum tersinkronkan (offline) ' +
+          'akan tetap tersimpan dan dikirim saat kembali online.'
+        }
+        confirmLabel="Ya, keluar"
+        cancelLabel="Batal"
+        variant="danger"
+        busy={loggingOut}
+        onConfirm={handleLogout}
+        onClose={() => setConfirmingLogout(false)}
+      />
     </div>
   )
 }

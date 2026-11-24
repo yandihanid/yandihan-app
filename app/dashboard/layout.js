@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LogOut } from 'lucide-react'
+import { ExternalLink, LogOut } from 'lucide-react'
 import { getMyStore, verifySession } from '@/lib/dal'
 import { SITE_NAME } from '@/lib/site'
 import { isPlatformAdmin } from '@/lib/platform'
@@ -68,6 +68,19 @@ export default async function DashboardLayout({ children }) {
                   <span className="dashboard-signout-label">Keluar</span>
                 </button>
               </form>
+
+              {store && store.cashier_token && (
+                <Link
+                  href={`/c/${store.cashier_token}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-ghost btn-sm dashboard-open-cashier"
+                  title="Buka layar kasir di tab baru"
+                >
+                  <ExternalLink size={18} aria-hidden="true" />
+                  <span className="dashboard-open-cashier-label">Layar Kasir</span>
+                </Link>
+              )}
             </div>
           </header>
 
