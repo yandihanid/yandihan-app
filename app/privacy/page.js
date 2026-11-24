@@ -67,13 +67,11 @@ export default function PrivacyPage() {
         </p>
         <p>
           <strong>Data toko.</strong> Nama toko, dan alamat serta nomor telepon kalau
-          Anda mengisinya untuk dicetak di struk. Juga kode unik toko yang dipakai bot
-          Telegram untuk menghubungkan kasir ke toko Anda.
+          Anda mengisinya untuk dicetak di struk. Serta token kasir yang dipakai untuk menghubungkan link kasir ke toko Anda.
         </p>
         <p>
           <strong>Data operasional.</strong> Produk (nama, harga, stok), kasir (nama,
-          tautan rahasianya, penanda perangkat yang terikat padanya, dan ID chat Telegram
-          kalau kasir itu memakai bot), serta transaksi (waktu, produk dan jumlahnya,
+          tautan rahasianya, dan penanda perangkat yang terikat padanya), serta transaksi (waktu, produk dan jumlahnya,
           nominal, metode pembayaran, uang yang diterima dan kembaliannya, diskon, dan
           status).
         </p>
@@ -164,12 +162,7 @@ export default function PrivacyPage() {
             kartu atau rekening Anda dimasukkan di halaman {PAYMENT_GATEWAY} dan tidak pernah
             melewati server kami.
           </li>
-          <li>
-            <strong>Telegram</strong> -- hanya kalau kasir Anda memakai bot Telegram.
-            Dalam hal itu pesan laporan dan ID chat kasir melewati Telegram sesuai
-            kebijakan privasi mereka.
-          </li>
-        </ul>
+                  </ul>
 
         <h2>6. Bukti pembayaran bisa dibuka oleh pemegang tautannya</h2>
         <p>

@@ -73,7 +73,6 @@ export const metadata = {
     'laporan keuangan warung',
     'aplikasi kasir gratis',
     'struk digital',
-    'kasir Telegram',
   ],
   alternates: { canonical: '/' },
   openGraph: {
@@ -164,12 +163,6 @@ const FEATURES = [
     title: 'Link kasir terikat satu perangkat',
     desc: 'Begitu link dibuka di HP kasir, perangkat lain yang memakai link yang sama ditolak. Tautan yang tersebar di grup chat tidak otomatis jadi pintu masuk.',
   },
-  {
-    icon: Send,
-    tone: 'lp-icon-green',
-    title: 'Bisa lapor dari Telegram',
-    desc: 'Kasir yang lebih nyaman dengan chat bisa mengirim laporan ke bot. Harga tetap diambil dari daftar produk dan stok tetap berkurang: aturannya sama dengan jalur web.',
-  },
 ]
 
 /**
@@ -190,7 +183,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Bagaimana cara mendapatkan link kasir?',
-    a: 'Setelah mendaftar, buat toko Anda, lalu tambahkan kasir di menu Pengaturan. Setiap kasir mendapat satu URL sendiri yang bisa Anda kirim lewat WhatsApp atau Telegram. Kasir cukup membuka link itu: tidak ada aplikasi yang perlu dipasang dan tidak ada akun yang perlu ia buat.',
+    a: 'Setelah mendaftar, buat toko Anda, lalu tambahkan kasir di menu Pengaturan. Setiap kasir mendapat satu URL sendiri yang bisa Anda kirim lewat WhatsApp. Kasir cukup membuka link itu: tidak ada aplikasi yang perlu dipasang dan tidak ada akun yang perlu ia buat.',
   },
   {
     q: 'Kasir saya harus memasang aplikasi?',
@@ -199,10 +192,6 @@ const FAQ_ITEMS = [
   {
     q: 'Bagaimana kalau internet mati saat sedang jualan?',
     a: 'Transaksinya tidak hilang. Yang gagal terkirim disimpan dulu di HP kasir, termasuk foto bukti transfernya, dan dikirim otomatis begitu sinyal kembali. Kasir bisa terus melayani pembeli sementara itu.',
-  },
-  {
-    q: 'Bisa mencatat penjualan lewat Telegram?',
-    a: 'Bisa. Hubungkan bot ke toko Anda dengan mengirim /start diikuti kode toko, lalu laporkan penjualan dengan mengetik jumlah dan nama produknya. Harganya diambil dari daftar produk Anda, stok tetap berkurang, dan struknya tetap dibuat: persis seperti jalur web. Satu catatan jujur, saat ini botnya menerima laporan dan belum mengirim ringkasan omzet.',
   },
   {
     q: 'Apa itu On the Table dan berapa biayanya?',

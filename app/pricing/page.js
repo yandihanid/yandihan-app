@@ -39,7 +39,7 @@ const DETAILS = [
     icon: Users,
     tone: 'lp-icon-blue',
     title: 'Apa arti "1 kasir" di paket gratis?',
-    desc: 'Satu slot kasir, dan slot itu dihitung sama baik kasir web maupun kasir Telegram. Jadi paket GRATIS boleh punya satu link kasir web ATAU satu kasir bot Telegram, bukan satu-satunya masing-masing. Anda sendiri tetap bisa membuka dashboard dari perangkat mana saja.',
+    desc: 'Satu slot link kasir web aktif yang dapat dibuka langsung dari browser HP atau tablet karyawan. Anda sendiri sebagai pemilik tetap bisa membuka dashboard dari perangkat mana saja.',
   },
   {
     icon: Package,
