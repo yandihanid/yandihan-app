@@ -282,7 +282,8 @@ export default function GuidePage() {
             </li>
           </ol>
 
-          {/* ── Divider ── */}
+        </div>
+
         {/* Footer note */}
         <p
           style={{
