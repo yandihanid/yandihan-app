@@ -97,14 +97,27 @@ export async function updateStore(formData) {
   const { user, error: authErr } = await requireUser()
   if (authErr) return { error: authErr }
 
-  const { error } = await supabase.from('stores').insert({
-    ...profile,
-    user_id: user.id,
-    cashier_token: generateCashierToken(),
-  })
+  // unique_code wajib terisi (NOT NULL di produksi) dan unik (index unik),
+  // dipakai bot Telegram (/start KODE_TOKO) untuk menemukan toko. Id toko baru
+  // dihasilkan PostgreSQL saat INSERT, jadi kode tidak bisa diturunkan dari id
+  // di sisi app; buat sendiri dan coba kembali kalau tabrakan unik.
+  let insertErr
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error } = await supabase.from('stores').insert({
+      ...profile,
+      user_id: user.id,
+      unique_code: generateStoreCode(),
+      cashier_token: generateCashierToken(),
+    })
+    if (!error) break
+    insertErr = error
+    if (!isUniqueViolation(error)) break
+  }
 
-  if (error)
-    return { error: 'Gagal membuat toko: ' + (error?.message || error?.detail || String(error)) }
+  if (insertErr)
+    return {
+      error: 'Gagal membuat toko: ' + (insertErr?.message || insertErr?.detail || String(insertErr)),
+    }
 
   await auditLog({
     storeId: null, // store ID belum diketahui saat insert; user_id sebagai penanda
@@ -126,6 +139,20 @@ export async function updateStore(formData) {
 // 24 byte = 192 bit, base64url supaya aman dipakai sebagai segmen URL /c/<token>.
 function generateCashierToken() {
   return randomBytes(24).toString('base64url')
+}
+
+/**
+ * Kode toko pendek (8 karakter heksadesimal huruf besar) untuk bot Telegram
+ * (/start KODE_TOKO). 4 byte acak = 8 karakter heksa, sama panjang dengan kode
+ * yang di-backfill migrasi 0001 untuk baris lama. Dibuat di aplikasi karena id
+ * toko baru dihasilkan PostgreSQL saat INSERT.
+ */
+function generateStoreCode() {
+  return randomBytes(4).toString('hex').toUpperCase()
+}
+
+function isUniqueViolation(error) {
+  return error?.code === '23505' || /unique/i.test((error?.message || '') + (error?.detail || ''))
 }
 
 /**
