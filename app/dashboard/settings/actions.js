@@ -103,7 +103,8 @@ export async function updateStore(formData) {
     cashier_token: generateCashierToken(),
   })
 
-  if (error) return { error: 'Gagal membuat toko' }
+  if (error)
+    return { error: 'Gagal membuat toko: ' + (error?.message || error?.detail || String(error)) }
 
   await auditLog({
     storeId: null, // store ID belum diketahui saat insert; user_id sebagai penanda
